@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Contact — Atomes studio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics="">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#171512}
+image-slot{display:block;width:100%;height:100%}
+/* Rendu responsive : sous 720px, l'image passe au-dessus du texte (jamais de texte sur l'image), ratio conservé */
+@media (max-width:720px){
+  .m-sec{flex-direction:column !important;align-items:stretch !important;min-height:0 !important}
+  .m-img{position:relative !important;top:auto !important;left:auto !important;right:auto !important;bottom:auto !important;width:100% !important;height:auto !important;aspect-ratio:3/2}
+  .m-grad{display:none !important}
+  .m-txt{width:100% !important;max-width:100% !important;box-sizing:border-box;margin:0 !important}
+}
+::selection{background:#ece7de;color:#171512}
+</style>
+</helmet>
+
+<div data-screen-label="Contact" style="min-height:100vh;background:#171512;color:#ece7de;font-family:'Archivo',sans-serif;display:flex;flex-direction:column">
+
+  <nav style="position:sticky;top:0;z-index:50;background:rgba(23,21,18,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:24px clamp(20px,5vw,48px);border-bottom:1px solid rgba(236,231,222,.14)">
+    <a href="index.html" style="font:500 19px 'Archivo',sans-serif;letter-spacing:-0.02em;color:#ece7de;text-decoration:none">atomes<span style="opacity:.4">.studio</span></a>
+    <div style="display:flex;gap:clamp(18px,3vw,36px);font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap">
+      <a href="index.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">Accueil</a>
+      <a href="projets.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">Projets</a>
+      <a href="a-propos.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">À propos</a>
+      <a href="contact.html" style="color:#ffffff;text-decoration:none">Contact</a>
+    </div>
+  </nav>
+
+  <!-- CONTACT — image + dégradé + contenu, comme la page À propos -->
+  <section class="m-sec" style="position:relative;overflow:hidden;display:flex;align-items:center;flex:1">
+    <div class="m-img" style="position:absolute;top:0;left:0;bottom:0;width:50%;overflow:hidden">
+      <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="contact-photo" shape="rect" placeholder="Photo — atelier ou projet" style="width:100%;height:100%;display:block" hint-size="100%,520px"></x-import>
+    </div>
+    <div class="m-grad" style="position:absolute;top:0;left:0;bottom:0;width:50%;background:linear-gradient(270deg,#171512 0%,rgba(23,21,18,.55) 30%,rgba(23,21,18,0) 65%);pointer-events:none"></div>
+    <div class="m-txt" style="position:relative;margin-left:auto;width:min(680px,58%);padding:clamp(40px,6vw,72px) clamp(20px,5vw,48px)">
+      <p style="margin: 0 0 36px; font: 500 clamp(20px,2.2vw,26px)/1.5 'Archivo',sans-serif; letter-spacing: -0.01em; width: 557px; height: 80px">Construction, rénovation, extension...<br>Parlez-nous de votre projet.</p>
+      <sc-if value="{{ notSent }}" hint-placeholder-val="{{ true }}">
+        <form onSubmit="{{ submit }}" style="display:flex;flex-direction:column;gap:22px;max-width:560px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:22px">
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Prénom</label>
+              <input value="{{ prenom }}" onChange="{{ setPrenom }}" placeholder="Votre prénom" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+              <sc-if value="{{ hasErrPrenom }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errPrenom }}</div></sc-if>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Nom</label>
+              <input value="{{ nom }}" onChange="{{ setNom }}" placeholder="Votre nom" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+              <sc-if value="{{ hasErrNom }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errNom }}</div></sc-if>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Email</label>
+            <input value="{{ email }}" onChange="{{ setEmail }}" placeholder="vous@exemple.fr" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+            <sc-if value="{{ hasErrEmail }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errEmail }}</div></sc-if>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Téléphone <span style="text-transform:none;color:rgba(236,231,222,.35)">(facultatif)</span></label>
+            <input value="{{ telephone }}" onChange="{{ setTelephone }}" placeholder="06 12 34 56 78" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Type de projet</label>
+            <select value="{{ type }}" onChange="{{ setType }}" style="background:#171512;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+              <option>Construction</option>
+              <option>Rénovation</option>
+              <option>Extension</option>
+              <option>Autre</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Votre projet</label>
+            <textarea value="{{ message }}" onChange="{{ setMessage }}" rows="6" placeholder="Lieu, surface, budget envisagé, calendrier…" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px/1.6 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none;resize:vertical" style-focus="border-color:rgba(236,231,222,.75)"></textarea>
+            <sc-if value="{{ hasErrMessage }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errMessage }}</div></sc-if>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Pièces jointes <span style="text-transform:none;color:rgba(236,231,222,.35)">(facultatif — plans, photos, PDF)</span></label>
+            <label onDragOver="{{ dragOver }}" onDragLeave="{{ dragLeave }}" onDrop="{{ drop }}" style="{{ dropZoneStyle }}" style-hover="border-color:rgba(236,231,222,.6)">
+              <span style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:rgba(236,231,222,.6);pointer-events:none">+ Ajouter des fichiers</span>
+              <input type="file" multiple="" accept="image/*,.pdf" onChange="{{ setFichiers }}" style="display:none">
+              <span style="font:400 13px 'Archivo',sans-serif;color:rgba(236,231,222,.5);pointer-events:none">{{ fichiersLabel }}</span>
+            </label>
+          </div>
+          <button type="submit" style="font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#171512;background:#ece7de;padding:16px 28px;border:none;cursor:pointer;align-self:flex-start" style-hover="background:#ffffff">Envoyer</button>
+        </form>
+      </sc-if>
+      <sc-if value="{{ sent }}" hint-placeholder-val="{{ false }}">
+        <div style="border:1px solid rgba(236,231,222,.25);padding:40px;max-width:560px;box-sizing:border-box">
+          <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(236,231,222,.5);margin-bottom:16px">MESSAGE ENVOYÉ</div>
+          <p style="margin:0;font:500 20px/1.5 'Archivo',sans-serif">Merci. Nous revenons vers vous dans les meilleurs délais.</p>
+          <button onClick="{{ reset }}" style="margin-top:28px;font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#ece7de;background:transparent;border:1px solid rgba(236,231,222,.35);padding:12px 20px;cursor:pointer" style-hover="border-color:rgba(236,231,222,.8)">Nouveau message</button>
+        </div>
+      </sc-if>
+    </div>
+  </section>
+
+  <footer style="border-top:1px solid rgba(236,231,222,.14);padding:36px clamp(20px,5vw,48px);display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;font:400 11.5px/1.9 'IBM Plex Mono',monospace;color:rgba(236,231,222,.45)">
+    <div>ATOMES.STUDIO — ARCHITECTURE DU DÉTAIL<br>SIMON CHARLES — ARCHITECTE HMONP · INGÉNIEUR GÉNIE CIVIL ET URBANISME</div>
+    <div>83000 TOULON<br><a href="mailto:contact@atomes.studio" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">CONTACT@ATOMES.STUDIO</a></div>
+  </footer>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { prenom: '', nom: '', email: '', telephone: '', type: 'Construction', message: '', fichiers: [], survol: false, tried: false, sent: false };
+
+  validate() {
+    const e = {};
+    if (!this.state.prenom.trim()) e.prenom = 'Champ requis';
+    if (!this.state.nom.trim()) e.nom = 'Champ requis';
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(this.state.email)) e.email = 'Adresse email invalide';
+    if (this.state.message.trim().length < 10) e.message = 'Décrivez votre projet en quelques mots (10 caractères min.)';
+    return e;
+  }
+
+  renderVals() {
+    const set = k => e => this.setState({ [k]: e.target.value });
+    const errs = this.state.tried ? this.validate() : {};
+    return {
+      prenom: this.state.prenom, nom: this.state.nom, email: this.state.email, telephone: this.state.telephone, type: this.state.type, message: this.state.message,
+      setPrenom: set('prenom'), setNom: set('nom'), setEmail: set('email'), setTelephone: set('telephone'), setType: set('type'), setMessage: set('message'),
+      setFichiers: e => this.setState({ fichiers: [...e.target.files].map(f => f.name) }),
+      dragOver: e => { e.preventDefault(); if (!this.state.survol) this.setState({ survol: true }); },
+      dragLeave: () => this.setState({ survol: false }),
+      drop: e => {
+        e.preventDefault();
+        const noms = [...e.dataTransfer.files].map(f => f.name);
+        if (noms.length) this.setState({ fichiers: noms, survol: false });
+        else this.setState({ survol: false });
+      },
+      dropZoneStyle: {
+        display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', cursor: 'pointer',
+        border: '1px dashed ' + (this.state.survol ? '#ece7de' : 'rgba(236,231,222,.3)'),
+        background: this.state.survol ? 'rgba(236,231,222,.08)' : 'transparent',
+        transition: 'border-color .2s ease, background .2s ease'
+      },
+      fichiersLabel: this.state.fichiers.length
+        ? this.state.fichiers.length + ' fichier' + (this.state.fichiers.length > 1 ? 's' : '') + ' — ' + this.state.fichiers.join(', ')
+        : 'Aucun fichier sélectionné',
+      hasErrPrenom: !!errs.prenom, errPrenom: errs.prenom || '',
+      hasErrNom: !!errs.nom, errNom: errs.nom || '',
+      hasErrEmail: !!errs.email, errEmail: errs.email || '',
+      hasErrMessage: !!errs.message, errMessage: errs.message || '',
+      sent: this.state.sent, notSent: !this.state.sent,
+      submit: e => {
+        e.preventDefault();
+        if (Object.keys(this.validate()).length) this.setState({ tried: true });
+        else this.setState({ sent: true, tried: false });
+      },
+      reset: () => this.setState({ prenom: '', nom: '', email: '', telephone: '', message: '', type: 'Construction', fichiers: [], tried: false, sent: false })
+    };
+  }
+}
+</script>
+</body>
+</html>

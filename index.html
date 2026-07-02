@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Atomes studio — Architecture du détail</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics="">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#171512}
+image-slot{display:block;width:100%;height:100%}
+/* Rendu responsive : sous 720px, l'image passe au-dessus du texte (jamais de texte sur l'image), ratio conservé */
+@media (max-width:720px){
+  .m-sec{flex-direction:column !important;align-items:stretch !important;min-height:0 !important}
+  .m-img{position:relative !important;top:auto !important;left:auto !important;right:auto !important;bottom:auto !important;width:100% !important;height:auto !important;aspect-ratio:3/2}
+  .m-grad{display:none !important}
+  .m-txt{width:100% !important;max-width:100% !important;box-sizing:border-box;margin:0 !important}
+}
+::selection{background:#ece7de;color:#171512}
+</style>
+</helmet>
+
+<div data-screen-label="Accueil" style="min-height:100vh;background:#171512;color:#ece7de;font-family:'Archivo',sans-serif;display:flex;flex-direction:column">
+
+  <!-- NAV -->
+  <nav style="position:sticky;top:0;z-index:50;background:rgba(23,21,18,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:24px clamp(20px,5vw,48px);border-bottom:1px solid rgba(236,231,222,.14)">
+    <a href="index.html" style="font:500 19px 'Archivo',sans-serif;letter-spacing:-0.02em;color:#ece7de;text-decoration:none">atomes<span style="opacity:.4">.studio</span></a>
+    <div style="display:flex;gap:clamp(18px,3vw,36px);font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap">
+      <a href="index.html" style="color:#ffffff;text-decoration:none">Accueil</a>
+      <a href="projets.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">Projets</a>
+      <a href="a-propos.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">À propos</a>
+      <a href="contact.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">Contact</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="m-sec" style="position:relative;overflow:hidden;min-height:clamp(540px,78vh,800px);display:flex;align-items:center">
+    <img src="./a5ce3393-fd84-4dc1-b13c-f8d500c9d5f4-mr3ef561.png" alt="Projet — atomes" class="m-img" style="position:absolute;top:0;right:0;bottom:0;width:{{ largeurImg }}%;height:100%;object-fit:cover;display:block">
+    <div class="m-grad" style="position:absolute;top:0;left:{{ debutDegrade }}%;right:0;bottom:0;background:linear-gradient(90deg,#171512 0%,rgba(23,21,18,.55) 30%,rgba(23,21,18,0) 65%);pointer-events:none"></div>
+    <div class="m-txt" style="position:relative;max-width:640px;padding:clamp(56px,8vw,104px) clamp(20px,5vw,48px)">
+      <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,231,222,.5);margin-bottom:30px">ARCHITECTURE DU DÉTAIL</div>
+      <h1 style="margin:0;font:700 clamp(32px,6vw,78px)/1.02 'Archivo',sans-serif;letter-spacing:-0.03em;text-transform:uppercase">ARCHITECTURE.<br>CONSTRUCTION.<br>RÉNOVATION.</h1>
+      <p style="margin:36px 0 0;font:400 16px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.75);max-width:420px">L'air, l'eau, les matériaux&nbsp;: tout ce qui compose un bâtiment est atome, quelle que soit l'échelle. Notre réflexion transversale, jamais cloisonnée, nous amène à penser chaque projet dans ses moindres détails — pour un résultat unique, sur mesure.</p>
+      <p style="margin:18px 0 0;font:400 16px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.75);max-width:420px">Permis de construire, déclaration préalable, perspectives ou mission complète&nbsp;: parlez-nous de votre projet.</p>
+      <div style="display:flex;align-items:center;gap:28px;flex-wrap:wrap;margin-top:44px">
+        <a href="contact.html" style="font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#171512;background:#ece7de;padding:16px 28px;text-decoration:none;white-space:nowrap" style-hover="background:#ffffff">Nous contacter</a>
+        <a href="projets.html" style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">Voir les projets →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- PHILOSOPHIE -->
+  <section class="m-sec" style="position:relative;overflow:hidden;min-height:{{ hauteurSection }}px;display:flex;align-items:center;margin-top:{{ espaceSections }}px">
+    <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="philo-01" shape="rect" placeholder="Photo — régulation thermique" class="m-img" style="{{ img1 }}" hint-size="100%,400px"></x-import>
+    <div class="m-grad" style="{{ grad1 }}"></div>
+    <div class="m-txt" style="{{ txt1 }}">
+      <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">01</div>
+      <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">Régulation thermique</h3>
+      <p style="margin:0;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Le confort thermique est le premier révélateur de la qualité d'un bâtiment&nbsp;: une habitation où l'on a trop chaud ou trop froid, quel que soit son niveau de finition, n'est pas une habitation où l'on a envie de vivre. Nous plaçons donc la régulation thermique au cœur de la conception — orientation, inertie, ventilation — pour un confort durable et économe en énergie.</p>
+    </div>
+  </section>
+
+  <section class="m-sec" style="position:relative;overflow:hidden;min-height:{{ hauteurSection }}px;display:flex;align-items:center;margin-top:{{ espaceSections }}px">
+    <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="philo-02" shape="rect" placeholder="Photo — matériaux" class="m-img" style="{{ img2 }}" hint-size="100%,400px"></x-import>
+    <div class="m-grad" style="{{ grad2 }}"></div>
+    <div class="m-txt" style="{{ txt2 }}">
+      <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">02</div>
+      <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">Choix des matériaux</h3>
+      <p style="margin:0;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Matériaux et coloris sont choisis avec vous, pour composer un assemblage harmonieux et cohérent. Les jonctions entre matériaux sont dessinées dès la conception&nbsp;: un rendu épuré, des finitions durables et faciles d'entretien.</p>
+    </div>
+  </section>
+
+  <section class="m-sec" style="position:relative;overflow:hidden;min-height:{{ hauteurSection }}px;display:flex;align-items:center;margin-top:{{ espaceSections }}px">
+    <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="philo-03" shape="rect" placeholder="Photo — usages" class="m-img" style="{{ img3 }}" hint-size="100%,400px"></x-import>
+    <div class="m-grad" style="{{ grad3 }}"></div>
+    <div class="m-txt" style="{{ txt3 }}">
+      <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">03</div>
+      <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">Optimisation des usages</h3>
+      <p style="margin:0;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">L'agencement des espaces est pensé pour servir votre quotidien&nbsp;: pièces techniques au nord, déplacements réduits, surface habitable optimisée. Chaque mètre carré trouve sa fonction.</p>
+    </div>
+  </section>
+
+  <section class="m-sec" style="position:relative;overflow:hidden;min-height:{{ hauteurSection }}px;display:flex;align-items:center;margin-top:{{ espaceSections }}px">
+    <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="philo-04" shape="rect" placeholder="Photo — intégration technique" class="m-img" style="{{ img4 }}" hint-size="100%,400px"></x-import>
+    <div class="m-grad" style="{{ grad4 }}"></div>
+    <div class="m-txt" style="{{ txt4 }}">
+      <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">04</div>
+      <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">Intégration des éléments techniques</h3>
+      <p style="margin:0;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Gaines, réseaux, ventilation&nbsp;: parce que nous sommes à la fois architectes et ingénieurs, la forme et le fonctionnement du bâtiment sont pensés d'un seul geste. Les éléments techniques sont intégrés dès la conception — dissimulés au regard, mais toujours accessibles.</p>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section style="padding:clamp(40px,5vw,64px) clamp(20px,5vw,48px);display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:28px;margin-top:{{ espaceSections }}px">
+    <a href="contact.html" style="font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#171512;background:#ece7de;padding:16px 28px;text-decoration:none;white-space:nowrap" style-hover="background:#ffffff">Nous contacter</a>
+    <a href="projets.html" style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">Voir les projets →</a>
+  </section>
+
+  <!-- FOOTER -->
+  <footer style="border-top:1px solid rgba(236,231,222,.14);padding:36px clamp(20px,5vw,48px);display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;font:400 11.5px/1.9 'IBM Plex Mono',monospace;color:rgba(236,231,222,.45)">
+    <div>ATOMES.STUDIO — ARCHITECTURE DU DÉTAIL<br>SIMON CHARLES — ARCHITECTE HMONP · INGÉNIEUR GÉNIE CIVIL ET URBANISME</div>
+    <div>83000 TOULON<br><a href="mailto:contact@atomes.studio" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">CONTACT@ATOMES.STUDIO</a></div>
+  </footer>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;largeurImage&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:65,&quot;min&quot;:30,&quot;max&quot;:100,&quot;step&quot;:5,&quot;unit&quot;:&quot;%&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Hero&quot;},&quot;hauteurSousSections&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:300,&quot;min&quot;:220,&quot;max&quot;:560,&quot;step&quot;:20,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Sous-sections&quot;},&quot;dispositionSousSections&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Alternées&quot;,&quot;Image à gauche&quot;,&quot;Image à droite&quot;],&quot;default&quot;:&quot;Image à gauche&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Sous-sections&quot;},&quot;espacementSections&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:16,&quot;min&quot;:0,&quot;max&quot;:160,&quot;step&quot;:8,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Mise en page&quot;}}">class Component extends DCLogic {
+  renderVals() {
+    const largeurImg = Math.min(100, Math.max(30, this.props.largeurImage ?? 50));
+    const hauteurSection = Math.min(560, Math.max(220, this.props.hauteurSousSections ?? 320));
+
+    const mode = this.props.dispositionSousSections ?? 'Alternées';
+    const sideOf = i => mode === 'Image à gauche' ? 'left'
+      : mode === 'Image à droite' ? 'right'
+      : (i % 2 === 1 ? 'left' : 'right'); // alternées : 01/03 gauche, 02/04 droite
+
+    const imgStyle = side => side === 'left'
+      ? { position: 'absolute', top: 0, left: 0, bottom: 0, width: '50%', height: '100%' }
+      : { position: 'absolute', top: 0, right: 0, bottom: 0, width: '50%', height: '100%' };
+    const gradStyle = side => side === 'left'
+      ? { position: 'absolute', top: 0, left: 0, bottom: 0, width: '50%', background: 'linear-gradient(270deg,#171512 0%,rgba(23,21,18,.55) 30%,rgba(23,21,18,0) 65%)', pointerEvents: 'none' }
+      : { position: 'absolute', top: 0, left: '50%', right: 0, bottom: 0, background: 'linear-gradient(90deg,#171512 0%,rgba(23,21,18,.55) 30%,rgba(23,21,18,0) 65%)', pointerEvents: 'none' };
+    const txtStyle = side => Object.assign(
+      { position: 'relative', width: 'min(620px,58%)', padding: 'clamp(32px,5vw,56px) clamp(20px,5vw,48px)' },
+      side === 'left' ? { marginLeft: 'auto' } : { marginRight: 'auto' }
+    );
+
+    const espaceSections = Math.min(160, Math.max(0, this.props.espacementSections ?? 0));
+    const vals = { largeurImg, debutDegrade: 100 - largeurImg, hauteurSection, espaceSections };
+    [1, 2, 3, 4].forEach(i => {
+      const side = sideOf(i);
+      vals['img' + i] = imgStyle(side);
+      vals['grad' + i] = gradStyle(side);
+      vals['txt' + i] = txtStyle(side);
+    });
+    return vals;
+  }
+}</script>
+</body>
+</html>

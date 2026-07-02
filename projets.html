@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Projets — Atomes studio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#171512}
+image-slot{display:block;width:100%;height:100%}
+/* Rendu responsive : sous 720px, l'image passe au-dessus du texte (jamais de texte sur l'image), ratio A4 paysage conservé */
+@media (max-width:720px){
+  .proj-sec{flex-direction:column !important;align-items:stretch !important;min-height:0 !important}
+  .m-img{position:relative !important;top:auto !important;left:auto !important;right:auto !important;bottom:auto !important;width:100% !important;height:auto !important;aspect-ratio:297/210}
+  .m-grad{display:none !important}
+  .m-txt{width:100% !important;max-width:100% !important;box-sizing:border-box;margin:0 !important}
+  .m-pv{left:16px !important;right:auto !important;top:35.4vw !important}
+  .m-nx{left:auto !important;right:16px !important;top:35.4vw !important}
+  .m-ct{left:16px !important;right:auto !important;bottom:auto !important;top:calc(70.7vw - 34px) !important}
+}
+::selection{background:#ece7de;color:#171512}
+/* Effets de survol parent→enfant (impossibles en inline) */
+@property --gbg{syntax:'<color>';inherits:true;initial-value:#171512}
+.proj-sec{--gbg:#171512;transition:--gbg .35s ease}
+.proj-sec:hover{--gbg:#221e19}
+.proj-sec image-slot{transition:transform .6s ease}
+.proj-sec:hover image-slot{transform:scale(1.04)}
+</style>
+</helmet>
+
+<div data-screen-label="Projets" style="min-height:100vh;background:#171512;color:#ece7de;font-family:'Archivo',sans-serif;display:flex;flex-direction:column">
+
+  <nav style="position:sticky;top:0;z-index:50;background:rgba(23,21,18,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:24px clamp(20px,5vw,48px);border-bottom:1px solid rgba(236,231,222,.14)">
+    <a href="index.html" style="font:500 19px 'Archivo',sans-serif;letter-spacing:-0.02em;color:#ece7de;text-decoration:none">atomes<span style="opacity:.4">.studio</span></a>
+    <div style="display:flex;gap:clamp(18px,3vw,36px);font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap">
+      <a href="index.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">Accueil</a>
+      <a href="projets.html" style="color:#ffffff;text-decoration:none">Projets</a>
+      <a href="a-propos.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">À propos</a>
+      <a href="contact.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">Contact</a>
+    </div>
+  </nav>
+
+  <!-- 01 — VILLA ORTOLAN -->
+  <section onClick="{{ toggle3 }}" style="position:relative;overflow:hidden;min-height:{{ h3 }};display:flex;align-items:center;transition:min-height .5s cubic-bezier(.4,0,.2,1),background-color .35s ease;cursor:pointer" class="proj-sec" style-hover="background-color:#221e19">
+    <div onClick="{{ stopClic }}" class="m-img" style="{{ imgwA }}">
+      <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="{{ slot3 }}" shape="rect" placeholder="Photo — Villa Ortolan" style="width:100%;height:100%;display:block" hint-size="100%,320px"></x-import>
+    </div>
+    <div class="m-grad" style="{{ gradA }}"></div>
+    <sc-if value="{{ open3 }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ prev3 }}" class="m-pv" style="{{ pvA }}" style-hover="background:rgba(23,21,18,.95)">←</button>
+      <button onClick="{{ next3 }}" class="m-nx" style="{{ nxA }}" style-hover="background:rgba(23,21,18,.95)">→</button>
+      <div class="m-ct" style="{{ ctA }}">{{ cpt3 }}</div>
+    </sc-if>
+    <div class="m-txt" style="{{ txtA }}">
+      <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">01 — TOULON (83200) — 2026</div>
+      <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">VILLA ORTOLAN</h3>
+      <sc-if value="{{ open3 }}" hint-placeholder-val="{{ false }}">
+        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Villa sur les pentes du mont Faron, avec une vue dégagée sur la ville et les monts environnants. Villa de type 4 d'environ 90&nbsp;m² avec garages et ateliers.<br><br>L'objectif du client&nbsp;: la rénovation complète de l'habitation, avec doublage des murs périphériques. Nous avons proposé un agencement avec un cellier «&nbsp;dissimulé&nbsp;», ainsi que la conservation du dialogue ancien/moderne qui fait tout le charme de ce projet.</p>
+      </sc-if>
+      <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.6)" style-hover="color:#ece7de">{{ lbl3 }}</div>
+    </div>
+  </section>
+
+  <!-- 02 — VILLA SIBLAS -->
+  <section onClick="{{ toggle2 }}" style="position:relative;overflow:hidden;min-height:{{ h2 }};display:flex;align-items:center;transition:min-height .5s cubic-bezier(.4,0,.2,1),background-color .35s ease;cursor:pointer;margin-top:{{ esp }}px" class="proj-sec" style-hover="background-color:#221e19">
+    <div onClick="{{ stopClic }}" class="m-img" style="{{ imgwB }}">
+      <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="{{ slot2 }}" shape="rect" placeholder="Photo — Villa Siblas" style="width:100%;height:100%;display:block" hint-size="100%,320px"></x-import>
+    </div>
+    <div class="m-grad" style="{{ gradB }}"></div>
+    <sc-if value="{{ open2 }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ prev2 }}" class="m-pv" style="{{ pvB }}" style-hover="background:rgba(23,21,18,.95)">←</button>
+      <button onClick="{{ next2 }}" class="m-nx" style="{{ nxB }}" style-hover="background:rgba(23,21,18,.95)">→</button>
+      <div class="m-ct" style="{{ ctB }}">{{ cpt2 }}</div>
+    </sc-if>
+    <div class="m-txt" style="{{ txtB }}">
+      <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">02 — TOULON (83200) — 2026</div>
+      <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">VILLA SIBLAS</h3>
+      <sc-if value="{{ open2 }}" hint-placeholder-val="{{ false }}">
+        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Maison sur les hauteurs de Toulon, avec vue dégagée sur la rade et la Méditerranée. L'ensemble comprend un appartement de type 2 d'environ 35&nbsp;m² au rez-de-chaussée, et une habitation indépendante d'environ 115&nbsp;m² sur les niveaux R+1 et R+2.<br><br>Une étude complète du système de régulation thermique a conduit au choix d'une pompe à chaleur air/air gainable. Les bouches de soufflage et de reprise sont dissimulées&nbsp;: une habitation épurée, moderne et respectueuse de l'environnement.</p>
+      </sc-if>
+      <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.6)" style-hover="color:#ece7de">{{ lbl2 }}</div>
+    </div>
+  </section>
+
+  <!-- 03 — MAISON GIENS -->
+  <section onClick="{{ toggle7 }}" style="position:relative;overflow:hidden;min-height:{{ h7 }};display:flex;align-items:center;transition:min-height .5s cubic-bezier(.4,0,.2,1),background-color .35s ease;cursor:pointer;margin-top:{{ esp }}px" class="proj-sec" style-hover="background-color:#221e19">
+    <div onClick="{{ stopClic }}" class="m-img" style="{{ imgwA }}">
+      <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="{{ slot7 }}" shape="rect" placeholder="Photo — Maison Giens" style="width:100%;height:100%;display:block" hint-size="100%,320px"></x-import>
+    </div>
+    <div class="m-grad" style="{{ gradA }}"></div>
+    <sc-if value="{{ open7 }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ prev7 }}" class="m-pv" style="{{ pvA }}" style-hover="background:rgba(23,21,18,.95)">←</button>
+      <button onClick="{{ next7 }}" class="m-nx" style="{{ nxA }}" style-hover="background:rgba(23,21,18,.95)">→</button>
+      <div class="m-ct" style="{{ ctA }}">{{ cpt7 }}</div>
+    </sc-if>
+    <div class="m-txt" style="{{ txtA }}">
+      <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">03 — GIENS (83400) — 2026</div>
+      <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">MAISON GIENS</h3>
+      <sc-if value="{{ open7 }}" hint-placeholder-val="{{ false }}">
+        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Programme, surface, matériaux, points singuliers&nbsp;: décrivez ici le projet en quelques lignes.</p>
+      </sc-if>
+      <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.6)" style-hover="color:#ece7de">{{ lbl7 }}</div>
+    </div>
+  </section>
+
+  <!-- 04 — EDEN MODERNE -->
+  <section onClick="{{ toggle5 }}" style="position:relative;overflow:hidden;min-height:{{ h5 }};display:flex;align-items:center;transition:min-height .5s cubic-bezier(.4,0,.2,1),background-color .35s ease;cursor:pointer;margin-top:{{ esp }}px" class="proj-sec" style-hover="background-color:#221e19">
+    <div onClick="{{ stopClic }}" class="m-img" style="{{ imgwB }}">
+      <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="{{ slot5 }}" shape="rect" placeholder="Photo — Eden Moderne" style="width:100%;height:100%;display:block" hint-size="100%,320px"></x-import>
+    </div>
+    <div class="m-grad" style="{{ gradB }}"></div>
+    <sc-if value="{{ open5 }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ prev5 }}" class="m-pv" style="{{ pvB }}" style-hover="background:rgba(23,21,18,.95)">←</button>
+      <button onClick="{{ next5 }}" class="m-nx" style="{{ nxB }}" style-hover="background:rgba(23,21,18,.95)">→</button>
+      <div class="m-ct" style="{{ ctB }}">{{ cpt5 }}</div>
+    </sc-if>
+    <div class="m-txt" style="{{ txtB }}">
+      <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">04 — CONCARNEAU (29900) — 2024</div>
+      <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">EDEN MODERNE</h3>
+      <sc-if value="{{ open5 }}" hint-placeholder-val="{{ false }}">
+        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Programme, surface, matériaux, points singuliers&nbsp;: décrivez ici le projet en quelques lignes.</p>
+      </sc-if>
+      <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.6)" style-hover="color:#ece7de">{{ lbl5 }}</div>
+    </div>
+  </section>
+
+  <!-- 05 — LOFT PALAVAS -->
+  <section onClick="{{ toggle4 }}" style="position:relative;overflow:hidden;min-height:{{ h4 }};display:flex;align-items:center;transition:min-height .5s cubic-bezier(.4,0,.2,1),background-color .35s ease;cursor:pointer;margin-top:{{ esp }}px" class="proj-sec" style-hover="background-color:#221e19">
+    <div onClick="{{ stopClic }}" class="m-img" style="{{ imgwA }}">
+      <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="{{ slot4 }}" shape="rect" placeholder="Photo — Loft Palavas" style="width:100%;height:100%;display:block" hint-size="100%,320px"></x-import>
+    </div>
+    <div class="m-grad" style="{{ gradA }}"></div>
+    <sc-if value="{{ open4 }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ prev4 }}" class="m-pv" style="{{ pvA }}" style-hover="background:rgba(23,21,18,.95)">←</button>
+      <button onClick="{{ next4 }}" class="m-nx" style="{{ nxA }}" style-hover="background:rgba(23,21,18,.95)">→</button>
+      <div class="m-ct" style="{{ ctA }}">{{ cpt4 }}</div>
+    </sc-if>
+    <div class="m-txt" style="{{ txtA }}">
+      <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">05 — PALAVAS-LES-FLOTS (34250) — 2025</div>
+      <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">LOFT PALAVAS</h3>
+      <sc-if value="{{ open4 }}" hint-placeholder-val="{{ false }}">
+        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Programme, surface, matériaux, points singuliers&nbsp;: décrivez ici le projet en quelques lignes.</p>
+      </sc-if>
+      <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.6)" style-hover="color:#ece7de">{{ lbl4 }}</div>
+    </div>
+  </section>
+
+  <!-- 06 — VILLA ARDÈCHOISE -->
+  <section onClick="{{ toggle1 }}" style="position:relative;overflow:hidden;min-height:{{ h1 }};display:flex;align-items:center;transition:min-height .5s cubic-bezier(.4,0,.2,1),background-color .35s ease;cursor:pointer;margin-top:{{ esp }}px" class="proj-sec" style-hover="background-color:#221e19">
+    <div onClick="{{ stopClic }}" class="m-img" style="{{ imgwB }}">
+      <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="{{ slot1 }}" shape="rect" placeholder="Photo — Villa Ardèchoise" style="width:100%;height:100%;display:block" hint-size="100%,320px"></x-import>
+    </div>
+    <div class="m-grad" style="{{ gradB }}"></div>
+    <sc-if value="{{ open1 }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ prev1 }}" class="m-pv" style="{{ pvB }}" style-hover="background:rgba(23,21,18,.95)">←</button>
+      <button onClick="{{ next1 }}" class="m-nx" style="{{ nxB }}" style-hover="background:rgba(23,21,18,.95)">→</button>
+      <div class="m-ct" style="{{ ctB }}">{{ cpt1 }}</div>
+    </sc-if>
+    <div class="m-txt" style="{{ txtB }}">
+      <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">06 — MONTRÉAL (07110) — 2023</div>
+      <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">VILLA ARDÈCHOISE</h3>
+      <sc-if value="{{ open1 }}" hint-placeholder-val="{{ false }}">
+        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Programme, surface, matériaux, points singuliers&nbsp;: décrivez ici le projet en quelques lignes.</p>
+      </sc-if>
+      <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.6)" style-hover="color:#ece7de">{{ lbl1 }}</div>
+    </div>
+  </section>
+
+  <!-- 07 — COLOC DES MUSICIENS -->
+  <section onClick="{{ toggle6 }}" style="position:relative;overflow:hidden;min-height:{{ h6 }};display:flex;align-items:center;transition:min-height .5s cubic-bezier(.4,0,.2,1),background-color .35s ease;cursor:pointer;margin-top:{{ esp }}px" class="proj-sec" style-hover="background-color:#221e19">
+    <div onClick="{{ stopClic }}" class="m-img" style="{{ imgwA }}">
+      <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="{{ slot6 }}" shape="rect" placeholder="Photo — Coloc des Musiciens" style="width:100%;height:100%;display:block" hint-size="100%,320px"></x-import>
+    </div>
+    <div class="m-grad" style="{{ gradA }}"></div>
+    <sc-if value="{{ open6 }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ prev6 }}" class="m-pv" style="{{ pvA }}" style-hover="background:rgba(23,21,18,.95)">←</button>
+      <button onClick="{{ next6 }}" class="m-nx" style="{{ nxA }}" style-hover="background:rgba(23,21,18,.95)">→</button>
+      <div class="m-ct" style="{{ ctA }}">{{ cpt6 }}</div>
+    </sc-if>
+    <div class="m-txt" style="{{ txtA }}">
+      <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">07 — VILLEURBANNE (69100) — 2022</div>
+      <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">COLOC DES MUSICIENS</h3>
+      <sc-if value="{{ open6 }}" hint-placeholder-val="{{ false }}">
+        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Programme, surface, matériaux, points singuliers&nbsp;: décrivez ici le projet en quelques lignes.</p>
+      </sc-if>
+      <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.6)" style-hover="color:#ece7de">{{ lbl6 }}</div>
+    </div>
+  </section>
+
+  <div style="flex:1"></div>
+
+  <footer style="border-top:1px solid rgba(236,231,222,.14);padding:36px clamp(20px,5vw,48px);display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;font:400 11.5px/1.9 'IBM Plex Mono',monospace;color:rgba(236,231,222,.45)">
+    <div>ATOMES.STUDIO — ARCHITECTURE DU DÉTAIL<br>SIMON CHARLES — ARCHITECTE HMONP · INGÉNIEUR GÉNIE CIVIL ET URBANISME</div>
+    <div>83000 TOULON<br><a href="mailto:contact@atomes.studio" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">CONTACT@ATOMES.STUDIO</a></div>
+  </footer>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;hauteurOuverte&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 35, &quot;min&quot;: 25, &quot;max&quot;: 60, &quot;step&quot;: 0.5, &quot;unit&quot;: &quot;vw&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Sections projet&quot;}, &quot;hauteurFermee&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 400, &quot;min&quot;: 200, &quot;max&quot;: 500, &quot;step&quot;: 10, &quot;unit&quot;: &quot;px&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Sections projet&quot;}, &quot;espacementSections&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 32, &quot;min&quot;: 0, &quot;max&quot;: 160, &quot;step&quot;: 8, &quot;unit&quot;: &quot;px&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Sections projet&quot;}, &quot;dispositionProjets&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Alternées&quot;, &quot;Image à gauche&quot;, &quot;Image à droite&quot;], &quot;default&quot;: &quot;Image à gauche&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Sections projet&quot;}}">
+class Component extends DCLogic {
+  state = { open: 0, idx: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 } };
+
+  componentDidMount() {
+    this._onResize = () => this.forceUpdate();
+    window.addEventListener('resize', this._onResize);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this._onResize);
+  }
+
+  renderVals() {
+    const N = 8; // image principale + 7 supplémentaires
+    const vals = { stopClic: e => e.stopPropagation() };
+
+    // Tweaks
+    const hOuvert = Math.min(60, Math.max(25, this.props.hauteurOuverte ?? 35.5));   // vw (35.36 ≈ A4 paysage)
+    const hFerme = Math.min(500, Math.max(200, this.props.hauteurFermee ?? 320));    // px
+    vals.esp = Math.min(160, Math.max(0, this.props.espacementSections ?? 0));       // px
+
+    // Disposition : les sections en position impaire portent les styles A, les paires B
+    const mode = this.props.dispositionProjets ?? 'Alternées';
+    const sideA = mode === 'Image à droite' ? 'right' : 'left';
+    const sideB = mode === 'Image à gauche' ? 'left' : 'right';
+    const btn = { position: 'absolute', top: '50%', transform: 'translateY(-50%)', width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(23,21,18,.7)', border: '1px solid rgba(236,231,222,.35)', color: '#ece7de', fontSize: '17px', cursor: 'pointer', zIndex: 2 };
+    const mk = side => ({
+      imgw: side === 'left'
+        ? { position: 'absolute', top: 0, left: 0, bottom: 0, width: '50%', cursor: 'default', overflow: 'hidden' }
+        : { position: 'absolute', top: 0, right: 0, bottom: 0, width: '50%', cursor: 'default', overflow: 'hidden' },
+      grad: side === 'left'
+        ? { position: 'absolute', top: 0, left: 0, bottom: 0, width: '50%', background: 'linear-gradient(270deg,var(--gbg) 0%,color-mix(in srgb,var(--gbg) 55%,transparent) 30%,transparent 65%)', pointerEvents: 'none' }
+        : { position: 'absolute', top: 0, left: '50%', right: 0, bottom: 0, background: 'linear-gradient(90deg,var(--gbg) 0%,color-mix(in srgb,var(--gbg) 55%,transparent) 30%,transparent 65%)', pointerEvents: 'none' },
+      pv: Object.assign({}, btn, side === 'left' ? { left: '20px' } : { left: 'calc(50% + 20px)' }),
+      nx: Object.assign({}, btn, side === 'left' ? { left: 'calc(50% - 64px)' } : { right: '20px' }),
+      ct: Object.assign({ position: 'absolute', bottom: '16px', font: "400 11.5px 'IBM Plex Mono',monospace", color: 'rgba(236,231,222,.75)', zIndex: 2 }, side === 'left' ? { left: '20px' } : { right: '20px' }),
+      txt: Object.assign({ position: 'relative', width: 'min(620px,58%)', padding: 'clamp(32px,5vw,56px) clamp(20px,5vw,48px)' }, side === 'left' ? { marginLeft: 'auto' } : { marginRight: 'auto' })
+    });
+    const A = mk(sideA), B = mk(sideB);
+    vals.imgwA = A.imgw; vals.gradA = A.grad; vals.pvA = A.pv; vals.nxA = A.nx; vals.ctA = A.ct; vals.txtA = A.txt;
+    vals.imgwB = B.imgw; vals.gradB = B.grad; vals.pvB = B.pv; vals.nxB = B.nx; vals.ctB = B.ct; vals.txtB = B.txt;
+    for (let i = 1; i <= 7; i++) {
+      const base = 'proj-0' + i;
+      const ids = [base, base + '-a', base + '-b', base + '-c', base + '-d', base + '-e', base + '-f', base + '-g'];
+      const isOpen = this.state.open === i;
+      const k = this.state.idx[i];
+      vals['open' + i] = isOpen;
+      vals['toggle' + i] = () => this.setState(s => {
+        const idx = Object.assign({}, s.idx);
+        if (s.open) idx[s.open] = 0; // la section quittée revient à son image 1
+        return { open: s.open === i ? 0 : i, idx };
+      });
+      vals['lbl' + i] = isOpen ? 'Réduire −' : 'En savoir plus +';
+      // mobile : le ratio en vw donnerait une section minuscule → hauteur en vh
+      const mobile = typeof window !== 'undefined' && window.innerWidth <= 640;
+      vals['h' + i] = isOpen ? (mobile ? '78vh' : hOuvert + 'vw') : hFerme + 'px';
+      vals['slot' + i] = ids[k];
+      vals['cpt' + i] = (k + 1) + ' / ' + N;
+      vals['prev' + i] = e => {
+        e.stopPropagation();
+        this.setState(s => ({ idx: Object.assign({}, s.idx, { [i]: (s.idx[i] + N - 1) % N }) }));
+      };
+      vals['next' + i] = e => {
+        e.stopPropagation();
+        this.setState(s => ({ idx: Object.assign({}, s.idx, { [i]: (s.idx[i] + 1) % N }) }));
+      };
+    }
+    return vals;
+  }
+}
+</script>
+</body>
+</html>
