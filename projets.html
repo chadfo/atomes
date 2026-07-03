@@ -9,21 +9,33 @@
 <body>
 <x-dc>
 <helmet data-dc-atomics>
+<link rel="icon" type="image/png" href="./favicon.png">
+<script src="./atom-logo.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 body{margin:0;background:#171512}
 image-slot{display:block;width:100%;height:100%}
-/* Rendu responsive : sous 720px, l'image passe au-dessus du texte (jamais de texte sur l'image), ratio A4 paysage conservé */
-@media (max-width:720px){
+/* Rendu responsive : sous 980px (dès que le texte empiète sur l'image), l'image passe au-dessus du texte et le dégradé devient vertical (l'image fond vers le fond en bas), ratio A4 paysage conservé */
+@media (max-width:980px){
   .proj-sec{flex-direction:column !important;align-items:stretch !important;min-height:0 !important}
   .m-img{position:relative !important;top:auto !important;left:auto !important;right:auto !important;bottom:auto !important;width:100% !important;height:auto !important;aspect-ratio:297/210}
-  .m-grad{display:none !important}
+  .m-grad{top:0 !important;left:0 !important;right:0 !important;bottom:auto !important;width:100% !important;height:70.7vw !important;background:linear-gradient(180deg,transparent 45%,color-mix(in srgb,var(--gbg) 55%,transparent) 78%,var(--gbg) 100%) !important}
   .m-txt{width:100% !important;max-width:100% !important;box-sizing:border-box;margin:0 !important}
   .m-pv{left:16px !important;right:auto !important;top:35.4vw !important}
   .m-nx{left:auto !important;right:16px !important;top:35.4vw !important}
   .m-ct{left:16px !important;right:auto !important;bottom:auto !important;top:calc(70.7vw - 34px) !important}
+}
+/* Logo animé : boîte fixe dès le premier rendu, le canvas n'influence jamais la mise en page */
+atom-logo{display:block;width:30px;height:30px;flex:0 0 auto;position:relative;contain:strict;overflow:hidden}
+atom-logo canvas{position:absolute;inset:0}
+/* Menu mobile : hamburger sous 640px (case à cocher masquée) */
+.nav-btn{flex-direction:column;gap:5px;cursor:pointer;padding:8px 0}
+@media (max-width:640px){
+  .nav-btn{display:flex !important}
+  .nav-links{display:none !important}
+  .nav-tgl:checked ~ .nav-links{display:flex !important;flex-direction:column;width:100%;gap:20px;padding:12px 0 4px}
 }
 ::selection{background:#ece7de;color:#171512}
 /* Effets de survol parent→enfant (impossibles en inline) */
@@ -38,8 +50,14 @@ image-slot{display:block;width:100%;height:100%}
 <div data-screen-label="Projets" style="min-height:100vh;background:#171512;color:#ece7de;font-family:'Archivo',sans-serif;display:flex;flex-direction:column">
 
   <nav style="position:sticky;top:0;z-index:50;background:rgba(23,21,18,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:24px clamp(20px,5vw,48px);border-bottom:1px solid rgba(236,231,222,.14)">
-    <a href="index.html" style="font:500 19px 'Archivo',sans-serif;letter-spacing:-0.02em;color:#ece7de;text-decoration:none">atomes<span style="opacity:.4">.studio</span></a>
-    <div style="display:flex;gap:clamp(18px,3vw,36px);font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap">
+    <a href="index.html" style="display:flex;align-items:center;gap:10px;font:500 19px 'Archivo',sans-serif;letter-spacing:-0.02em;color:#ece7de;text-decoration:none"><atom-logo style="width:30px;height:30px;display:block"></atom-logo><span>atomes<span style="opacity:.4">.studio</span></span></a>
+    <input type="checkbox" id="nav-toggle" class="nav-tgl" style="display:none">
+    <label for="nav-toggle" class="nav-btn" aria-label="Menu" style="display:none">
+      <span style="display:block;width:22px;height:2px;background:#ece7de"></span>
+      <span style="display:block;width:22px;height:2px;background:#ece7de"></span>
+      <span style="display:block;width:22px;height:2px;background:#ece7de"></span>
+    </label>
+    <div class="nav-links" style="display:flex;gap:clamp(18px,3vw,36px);font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap">
       <a href="index.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">Accueil</a>
       <a href="projets.html" style="color:#ffffff;text-decoration:none">Projets</a>
       <a href="a-propos.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">À propos</a>
@@ -198,12 +216,12 @@ image-slot{display:block;width:100%;height:100%}
 
   <footer style="border-top:1px solid rgba(236,231,222,.14);padding:36px clamp(20px,5vw,48px);display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;font:400 11.5px/1.9 'IBM Plex Mono',monospace;color:rgba(236,231,222,.45)">
     <div>ATOMES.STUDIO — ARCHITECTURE DU DÉTAIL<br>SIMON CHARLES — ARCHITECTE HMONP · INGÉNIEUR GÉNIE CIVIL ET URBANISME</div>
-    <div>83000 TOULON<br><a href="mailto:contact@atomes.studio" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">CONTACT@ATOMES.STUDIO</a></div>
+    <div>83000 TOULON<br><a href="mailto:contact@atomes.studio" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">MAIL — CONTACT@ATOMES.STUDIO</a><br><a href="https://www.instagram.com/atomes.studio" target="_blank" rel="noopener" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">INSTAGRAM — @ATOMES.STUDIO</a></div>
   </footer>
 </div>
 
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;hauteurOuverte&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 35, &quot;min&quot;: 25, &quot;max&quot;: 60, &quot;step&quot;: 0.5, &quot;unit&quot;: &quot;vw&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Sections projet&quot;}, &quot;hauteurFermee&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 400, &quot;min&quot;: 200, &quot;max&quot;: 500, &quot;step&quot;: 10, &quot;unit&quot;: &quot;px&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Sections projet&quot;}, &quot;espacementSections&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 32, &quot;min&quot;: 0, &quot;max&quot;: 160, &quot;step&quot;: 8, &quot;unit&quot;: &quot;px&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Sections projet&quot;}, &quot;dispositionProjets&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Alternées&quot;, &quot;Image à gauche&quot;, &quot;Image à droite&quot;], &quot;default&quot;: &quot;Image à gauche&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Sections projet&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;hauteurOuverte&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 35, &quot;min&quot;: 25, &quot;max&quot;: 60, &quot;step&quot;: 0.5, &quot;unit&quot;: &quot;vw&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Sections projet&quot;}, &quot;hauteurFermee&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 400, &quot;min&quot;: 200, &quot;max&quot;: 500, &quot;step&quot;: 10, &quot;unit&quot;: &quot;px&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Sections projet&quot;}, &quot;espacementSections&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 16, &quot;min&quot;: 0, &quot;max&quot;: 160, &quot;step&quot;: 8, &quot;unit&quot;: &quot;px&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Sections projet&quot;}, &quot;dispositionProjets&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Alternées&quot;, &quot;Image à gauche&quot;, &quot;Image à droite&quot;], &quot;default&quot;: &quot;Image à gauche&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Sections projet&quot;}}">
 class Component extends DCLogic {
   state = { open: 0, idx: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 } };
 
@@ -222,7 +240,7 @@ class Component extends DCLogic {
     // Tweaks
     const hOuvert = Math.min(60, Math.max(25, this.props.hauteurOuverte ?? 35.5));   // vw (35.36 ≈ A4 paysage)
     const hFerme = Math.min(500, Math.max(200, this.props.hauteurFermee ?? 320));    // px
-    vals.esp = Math.min(160, Math.max(0, this.props.espacementSections ?? 0));       // px
+    vals.esp = Math.min(160, Math.max(0, this.props.espacementSections ?? 16));       // px
 
     // Disposition : les sections en position impaire portent les styles A, les paires B
     const mode = this.props.dispositionProjets ?? 'Alternées';

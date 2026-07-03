@@ -9,18 +9,30 @@
 <body>
 <x-dc>
 <helmet data-dc-atomics="">
+<link rel="icon" type="image/png" href="./favicon.png">
+<script src="./atom-logo.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
 <style>
 body{margin:0;background:#171512}
 image-slot{display:block;width:100%;height:100%}
-/* Rendu responsive : sous 720px, l'image passe au-dessus du texte (jamais de texte sur l'image), ratio conservé */
-@media (max-width:720px){
+/* Rendu responsive : sous 980px (dès que le texte empiète sur l'image), l'image passe au-dessus du texte et le dégradé devient vertical, ratio conservé */
+@media (max-width:980px){
   .m-sec{flex-direction:column !important;align-items:stretch !important;min-height:0 !important}
   .m-img{position:relative !important;top:auto !important;left:auto !important;right:auto !important;bottom:auto !important;width:100% !important;height:auto !important;aspect-ratio:3/2}
-  .m-grad{display:none !important}
+  .m-grad{top:0 !important;left:0 !important;right:0 !important;bottom:auto !important;width:100% !important;height:66.7vw !important;background:linear-gradient(180deg,transparent 45%,rgba(23,21,18,.55) 78%,#171512 100%) !important}
   .m-txt{width:100% !important;max-width:100% !important;box-sizing:border-box;margin:0 !important}
+}
+/* Logo animé : boîte fixe dès le premier rendu, le canvas n'influence jamais la mise en page */
+atom-logo{display:block;width:30px;height:30px;flex:0 0 auto;position:relative;contain:strict;overflow:hidden}
+atom-logo canvas{position:absolute;inset:0}
+/* Menu mobile : hamburger sous 640px (case à cocher masquée) */
+.nav-btn{flex-direction:column;gap:5px;cursor:pointer;padding:8px 0}
+@media (max-width:640px){
+  .nav-btn{display:flex !important}
+  .nav-links{display:none !important}
+  .nav-tgl:checked ~ .nav-links{display:flex !important;flex-direction:column;width:100%;gap:20px;padding:12px 0 4px}
 }
 ::selection{background:#ece7de;color:#171512}
 </style>
@@ -29,8 +41,14 @@ image-slot{display:block;width:100%;height:100%}
 <div data-screen-label="Contact" style="min-height:100vh;background:#171512;color:#ece7de;font-family:'Archivo',sans-serif;display:flex;flex-direction:column">
 
   <nav style="position:sticky;top:0;z-index:50;background:rgba(23,21,18,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:24px clamp(20px,5vw,48px);border-bottom:1px solid rgba(236,231,222,.14)">
-    <a href="index.html" style="font:500 19px 'Archivo',sans-serif;letter-spacing:-0.02em;color:#ece7de;text-decoration:none">atomes<span style="opacity:.4">.studio</span></a>
-    <div style="display:flex;gap:clamp(18px,3vw,36px);font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap">
+    <a href="index.html" style="display:flex;align-items:center;gap:10px;font:500 19px 'Archivo',sans-serif;letter-spacing:-0.02em;color:#ece7de;text-decoration:none"><atom-logo style="width:30px;height:30px;display:block"></atom-logo><span>atomes<span style="opacity:.4">.studio</span></span></a>
+    <input type="checkbox" id="nav-toggle" class="nav-tgl" style="display:none">
+    <label for="nav-toggle" class="nav-btn" aria-label="Menu" style="display:none">
+      <span style="display:block;width:22px;height:2px;background:#ece7de"></span>
+      <span style="display:block;width:22px;height:2px;background:#ece7de"></span>
+      <span style="display:block;width:22px;height:2px;background:#ece7de"></span>
+    </label>
+    <div class="nav-links" style="display:flex;gap:clamp(18px,3vw,36px);font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap">
       <a href="index.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">Accueil</a>
       <a href="projets.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">Projets</a>
       <a href="a-propos.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">À propos</a>
@@ -71,7 +89,7 @@ image-slot{display:block;width:100%;height:100%}
           </div>
           <div style="display:flex;flex-direction:column;gap:8px">
             <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Type de projet</label>
-            <select value="{{ type }}" onChange="{{ setType }}" style="background:#171512;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+            <select value="{{ type }}" onChange="{{ setType }}" style="background:transparent;color-scheme:dark;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
               <option>Construction</option>
               <option>Rénovation</option>
               <option>Extension</option>
@@ -91,7 +109,8 @@ image-slot{display:block;width:100%;height:100%}
               <span style="font:400 13px 'Archivo',sans-serif;color:rgba(236,231,222,.5);pointer-events:none">{{ fichiersLabel }}</span>
             </label>
           </div>
-          <button type="submit" style="font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#171512;background:#ece7de;padding:16px 28px;border:none;cursor:pointer;align-self:flex-start" style-hover="background:#ffffff">Envoyer</button>
+          <button type="submit" disabled="{{ envoi }}" style="font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#171512;background:#ece7de;padding:16px 28px;border:none;cursor:pointer;align-self:flex-start" style-hover="background:#ffffff">{{ btnEnvoyer }}</button>
+          <sc-if value="{{ hasErreurEnvoi }}" hint-placeholder-val="{{ false }}"><div style="font:400 12.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ erreurEnvoi }}</div></sc-if>
         </form>
       </sc-if>
       <sc-if value="{{ sent }}" hint-placeholder-val="{{ false }}">
@@ -106,14 +125,14 @@ image-slot{display:block;width:100%;height:100%}
 
   <footer style="border-top:1px solid rgba(236,231,222,.14);padding:36px clamp(20px,5vw,48px);display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;font:400 11.5px/1.9 'IBM Plex Mono',monospace;color:rgba(236,231,222,.45)">
     <div>ATOMES.STUDIO — ARCHITECTURE DU DÉTAIL<br>SIMON CHARLES — ARCHITECTE HMONP · INGÉNIEUR GÉNIE CIVIL ET URBANISME</div>
-    <div>83000 TOULON<br><a href="mailto:contact@atomes.studio" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">CONTACT@ATOMES.STUDIO</a></div>
+    <div>83000 TOULON<br><a href="mailto:contact@atomes.studio" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">MAIL — CONTACT@ATOMES.STUDIO</a><br><a href="https://www.instagram.com/atomes.studio" target="_blank" rel="noopener" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">INSTAGRAM — @ATOMES.STUDIO</a></div>
   </footer>
 </div>
 
 </x-dc>
 <script type="text/x-dc" data-dc-script>
 class Component extends DCLogic {
-  state = { prenom: '', nom: '', email: '', telephone: '', type: 'Construction', message: '', fichiers: [], survol: false, tried: false, sent: false };
+  state = { prenom: '', nom: '', email: '', telephone: '', type: 'Construction', message: '', fichiers: [], survol: false, tried: false, sent: false, envoi: false, erreurEnvoi: '' };
 
   validate() {
     const e = {};
@@ -130,13 +149,13 @@ class Component extends DCLogic {
     return {
       prenom: this.state.prenom, nom: this.state.nom, email: this.state.email, telephone: this.state.telephone, type: this.state.type, message: this.state.message,
       setPrenom: set('prenom'), setNom: set('nom'), setEmail: set('email'), setTelephone: set('telephone'), setType: set('type'), setMessage: set('message'),
-      setFichiers: e => this.setState({ fichiers: [...e.target.files].map(f => f.name) }),
+      setFichiers: e => this.setState({ fichiers: [...e.target.files] }),
       dragOver: e => { e.preventDefault(); if (!this.state.survol) this.setState({ survol: true }); },
       dragLeave: () => this.setState({ survol: false }),
       drop: e => {
         e.preventDefault();
-        const noms = [...e.dataTransfer.files].map(f => f.name);
-        if (noms.length) this.setState({ fichiers: noms, survol: false });
+        const fichiers = [...e.dataTransfer.files];
+        if (fichiers.length) this.setState({ fichiers, survol: false });
         else this.setState({ survol: false });
       },
       dropZoneStyle: {
@@ -146,19 +165,43 @@ class Component extends DCLogic {
         transition: 'border-color .2s ease, background .2s ease'
       },
       fichiersLabel: this.state.fichiers.length
-        ? this.state.fichiers.length + ' fichier' + (this.state.fichiers.length > 1 ? 's' : '') + ' — ' + this.state.fichiers.join(', ')
+        ? this.state.fichiers.length + ' fichier' + (this.state.fichiers.length > 1 ? 's' : '') + ' — ' + this.state.fichiers.map(f => f.name).join(', ')
         : 'Aucun fichier sélectionné',
       hasErrPrenom: !!errs.prenom, errPrenom: errs.prenom || '',
       hasErrNom: !!errs.nom, errNom: errs.nom || '',
       hasErrEmail: !!errs.email, errEmail: errs.email || '',
       hasErrMessage: !!errs.message, errMessage: errs.message || '',
       sent: this.state.sent, notSent: !this.state.sent,
+      envoi: this.state.envoi,
+      btnEnvoyer: this.state.envoi ? 'Envoi en cours…' : 'Envoyer',
+      hasErreurEnvoi: !!this.state.erreurEnvoi, erreurEnvoi: this.state.erreurEnvoi,
       submit: e => {
         e.preventDefault();
-        if (Object.keys(this.validate()).length) this.setState({ tried: true });
-        else this.setState({ sent: true, tried: false });
+        if (this.state.envoi) return;
+        if (Object.keys(this.validate()).length) { this.setState({ tried: true }); return; }
+        this.setState({ envoi: true, erreurEnvoi: '', tried: false });
+        const fd = new FormData();
+        fd.append('Prénom', this.state.prenom);
+        fd.append('Nom', this.state.nom);
+        fd.append('email', this.state.email);
+        if (this.state.telephone.trim()) fd.append('Téléphone', this.state.telephone);
+        fd.append('Type de projet', this.state.type);
+        fd.append('Message', this.state.message);
+        this.state.fichiers.forEach((f, i) => fd.append('attachment' + (i || ''), f));
+        fd.append('_subject', 'Nouveau contact — atomes.studio (' + this.state.type + ')');
+        fd.append('_template', 'table');
+        fetch('https://formsubmit.co/ajax/contact@atomes.studio', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json' },
+          body: fd
+        }).then(r => r.json()).then(res => {
+          if (res.success === 'true' || res.success === true) this.setState({ envoi: false, sent: true });
+          else this.setState({ envoi: false, erreurEnvoi: 'L\u2019envoi a échoué. Réessayez ou écrivez-nous directement à contact@atomes.studio.' });
+        }).catch(() => {
+          this.setState({ envoi: false, erreurEnvoi: 'L\u2019envoi a échoué (connexion). Réessayez ou écrivez-nous directement à contact@atomes.studio.' });
+        });
       },
-      reset: () => this.setState({ prenom: '', nom: '', email: '', telephone: '', message: '', type: 'Construction', fichiers: [], tried: false, sent: false })
+      reset: () => this.setState({ prenom: '', nom: '', email: '', telephone: '', message: '', type: 'Construction', fichiers: [], tried: false, sent: false, envoi: false, erreurEnvoi: '' })
     };
   }
 }
