@@ -107,6 +107,15 @@ atom-logo canvas{position:absolute;inset:0}
             </select>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Document souhaité</label>
+            <select value="{{ documentSouhaite }}" onChange="{{ setDocumentSouhaite }}" style="background:transparent;color-scheme:dark;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+              <option>Permis de construire</option>
+              <option>Déclaration préalable</option>
+              <option>Dossier de consultation</option>
+              <option>Autre</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
             <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Votre projet</label>
             <textarea value="{{ message }}" onChange="{{ setMessage }}" rows="6" placeholder="Lieu, surface, budget envisagé, calendrier…" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px/1.6 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none;resize:vertical" style-focus="border-color:rgba(236,231,222,.75)"></textarea>
             <sc-if value="{{ hasErrMessage }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errMessage }}</div></sc-if>
@@ -118,6 +127,15 @@ atom-logo canvas{position:absolute;inset:0}
               <input type="file" multiple="" accept="image/*,.pdf" onChange="{{ setFichiers }}" style="display:none">
               <span style="font:400 13px 'Archivo',sans-serif;color:rgba(236,231,222,.5);pointer-events:none">{{ fichiersLabel }}</span>
             </label>
+            <sc-if value="{{ hasFichiers }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <sc-for list="{{ fichiersList }}" as="f" hint-placeholder-count="0">
+                  <span style="display:flex;align-items:center;gap:10px;border:1px solid rgba(236,231,222,.25);padding:7px 10px 7px 12px;font:400 12.5px 'Archivo',sans-serif;color:rgba(236,231,222,.85)">{{ f.nom }}<button type="button" onClick="{{ f.retirer }}" aria-label="Retirer ce fichier" style="background:transparent;border:none;color:rgba(236,231,222,.5);font:400 15px/1 'Archivo',sans-serif;cursor:pointer;padding:0" style-hover="color:#ece7de">×</button></span>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ hasFichiersRefuses }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ fichiersRefuses }}</div></sc-if>
+            <sc-if value="{{ hasErrFichiers }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errFichiers }}</div></sc-if>
           </div>
           <button type="submit" disabled="{{ envoi }}" style="font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#171512;background:#ece7de;padding:16px 28px;border:none;cursor:pointer;align-self:flex-start" style-hover="background:#ffffff">{{ btnEnvoyer }}</button>
           <sc-if value="{{ hasErreurEnvoi }}" hint-placeholder-val="{{ false }}"><div style="font:400 12.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ erreurEnvoi }}</div></sc-if>
@@ -142,7 +160,24 @@ atom-logo canvas{position:absolute;inset:0}
 </x-dc>
 <script type="text/x-dc" data-dc-script>
 class Component extends DCLogic {
-  state = { prenom: '', nom: '', email: '', telephone: '', type: 'Construction', message: '', fichiers: [], survol: false, tried: false, sent: false, envoi: false, erreurEnvoi: '' };
+  state = { prenom: '', nom: '', email: '', telephone: '', type: 'Construction', documentSouhaite: 'Permis de construire', message: '', fichiers: [], fichiersRefuses: '', survol: false, tried: false, sent: false, envoi: false, erreurEnvoi: '' };
+
+  accepte(f) {
+    return f.type.indexOf('image/') === 0 || f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+  }
+
+  ajouterFichiers(nouveaux) {
+    const acceptes = [], refuses = [];
+    [...nouveaux].forEach(f => (this.accepte(f) ? acceptes : refuses).push(f));
+    const existants = this.state.fichiers;
+    const cles = new Set(existants.map(f => f.name + '|' + f.size));
+    const ajout = acceptes.filter(f => !cles.has(f.name + '|' + f.size));
+    this.setState({
+      fichiers: existants.concat(ajout),
+      fichiersRefuses: refuses.length ? 'Format non pris en charge (images et PDF uniquement) : ' + refuses.map(f => f.name).join(', ') : '',
+      survol: false
+    });
+  }
 
   componentDidMount() {
     if (new URLSearchParams(location.search).get('envoye') === '1') {
@@ -157,6 +192,7 @@ class Component extends DCLogic {
     if (!this.state.nom.trim()) e.nom = 'Champ requis';
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(this.state.email)) e.email = 'Adresse email invalide';
     if (this.state.message.trim().length < 10) e.message = 'Décrivez votre projet en quelques mots (10 caractères min.)';
+    if (this.state.fichiers.reduce((s, f) => s + f.size, 0) > 10 * 1024 * 1024) e.fichiers = 'Pièces jointes trop lourdes — 10 Mo max au total.';
     return e;
   }
 
@@ -166,14 +202,13 @@ class Component extends DCLogic {
     return {
       prenom: this.state.prenom, nom: this.state.nom, email: this.state.email, telephone: this.state.telephone, type: this.state.type, message: this.state.message,
       setPrenom: set('prenom'), setNom: set('nom'), setEmail: set('email'), setTelephone: set('telephone'), setType: set('type'), setMessage: set('message'),
-      setFichiers: e => this.setState({ fichiers: [...e.target.files] }),
+      documentSouhaite: this.state.documentSouhaite, setDocumentSouhaite: set('documentSouhaite'),
+      setFichiers: e => { this.ajouterFichiers(e.target.files); e.target.value = ''; },
       dragOver: e => { e.preventDefault(); if (!this.state.survol) this.setState({ survol: true }); },
       dragLeave: () => this.setState({ survol: false }),
       drop: e => {
         e.preventDefault();
-        const fichiers = [...e.dataTransfer.files];
-        if (fichiers.length) this.setState({ fichiers, survol: false });
-        else this.setState({ survol: false });
+        this.ajouterFichiers(e.dataTransfer.files);
       },
       dropZoneStyle: {
         display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', cursor: 'pointer',
@@ -182,8 +217,15 @@ class Component extends DCLogic {
         transition: 'border-color .2s ease, background .2s ease'
       },
       fichiersLabel: this.state.fichiers.length
-        ? this.state.fichiers.length + ' fichier' + (this.state.fichiers.length > 1 ? 's' : '') + ' — ' + this.state.fichiers.map(f => f.name).join(', ')
+        ? this.state.fichiers.length + ' fichier' + (this.state.fichiers.length > 1 ? 's' : '') + ' sélectionné' + (this.state.fichiers.length > 1 ? 's' : '')
         : 'Aucun fichier sélectionné',
+      hasFichiers: this.state.fichiers.length > 0,
+      fichiersList: this.state.fichiers.map((f, i) => ({
+        nom: f.name,
+        retirer: () => this.setState({ fichiers: this.state.fichiers.filter((_, j) => j !== i), fichiersRefuses: '' })
+      })),
+      hasFichiersRefuses: !!this.state.fichiersRefuses, fichiersRefuses: this.state.fichiersRefuses,
+      hasErrFichiers: !!errs.fichiers, errFichiers: errs.fichiers || '',
       hasErrPrenom: !!errs.prenom, errPrenom: errs.prenom || '',
       hasErrNom: !!errs.nom, errNom: errs.nom || '',
       hasErrEmail: !!errs.email, errEmail: errs.email || '',
@@ -214,6 +256,7 @@ class Component extends DCLogic {
           add('email', this.state.email);
           if (this.state.telephone.trim()) add('Téléphone', this.state.telephone);
           add('Type de projet', this.state.type);
+          add('Document souhaité', this.state.documentSouhaite);
           add('Message', this.state.message);
           add('_subject', 'Nouveau contact — atomes.studio (' + this.state.type + ')');
           add('_template', 'table');
@@ -237,6 +280,7 @@ class Component extends DCLogic {
         fd.append('email', this.state.email);
         if (this.state.telephone.trim()) fd.append('Téléphone', this.state.telephone);
         fd.append('Type de projet', this.state.type);
+        fd.append('Document souhaité', this.state.documentSouhaite);
         fd.append('Message', this.state.message);
         this.state.fichiers.forEach((f, i) => fd.append('attachment' + (i || ''), f));
         fd.append('_subject', 'Nouveau contact — atomes.studio (' + this.state.type + ')');
@@ -252,7 +296,7 @@ class Component extends DCLogic {
           this.setState({ envoi: false, erreurEnvoi: 'L\u2019envoi a échoué (connexion). Réessayez ou écrivez-nous directement à contact@atomes.studio.' });
         });
       },
-      reset: () => this.setState({ prenom: '', nom: '', email: '', telephone: '', message: '', type: 'Construction', fichiers: [], tried: false, sent: false, envoi: false, erreurEnvoi: '' })
+      reset: () => this.setState({ prenom: '', nom: '', email: '', telephone: '', message: '', type: 'Construction', documentSouhaite: 'Permis de construire', fichiers: [], fichiersRefuses: '', tried: false, sent: false, envoi: false, erreurEnvoi: '' })
     };
   }
 }
