@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
 <meta charset="utf-8">
 <title>Projets — Atomes studio</title>
@@ -8,12 +8,22 @@
 </head>
 <body>
 <x-dc>
-<helmet data-dc-atomics>
+<helmet data-dc-atomics="">
 <link rel="icon" type="image/png" href="./favicon.png">
+<meta name="description" content="Projets d'architecture Atomes studio : constructions neuves, rénovations, surélévations et aménagements — à Toulon, Hyères, dans le Var et partout en France.">
+<link rel="canonical" href="https://atomes.studio/projets.html">
+<meta property="og:site_name" content="Atomes studio">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://atomes.studio/projets.html">
+<meta property="og:title" content="Projets — Atomes studio">
+<meta property="og:description" content="Constructions neuves, rénovations, surélévations et aménagements — à Toulon, Hyères, dans le Var et partout en France.">
+<meta property="og:image" content="https://atomes.studio/a5ce3393-fd84-4dc1-b13c-f8d500c9d5f4-mr3ef561.png">
+<meta property="og:locale" content="fr_FR">
+<meta name="twitter:card" content="summary_large_image">
 <script src="./atom-logo.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
 <style>
 body{margin:0;background:#171512}
 image-slot{display:block;width:100%;height:100%}
@@ -67,11 +77,11 @@ atom-logo canvas{position:absolute;inset:0}
 
   <!-- 01 — VILLA ORTOLAN -->
   <section onClick="{{ toggle3 }}" style="position:relative;overflow:hidden;min-height:{{ h3 }};display:flex;align-items:center;transition:min-height .5s cubic-bezier(.4,0,.2,1),background-color .35s ease;cursor:pointer" class="proj-sec" style-hover="background-color:#221e19">
-    <div onClick="{{ stopClic }}" class="m-img" style="{{ imgwA }}">
+    <div class="m-img" style="{{ imgwA }}">
       <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="{{ slot3 }}" shape="rect" placeholder="Photo — Villa Ortolan" style="width:100%;height:100%;display:block" hint-size="100%,320px"></x-import>
     </div>
     <div class="m-grad" style="{{ gradA }}"></div>
-    <sc-if value="{{ open3 }}" hint-placeholder-val="{{ false }}">
+    <sc-if value="{{ nav3 }}" hint-placeholder-val="{{ false }}">
       <button onClick="{{ prev3 }}" class="m-pv" style="{{ pvA }}" style-hover="background:rgba(23,21,18,.95)">←</button>
       <button onClick="{{ next3 }}" class="m-nx" style="{{ nxA }}" style-hover="background:rgba(23,21,18,.95)">→</button>
       <div class="m-ct" style="{{ ctA }}">{{ cpt3 }}</div>
@@ -88,11 +98,11 @@ atom-logo canvas{position:absolute;inset:0}
 
   <!-- 02 — VILLA SIBLAS -->
   <section onClick="{{ toggle2 }}" style="position:relative;overflow:hidden;min-height:{{ h2 }};display:flex;align-items:center;transition:min-height .5s cubic-bezier(.4,0,.2,1),background-color .35s ease;cursor:pointer;margin-top:{{ esp }}px" class="proj-sec" style-hover="background-color:#221e19">
-    <div onClick="{{ stopClic }}" class="m-img" style="{{ imgwB }}">
+    <div class="m-img" style="{{ imgwB }}">
       <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="{{ slot2 }}" shape="rect" placeholder="Photo — Villa Siblas" style="width:100%;height:100%;display:block" hint-size="100%,320px"></x-import>
     </div>
     <div class="m-grad" style="{{ gradB }}"></div>
-    <sc-if value="{{ open2 }}" hint-placeholder-val="{{ false }}">
+    <sc-if value="{{ nav2 }}" hint-placeholder-val="{{ false }}">
       <button onClick="{{ prev2 }}" class="m-pv" style="{{ pvB }}" style-hover="background:rgba(23,21,18,.95)">←</button>
       <button onClick="{{ next2 }}" class="m-nx" style="{{ nxB }}" style-hover="background:rgba(23,21,18,.95)">→</button>
       <div class="m-ct" style="{{ ctB }}">{{ cpt2 }}</div>
@@ -109,11 +119,11 @@ atom-logo canvas{position:absolute;inset:0}
 
   <!-- 03 — MAISON GIENS -->
   <section onClick="{{ toggle7 }}" style="position:relative;overflow:hidden;min-height:{{ h7 }};display:flex;align-items:center;transition:min-height .5s cubic-bezier(.4,0,.2,1),background-color .35s ease;cursor:pointer;margin-top:{{ esp }}px" class="proj-sec" style-hover="background-color:#221e19">
-    <div onClick="{{ stopClic }}" class="m-img" style="{{ imgwA }}">
+    <div class="m-img" style="{{ imgwA }}">
       <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="{{ slot7 }}" shape="rect" placeholder="Photo — Maison Giens" style="width:100%;height:100%;display:block" hint-size="100%,320px"></x-import>
     </div>
     <div class="m-grad" style="{{ gradA }}"></div>
-    <sc-if value="{{ open7 }}" hint-placeholder-val="{{ false }}">
+    <sc-if value="{{ nav7 }}" hint-placeholder-val="{{ false }}">
       <button onClick="{{ prev7 }}" class="m-pv" style="{{ pvA }}" style-hover="background:rgba(23,21,18,.95)">←</button>
       <button onClick="{{ next7 }}" class="m-nx" style="{{ nxA }}" style-hover="background:rgba(23,21,18,.95)">→</button>
       <div class="m-ct" style="{{ ctA }}">{{ cpt7 }}</div>
@@ -122,7 +132,7 @@ atom-logo canvas{position:absolute;inset:0}
       <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">03 — GIENS (83400) — 2026</div>
       <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">MAISON GIENS</h3>
       <sc-if value="{{ open7 }}" hint-placeholder-val="{{ false }}">
-        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Programme, surface, matériaux, points singuliers&nbsp;: décrivez ici le projet en quelques lignes.</p>
+        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Maison de type 3 d'environ 55&nbsp;m², sur la presqu'île de Giens. Sur une surface compacte, chaque mètre carré est optimisé&nbsp;: le séjour cathédrale ouvre le volume en hauteur, et les poutres apparentes conservées entretiennent le dialogue entre l'ancien et le moderne.<br><br>Un détail donne sa cohérence à l'ensemble&nbsp;: l'escalier reprend exactement la pente de la toiture — une ligne unique traverse le projet, pour un rendu épuré et parfaitement lisible.</p>
       </sc-if>
       <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.6)" style-hover="color:#ece7de">{{ lbl7 }}</div>
     </div>
@@ -130,11 +140,11 @@ atom-logo canvas{position:absolute;inset:0}
 
   <!-- 04 — EDEN MODERNE -->
   <section onClick="{{ toggle5 }}" style="position:relative;overflow:hidden;min-height:{{ h5 }};display:flex;align-items:center;transition:min-height .5s cubic-bezier(.4,0,.2,1),background-color .35s ease;cursor:pointer;margin-top:{{ esp }}px" class="proj-sec" style-hover="background-color:#221e19">
-    <div onClick="{{ stopClic }}" class="m-img" style="{{ imgwB }}">
+    <div class="m-img" style="{{ imgwB }}">
       <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="{{ slot5 }}" shape="rect" placeholder="Photo — Eden Moderne" style="width:100%;height:100%;display:block" hint-size="100%,320px"></x-import>
     </div>
     <div class="m-grad" style="{{ gradB }}"></div>
-    <sc-if value="{{ open5 }}" hint-placeholder-val="{{ false }}">
+    <sc-if value="{{ nav5 }}" hint-placeholder-val="{{ false }}">
       <button onClick="{{ prev5 }}" class="m-pv" style="{{ pvB }}" style-hover="background:rgba(23,21,18,.95)">←</button>
       <button onClick="{{ next5 }}" class="m-nx" style="{{ nxB }}" style-hover="background:rgba(23,21,18,.95)">→</button>
       <div class="m-ct" style="{{ ctB }}">{{ cpt5 }}</div>
@@ -143,7 +153,7 @@ atom-logo canvas{position:absolute;inset:0}
       <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">04 — CONCARNEAU (29900) — 2024</div>
       <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">EDEN MODERNE</h3>
       <sc-if value="{{ open5 }}" hint-placeholder-val="{{ false }}">
-        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Programme, surface, matériaux, points singuliers&nbsp;: décrivez ici le projet en quelques lignes.</p>
+        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Maison individuelle neuve de type 4 à Concarneau, en Bretagne. Le plan s'organise autour d'une grande pièce de vie et compte deux salles de bains&nbsp;— une maison pensée dès la conception pour rester confortable en toutes saisons.<br><br>Un grand garage et une terrasse en dalles sur plots complètent le projet et prolongent les espaces de vie vers l'extérieur.</p>
       </sc-if>
       <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.6)" style-hover="color:#ece7de">{{ lbl5 }}</div>
     </div>
@@ -151,11 +161,11 @@ atom-logo canvas{position:absolute;inset:0}
 
   <!-- 05 — LOFT PALAVAS -->
   <section onClick="{{ toggle4 }}" style="position:relative;overflow:hidden;min-height:{{ h4 }};display:flex;align-items:center;transition:min-height .5s cubic-bezier(.4,0,.2,1),background-color .35s ease;cursor:pointer;margin-top:{{ esp }}px" class="proj-sec" style-hover="background-color:#221e19">
-    <div onClick="{{ stopClic }}" class="m-img" style="{{ imgwA }}">
+    <div class="m-img" style="{{ imgwA }}">
       <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="{{ slot4 }}" shape="rect" placeholder="Photo — Loft Palavas" style="width:100%;height:100%;display:block" hint-size="100%,320px"></x-import>
     </div>
     <div class="m-grad" style="{{ gradA }}"></div>
-    <sc-if value="{{ open4 }}" hint-placeholder-val="{{ false }}">
+    <sc-if value="{{ nav4 }}" hint-placeholder-val="{{ false }}">
       <button onClick="{{ prev4 }}" class="m-pv" style="{{ pvA }}" style-hover="background:rgba(23,21,18,.95)">←</button>
       <button onClick="{{ next4 }}" class="m-nx" style="{{ nxA }}" style-hover="background:rgba(23,21,18,.95)">→</button>
       <div class="m-ct" style="{{ ctA }}">{{ cpt4 }}</div>
@@ -164,7 +174,7 @@ atom-logo canvas{position:absolute;inset:0}
       <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">05 — PALAVAS-LES-FLOTS (34250) — 2025</div>
       <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">LOFT PALAVAS</h3>
       <sc-if value="{{ open4 }}" hint-placeholder-val="{{ false }}">
-        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Programme, surface, matériaux, points singuliers&nbsp;: décrivez ici le projet en quelques lignes.</p>
+        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Projet atypique en plein cœur de Palavas-les-Flots&nbsp;: la surélévation d'un niveau d'un plateau ancien, en conservant la charpente existante pour y loger une mezzanine.<br><br>Le geste offre un triple bénéfice&nbsp;: 20&nbsp;m² de surface supplémentaire, un séjour cathédrale baigné de hauteur, et l'accès à un toit-terrasse d'environ 40&nbsp;m² avec vue panoramique sur la mer et le canal. L'ensemble développe environ 110&nbsp;m² et trois chambres.</p>
       </sc-if>
       <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.6)" style-hover="color:#ece7de">{{ lbl4 }}</div>
     </div>
@@ -172,11 +182,11 @@ atom-logo canvas{position:absolute;inset:0}
 
   <!-- 06 — VILLA ARDÈCHOISE -->
   <section onClick="{{ toggle1 }}" style="position:relative;overflow:hidden;min-height:{{ h1 }};display:flex;align-items:center;transition:min-height .5s cubic-bezier(.4,0,.2,1),background-color .35s ease;cursor:pointer;margin-top:{{ esp }}px" class="proj-sec" style-hover="background-color:#221e19">
-    <div onClick="{{ stopClic }}" class="m-img" style="{{ imgwB }}">
+    <div class="m-img" style="{{ imgwB }}">
       <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="{{ slot1 }}" shape="rect" placeholder="Photo — Villa Ardèchoise" style="width:100%;height:100%;display:block" hint-size="100%,320px"></x-import>
     </div>
     <div class="m-grad" style="{{ gradB }}"></div>
-    <sc-if value="{{ open1 }}" hint-placeholder-val="{{ false }}">
+    <sc-if value="{{ nav1 }}" hint-placeholder-val="{{ false }}">
       <button onClick="{{ prev1 }}" class="m-pv" style="{{ pvB }}" style-hover="background:rgba(23,21,18,.95)">←</button>
       <button onClick="{{ next1 }}" class="m-nx" style="{{ nxB }}" style-hover="background:rgba(23,21,18,.95)">→</button>
       <div class="m-ct" style="{{ ctB }}">{{ cpt1 }}</div>
@@ -185,7 +195,7 @@ atom-logo canvas{position:absolute;inset:0}
       <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">06 — MONTRÉAL (07110) — 2023</div>
       <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">VILLA ARDÈCHOISE</h3>
       <sc-if value="{{ open1 }}" hint-placeholder-val="{{ false }}">
-        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Programme, surface, matériaux, points singuliers&nbsp;: décrivez ici le projet en quelques lignes.</p>
+        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Villa contemporaine de type 3 d'environ 100&nbsp;m², implantée sur un terrain en restanques typique de l'Ardèche. Plutôt que de gommer les différences de niveau, le projet en tire parti&nbsp;: la vaste terrasse bois, exposée plein sud, se déploie dans la continuité de la piscine et met en scène la topographie du site.<br><br>Un grand garage complète le programme.</p>
       </sc-if>
       <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.6)" style-hover="color:#ece7de">{{ lbl1 }}</div>
     </div>
@@ -193,11 +203,11 @@ atom-logo canvas{position:absolute;inset:0}
 
   <!-- 07 — COLOC DES MUSICIENS -->
   <section onClick="{{ toggle6 }}" style="position:relative;overflow:hidden;min-height:{{ h6 }};display:flex;align-items:center;transition:min-height .5s cubic-bezier(.4,0,.2,1),background-color .35s ease;cursor:pointer;margin-top:{{ esp }}px" class="proj-sec" style-hover="background-color:#221e19">
-    <div onClick="{{ stopClic }}" class="m-img" style="{{ imgwA }}">
+    <div class="m-img" style="{{ imgwA }}">
       <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="{{ slot6 }}" shape="rect" placeholder="Photo — Coloc des Musiciens" style="width:100%;height:100%;display:block" hint-size="100%,320px"></x-import>
     </div>
     <div class="m-grad" style="{{ gradA }}"></div>
-    <sc-if value="{{ open6 }}" hint-placeholder-val="{{ false }}">
+    <sc-if value="{{ nav6 }}" hint-placeholder-val="{{ false }}">
       <button onClick="{{ prev6 }}" class="m-pv" style="{{ pvA }}" style-hover="background:rgba(23,21,18,.95)">←</button>
       <button onClick="{{ next6 }}" class="m-nx" style="{{ nxA }}" style-hover="background:rgba(23,21,18,.95)">→</button>
       <div class="m-ct" style="{{ ctA }}">{{ cpt6 }}</div>
@@ -206,7 +216,7 @@ atom-logo canvas{position:absolute;inset:0}
       <div style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.4)">07 — VILLEURBANNE (69100) — 2022</div>
       <h3 style="margin:14px 0 16px;font:700 clamp(22px,2.6vw,30px)/1.15 'Archivo',sans-serif;letter-spacing:-0.02em;text-transform:uppercase">COLOC DES MUSICIENS</h3>
       <sc-if value="{{ open6 }}" hint-placeholder-val="{{ false }}">
-        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Programme, surface, matériaux, points singuliers&nbsp;: décrivez ici le projet en quelques lignes.</p>
+        <p style="margin:0 0 18px;font:400 15px/1.65 'Archivo',sans-serif;color:rgba(236,231,222,.65)">Rénovation complète d'un appartement de ville de type 6, d'environ 105&nbsp;m², à Villeurbanne. Le plan a été entièrement repensé pour la colocation&nbsp;: des chambres généreuses, traitées à égalité pour que chacun trouve sa place, articulées autour d'espaces communs conviviaux.</p>
       </sc-if>
       <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.6)" style-hover="color:#ece7de">{{ lbl6 }}</div>
     </div>
@@ -216,7 +226,7 @@ atom-logo canvas{position:absolute;inset:0}
 
   <footer style="border-top:1px solid rgba(236,231,222,.14);padding:36px clamp(20px,5vw,48px);display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;font:400 11.5px/1.9 'IBM Plex Mono',monospace;color:rgba(236,231,222,.45)">
     <div>ATOMES.STUDIO — ARCHITECTURE DU DÉTAIL<br>SIMON CHARLES — ARCHITECTE HMONP · INGÉNIEUR GÉNIE CIVIL ET URBANISME</div>
-    <div>83000 TOULON<br><a href="mailto:contact@atomes.studio" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">MAIL — CONTACT@ATOMES.STUDIO</a><br><a href="https://www.instagram.com/atomes.studio" target="_blank" rel="noopener" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">INSTAGRAM — @ATOMES.STUDIO</a></div>
+    <div><a href="mailto:contact@atomes.studio" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">MAIL — CONTACT@ATOMES.STUDIO</a><br><a href="https://www.instagram.com/atomes.studio" target="_blank" rel="noopener" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">INSTAGRAM — @ATOMES.STUDIO</a></div>
   </footer>
 </div>
 
@@ -228,6 +238,34 @@ class Component extends DCLogic {
   componentDidMount() {
     this._onResize = () => this.forceUpdate();
     window.addEventListener('resize', this._onResize);
+    // Détecte quelles images sont réellement remplies (fichiers annexes des
+    // image-slots, avec ou sans point initial selon l'hébergement) pour ne
+    // faire défiler que celles-là.
+    const suf = ['', '-a', '-b', '-c', '-d', '-e', '-f', '-g'];
+    const probe = (id) => {
+      const tryUrl = (u) => fetch(u + '?v=' + Date.now(), { cache: 'no-store' })
+        .then(r => (r.ok ? r.json() : null)).catch(() => null);
+      return tryUrl('.imgslot-' + id + '.state.json')
+        .then(j => (j && j.u) ? j : tryUrl('imgslot-' + id + '.state.json'));
+    };
+    const found = {};
+    const jobs = [];
+    for (let i = 1; i <= 7; i++) {
+      const base = 'proj-0' + i;
+      found[i] = new Array(suf.length);
+      suf.forEach((s, k) => {
+        const id = base + s;
+        jobs.push(probe(id).then(j => { if (j && j.u) found[i][k] = id; }));
+      });
+    }
+    Promise.all(jobs).then(() => {
+      const avail = {};
+      for (let i = 1; i <= 7; i++) {
+        avail[i] = found[i].filter(Boolean);
+        if (!avail[i].length) avail[i] = ['proj-0' + i];
+      }
+      this.setState({ avail });
+    });
   }
   componentWillUnmount() {
     window.removeEventListener('resize', this._onResize);
@@ -264,9 +302,11 @@ class Component extends DCLogic {
     vals.imgwB = B.imgw; vals.gradB = B.grad; vals.pvB = B.pv; vals.nxB = B.nx; vals.ctB = B.ct; vals.txtB = B.txt;
     for (let i = 1; i <= 7; i++) {
       const base = 'proj-0' + i;
-      const ids = [base, base + '-a', base + '-b', base + '-c', base + '-d', base + '-e', base + '-f', base + '-g'];
+      const ids = (this.state.avail && this.state.avail[i])
+        || [base, base + '-a', base + '-b', base + '-c', base + '-d', base + '-e', base + '-f', base + '-g'];
+      const Ni = ids.length;
       const isOpen = this.state.open === i;
-      const k = this.state.idx[i];
+      const k = this.state.idx[i] % Ni;
       vals['open' + i] = isOpen;
       vals['toggle' + i] = () => this.setState(s => {
         const idx = Object.assign({}, s.idx);
@@ -278,14 +318,15 @@ class Component extends DCLogic {
       const mobile = typeof window !== 'undefined' && window.innerWidth <= 640;
       vals['h' + i] = isOpen ? (mobile ? '78vh' : hOuvert + 'vw') : hFerme + 'px';
       vals['slot' + i] = ids[k];
-      vals['cpt' + i] = (k + 1) + ' / ' + N;
+      vals['nav' + i] = isOpen && Ni > 1;
+      vals['cpt' + i] = (k + 1) + ' / ' + Ni;
       vals['prev' + i] = e => {
         e.stopPropagation();
-        this.setState(s => ({ idx: Object.assign({}, s.idx, { [i]: (s.idx[i] + N - 1) % N }) }));
+        this.setState(s => ({ idx: Object.assign({}, s.idx, { [i]: (s.idx[i] % Ni + Ni - 1) % Ni }) }));
       };
       vals['next' + i] = e => {
         e.stopPropagation();
-        this.setState(s => ({ idx: Object.assign({}, s.idx, { [i]: (s.idx[i] + 1) % N }) }));
+        this.setState(s => ({ idx: Object.assign({}, s.idx, { [i]: (s.idx[i] % Ni + 1) % Ni }) }));
       };
     }
     return vals;

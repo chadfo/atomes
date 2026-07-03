@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://atomes.studio/sitemap.xml
