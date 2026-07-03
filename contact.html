@@ -144,6 +144,13 @@ atom-logo canvas{position:absolute;inset:0}
 class Component extends DCLogic {
   state = { prenom: '', nom: '', email: '', telephone: '', type: 'Construction', message: '', fichiers: [], survol: false, tried: false, sent: false, envoi: false, erreurEnvoi: '' };
 
+  componentDidMount() {
+    if (new URLSearchParams(location.search).get('envoye') === '1') {
+      this.setState({ sent: true });
+      history.replaceState(null, '', location.pathname);
+    }
+  }
+
   validate() {
     const e = {};
     if (!this.state.prenom.trim()) e.prenom = 'Champ requis';
@@ -190,6 +197,40 @@ class Component extends DCLogic {
         if (this.state.envoi) return;
         if (Object.keys(this.validate()).length) { this.setState({ tried: true }); return; }
         this.setState({ envoi: true, erreurEnvoi: '', tried: false });
+        if (this.state.fichiers.length) {
+          // L'endpoint AJAX de FormSubmit ignore les fichiers : envoi natif multipart avec retour sur la page.
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = 'https://formsubmit.co/contact@atomes.studio';
+          form.enctype = 'multipart/form-data';
+          form.style.display = 'none';
+          const add = (name, value) => {
+            const inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = name; inp.value = value;
+            form.appendChild(inp);
+          };
+          add('Prénom', this.state.prenom);
+          add('Nom', this.state.nom);
+          add('email', this.state.email);
+          if (this.state.telephone.trim()) add('Téléphone', this.state.telephone);
+          add('Type de projet', this.state.type);
+          add('Message', this.state.message);
+          add('_subject', 'Nouveau contact — atomes.studio (' + this.state.type + ')');
+          add('_template', 'table');
+          add('_captcha', 'false');
+          add('_next', location.origin + location.pathname + '?envoye=1');
+          this.state.fichiers.forEach((f, i) => {
+            const inp = document.createElement('input');
+            inp.type = 'file'; inp.name = 'attachment' + (i || '');
+            const dt = new DataTransfer();
+            dt.items.add(f);
+            inp.files = dt.files;
+            form.appendChild(inp);
+          });
+          document.body.appendChild(form);
+          form.submit();
+          return;
+        }
         const fd = new FormData();
         fd.append('Prénom', this.state.prenom);
         fd.append('Nom', this.state.nom);
