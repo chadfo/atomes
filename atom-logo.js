@@ -44,9 +44,11 @@
       }
       const ctx = c.getContext('2d');
       ctx.clearRect(0, 0, c.width, c.height);
+      const col = this.getAttribute('color') || '#ece7de';
+      const nuc = this.getAttribute('color') ? col : '#fffdf8';
       const cx = c.width / 2, cy = c.height / 2, R = Math.min(cx, cy) * 0.98;
       const dot = Math.max(1, dpr * 0.8);
-      ctx.fillStyle = '#ece7de';
+      ctx.fillStyle = col;
       for (const p of this._p) {
         p.a += p.va; p.j += p.vj;
         const r = (p.r + Math.sin(p.j) * 0.05) * R;
@@ -56,9 +58,9 @@
       ctx.globalAlpha = 1;
       ctx.beginPath();
       ctx.arc(cx, cy, R * 0.13, 0, Math.PI * 2);
-      ctx.fillStyle = '#fffdf8';
+      ctx.fillStyle = nuc;
       ctx.fill();
-      ctx.fillStyle = '#ece7de';
+      ctx.fillStyle = col;
     }
   }
   customElements.define('atom-logo', AtomLogo);
