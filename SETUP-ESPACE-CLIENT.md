@@ -15,7 +15,7 @@ ouvre un espace client et envoie les e-mails. Compter une heure, en suivant les 
 | Site (vitrine + espace client) | GitHub Pages, inchangé | Statique, gratuit |
 
 Le site continue de fonctionner sans rien de tout cela : tant que `site/assets/js/config.js` est vide, le
-formulaire envoie via FormSubmit comme avant. Une fois configuré, FormSubmit reste la roue de secours :
+formulaire de devis envoie via FormSubmit comme avant. Une fois configuré, FormSubmit reste la roue de secours :
 si la fonction ne répond pas, la demande part par FormSubmit ; si la fonction a créé le dossier mais n'a
 pas pu te prévenir par e-mail, le formulaire t'envoie quand même la notification FormSubmit avec le numéro
 de dossier.

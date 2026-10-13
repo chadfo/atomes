@@ -346,7 +346,7 @@
     if (el.next) el.next.hidden = s.step === DERNIERE;
     if (el.submit) {
       el.submit.hidden = s.step !== DERNIERE;
-      el.submit.disabled = s.envoi;
+      el.submit.setAttribute('aria-disabled', s.envoi ? 'true' : 'false');   // garde le focus ; le garde s.envoi empêche le double envoi
       el.submit.textContent = s.envoi ? 'Envoi en cours…' : 'Envoyer la demande';
     }
     if (el.sendErr) { el.sendErr.textContent = s.erreurEnvoi; el.sendErr.hidden = !s.erreurEnvoi; }

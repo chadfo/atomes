@@ -5,7 +5,11 @@
 // à garder distinct de l'objet des devis (`Nouveau projet — …`).
 (() => {
   const form = document.getElementById('message');
-  if (!form) return;
+  if (!form) {
+    // Transition : ancienne page Contact (formulaire de devis) encore en cache, chargée avec ce script → page Devis
+    if (document.getElementById('demande')) location.replace('devis.html');
+    return;
+  }
 
   const ENDPOINT_AJAX = 'https://formsubmit.co/ajax/contact@atomes.studio';
   const ECHEC = 'L’envoi a échoué. Réessayez ou écrivez-nous directement à contact@atomes.studio.';
@@ -78,8 +82,9 @@
     });
     const errs = s.tried ? validate() : {};
     CHAMPS.forEach((k) => setErr(k, errs[k]));
+    if (el.liveAlert) el.liveAlert.textContent = '';   // renseignée juste après par envoyer() en cas d'erreurs
     if (el.submit) {
-      el.submit.disabled = s.envoi;
+      el.submit.setAttribute('aria-disabled', s.envoi ? 'true' : 'false');
       el.submit.textContent = s.envoi ? 'Envoi en cours…' : 'Envoyer le message';
     }
     if (el.sendErr) { el.sendErr.textContent = s.erreur; el.sendErr.hidden = !s.erreur; }
@@ -93,7 +98,8 @@
     if (erreurs.length) {
       s.tried = true; render();
       if (el.liveAlert) el.liveAlert.textContent = erreurs.length + (erreurs.length > 1 ? ' champs à corriger' : ' champ à corriger');
-      const premier = form.elements[erreurs[0]]; if (premier) premier.focus();
+      const premier = form.elements[erreurs[0]];
+      if (premier) { premier.focus({ preventScroll: true }); premier.closest('.field').scrollIntoView({ block: 'nearest' }); }
       return;
     }
     s.envoi = true; s.erreur = ''; render();
@@ -106,7 +112,7 @@
         if (res && (res.success === 'true' || res.success === true)) s.sent = true;
         else s.erreur = ECHEC;
         render();
-        if (s.sent && el.sent) el.sent.focus();
+        if (s.sent && el.sent) { el.sent.focus({ preventScroll: true }); el.sent.scrollIntoView({ block: 'nearest' }); }
       })
       .catch(() => { s.envoi = false; s.erreur = ECHEC_RESEAU; render(); });
   };

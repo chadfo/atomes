@@ -1,9 +1,9 @@
 /* ==========================================================================
    atomes.studio — feuille de style commune
    Jetons de la charte, composants partagés (nav, pied de page, boutons,
-   champs) et mises en page des quatre pages du site vitrine.
-   Base prévue pour l'espace client et l'espace admin : réutiliser les jetons
-   et les composants, ajouter les styles propres à chaque espace à la suite.
+   champs) et mises en page des cinq pages du site vitrine.
+   L'espace client et l'espace agence réutilisent les jetons et les composants ;
+   leurs styles propres sont à la suite.
    ========================================================================== */
 
 /* ---------- Jetons ---------- */
@@ -22,7 +22,7 @@
 }
 
 /* ---------- Base ---------- */
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:96px} /* barre de navigation fixe : l'élément ciblé ou focalisé reste visible */
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font)}
 ::selection{background:var(--ink);color:var(--bg)}
 [hidden]{display:none !important}
@@ -191,7 +191,7 @@ atom-logo canvas{position:absolute;inset:0}
 .intro{margin:0 0 36px;font:500 clamp(20px,2.2vw,26px)/1.5 var(--font);letter-spacing:-0.01em;max-width:560px;text-wrap:pretty}
 
 .form{display:flex;flex-direction:column;gap:26px;max-width:560px}
-.progress{display:flex;flex-direction:column;gap:12px;scroll-margin-top:96px}
+.progress{display:flex;flex-direction:column;gap:12px}
 .progress-bars{display:flex;gap:4px}
 .progress-bars span{flex:1;height:2px;background:rgba(var(--ink-rgb),.18)}
 .progress-bars span.is-on{background:var(--ink)}
@@ -314,6 +314,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .panneau > .f-hint{margin:0}
 .lbl-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 .lbl-row .f-err{text-align:right}
+.panneau .grid-2{grid-template-columns:repeat(auto-fit,minmax(min(100%,264px),1fr))} /* 264 px : « TÉLÉPHONE (facultatif) » + « Incomplet » sur une ligne */
+.panneau .form-actions a.btn{text-align:center;text-wrap:balance}
 @media (min-width:981px){
   .panneaux{display:grid}
   .panneaux .panneau{grid-area:1/1;display:flex;visibility:hidden}
@@ -321,7 +323,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 }
 
 /* ==========================================================================
-   Espace client (espace/index.html)
+   Espace client (dossier/index.html)
    ========================================================================== */
 .espace{width:100%;max-width:760px;margin:0 auto;padding:clamp(40px,6vw,72px) var(--pad-x);box-sizing:border-box;display:flex;flex-direction:column;gap:40px}
 .espace > [data-vue="dossier"]{display:flex;flex-direction:column;gap:40px}

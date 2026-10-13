@@ -87,7 +87,7 @@ icône), fond `#171512`.
   focus `.75`, padding 13 × 14 px, 15 px Archivo.
 - **Mise en page image/texte** : image absolue 50 % gauche + dégradé
   `linear-gradient(270deg,#171512 0%,rgba(23,21,18,.55) 30%,transparent 65%)`, texte à droite
-  `width:min(680px,58%)` (À propos, Contact) ou `min(620px,58%)` (Accueil, Projets).
+  `width:min(680px,58%)` (À propos, Contact, Devis) ou `min(620px,58%)` (Accueil, Projets).
 - **Espacements** : padding horizontal des pages `clamp(20px,5vw,48px)` ; nav padding 24 px ; gaps de
   formulaire 22 px.
 
@@ -169,6 +169,13 @@ multipart natif avec `_next = devis.html?envoye=1` s'il y a des pièces jointes)
 libellé français (voir `champs()`), plus `_template=table`, `_captcha=false`.
 **Objet du mail** : `Nouveau projet — <Type> · <1er document> · <Commune> (<Nom>)`, format contractuel.
 
+## Cache des navigateurs
+
+GitHub Pages fait garder chaque fichier 10 minutes par les navigateurs. Quand une page change de structure et
+que son script ou la feuille de style changent avec elle, versionner leur adresse dans la page
+(`site.css?v=2`, `contact.js?v=2`…) et augmenter le numéro à la modification suivante du même genre : sinon,
+pendant ces 10 minutes, un visiteur peut recevoir la nouvelle page avec l'ancien script.
+
 ## Publication
 
 Dépôt GitHub `chadfo/atomes` (public), domaine atomes.studio (DNS chez LWS, HTTPS forcé). Le dossier `site/`
@@ -186,7 +193,7 @@ Mise en place détaillée dans **SETUP-ESPACE-CLIENT.md**. Résumé :
   `AAMMJJHHMMSS` à l'heure de Paris, ex. `261012173615`), `modele_etapes` et `etapes` (timeline), `admins` ;
   règles de sécurité (un client ne voit que ses dossiers, l'agence voit tout) ; bucket privé `dossiers`
   (`<id>/client/` pièces du client, `<id>/agence/` documents fournis par l'agence).
-- `supabase/functions/demande/index.ts` : fonction appelée par le formulaire. Crée le dossier, dépose les
+- `supabase/functions/demande/index.ts` : fonction appelée par le formulaire de devis (devis.html). Crée le dossier, dépose les
   pièces, crée ou rattache le compte client (connexion par lien e-mail), envoie l'accusé de réception au
   client et la notification à l'agence (même objet `Nouveau projet — …` qu'avant) via Resend.
 - `supabase/migrations/0004_parcours_client.sql` : parcours v2. 11 étapes (`modele_etapes`) : Demande reçue ·
@@ -204,7 +211,7 @@ Mise en place détaillée dans **SETUP-ESPACE-CLIENT.md**. Résumé :
   la session est vérifiée dans la fonction. Signature : case « bon pour accord », nom, date, IP, navigateur,
   empreinte SHA-256 du PDF recalculée au moment de signer. Paiement : Stripe Checkout, carte uniquement.
 - `site/assets/js/config.js` : URL Supabase, clé anon, URL des fonctions `demande` (`apiUrl`) et `espace`
-  (`espaceUrl`). Vide = le formulaire envoie via FormSubmit comme avant ; rempli = fonction « demande »,
+  (`espaceUrl`). Vide = le formulaire de devis envoie via FormSubmit comme avant ; rempli = fonction « demande »,
   FormSubmit en secours si elle ne répond pas.
 - `site/dossier/` + `assets/js/dossier.js` : connexion sans mot de passe, liste des dossiers, timeline numérotée
   et datée (« Depuis le … » pour l'étape en cours), actions à l'étape en cours (questions, signature, paiement,
@@ -218,7 +225,8 @@ Mise en place détaillée dans **SETUP-ESPACE-CLIENT.md**. Résumé :
   envoi du devis (PDF déposé dans `<id>/agence/devis-<id>.pdf`, montant, libellé), état de la signature et du
   paiement, « Marquer comme payé », documents, demande de validation, modifications demandées.
   **Mode démo : `admin/?demo`**.
-- Un champ caché anti-robots (`_honey`) est présent dans le formulaire.
+- Un champ caché anti-robots (`_honey`) est présent dans les deux formulaires (devis et Contact). La page
+  Contact ne charge pas config.js : elle envoie par FormSubmit dans tous les cas.
 - `emails/` : la signature commune à tous les e-mails de l'agence (`signature.html`, à coller aussi dans le
   webmail) et le modèle Supabase du lien de connexion (`supabase-magic-link.html`). La fonction `demande`
   embarque la même signature. Logo : `site/images/logo-signature.gif` (animation du logo d’après `<atom-logo>`, 120 px, boucle de 10 s, encre sombre sur fond blanc) ; `logo-signature.png` en est la version fixe et `logo-mail.png` l’ancien badge, à supprimer quand plus aucun e-mail envoyé n’y fait référence.
