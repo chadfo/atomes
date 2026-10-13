@@ -132,6 +132,7 @@
                 <button type="button" class="chip" data-group="bien" data-value="Terrain bâti" aria-pressed="false">Terrain bâti</button>
                 <button type="button" class="chip" data-group="bien" data-value="Maison" aria-pressed="false">Maison</button>
                 <button type="button" class="chip" data-group="bien" data-value="Appartement" aria-pressed="false">Appartement</button>
+                <button type="button" class="chip" data-group="bien" data-value="Immeuble" aria-pressed="false">Immeuble</button>
                 <button type="button" class="chip" data-group="bien" data-value="Local ou bâtiment pro" aria-pressed="false">Local ou bâtiment pro</button>
                 <button type="button" class="chip" data-group="bien" data-value="Annexe, dépendance ou garage" aria-pressed="false">Annexe, dépendance ou garage</button>
                 <button type="button" class="chip" data-group="bien" data-value="Autre" aria-pressed="false">Autre</button>
@@ -148,8 +149,9 @@
           <!-- 03 — LE LIEU -->
           <div class="step">
             <div class="field">
-              <label class="lbl" for="f-adresse">Adresse du projet</label>
-              <input class="input" id="f-adresse" name="adresse" placeholder="N° et rue" autocomplete="address-line1" aria-describedby="err-adresse" aria-required="true">
+              <label class="lbl" for="f-adresse">Adresse ou emplacement du projet</label>
+              <input class="input" id="f-adresse" name="adresse" placeholder="N° et rue, ou simplement la rue, le lieu-dit…" autocomplete="address-line1" aria-describedby="hint-adresse err-adresse" aria-required="true">
+              <p class="f-hint" id="hint-adresse">Pas encore de numéro (terrain nu, lotissement…) ? Indiquez la rue, le lieu-dit ou le nom du lotissement.</p>
               <div class="f-err" id="err-adresse" data-err="adresse" hidden></div>
             </div>
             <div class="grid-commune">
@@ -172,37 +174,55 @@
 
           <!-- 04 — LES SURFACES -->
           <div class="step">
-            <p class="f-hint" id="hint-surfaces">Surfaces approximatives en m², toutes pièces comprises. Une estimation suffit ; laissez vide les champs facultatifs que vous ne connaissez pas.</p>
+            <p class="f-hint" id="hint-surfaces">En m², une estimation suffit. Le « ? » donne la définition de chaque surface.</p>
             <div class="grid-surfaces" role="group" aria-labelledby="lbl-surfaces" aria-describedby="hint-surfaces">
               <span class="sr-only" id="lbl-surfaces">Surfaces</span>
-              <div class="field" data-surface="surface">
-                <label class="lbl" for="f-surface"><span data-lbl>Surface créée</span> <span class="lbl-opt" data-lbl-opt hidden>(facultatif)</span></label>
-                <div class="unit-wrap">
-                  <input class="input" type="number" min="0" inputmode="numeric" id="f-surface" name="surface" aria-describedby="err-surface unit-surface" placeholder="40">
-                  <span class="unit" id="unit-surface">m²</span>
-                </div>
-                <div class="f-err" id="err-surface" data-err="surface" hidden></div>
-              </div>
               <div class="field" data-surface="surfaceExistante">
-                <label class="lbl" for="f-surfaceExistante"><span data-lbl>Surface existante</span> <span class="lbl-opt" data-lbl-opt hidden>(facultatif)</span></label>
+                <div class="lbl-ligne"><label class="lbl" id="lbl-surfaceExistante" for="f-surfaceExistante">Surface habitable existante</label> <span class="lbl lbl-fin"><span class="lbl-opt" id="opt-surfaceExistante">(si concerné)</span><button type="button" class="aide" data-aide aria-controls="def-surfaceExistante" aria-expanded="false" aria-label="Qu’est-ce que la surface habitable existante ?">?</button></span>
+                  <p class="f-def reveal" id="def-surfaceExistante" hidden>La surface habitable existante, c’est la surface au sol de toutes les pièces où l’on vit, mesurée à l’intérieur du logement existant. On ne compte pas l’épaisseur des murs, des cloisons et des escaliers, ni les endroits où le plafond est à moins de 1,80 m. On ne compte pas non plus les espaces annexes comme le garage, la cave, les combles non aménagés, les balcons, les terrasses ou la véranda. En bref, c’est la surface où l’on peut réellement marcher et se tenir debout dans les pièces de vie.</p>
+                </div>
                 <div class="unit-wrap">
-                  <input class="input" type="number" min="0" inputmode="numeric" id="f-surfaceExistante" name="surfaceExistante" aria-describedby="err-surfaceExistante unit-surfaceExistante" placeholder="120">
+                  <input class="input" type="number" min="0" inputmode="numeric" id="f-surfaceExistante" name="surfaceExistante" aria-labelledby="lbl-surfaceExistante opt-surfaceExistante" aria-describedby="err-surfaceExistante unit-surfaceExistante" placeholder="120">
                   <span class="unit" id="unit-surfaceExistante">m²</span>
                 </div>
                 <div class="f-err" id="err-surfaceExistante" data-err="surfaceExistante" hidden></div>
               </div>
-              <div class="field" data-surface="emprise">
-                <label class="lbl" for="f-emprise"><span data-lbl>Emprise au sol du projet</span> <span class="lbl-opt" data-lbl-opt hidden>(facultatif)</span></label>
+              <div class="field" data-surface="surface">
+                <div class="lbl-ligne"><label class="lbl" id="lbl-surface" for="f-surface">Surface habitable créée</label> <span class="lbl lbl-fin"><span class="lbl-opt" id="opt-surface">(si concerné)</span><button type="button" class="aide" data-aide aria-controls="def-surface" aria-expanded="false" aria-label="Qu’est-ce que la surface habitable créée ?">?</button></span>
+                  <p class="f-def reveal" id="def-surface" hidden>La surface habitable créée, c’est la surface habitable que votre projet ajoute : les nouvelles pièces où l’on vit, mesurées à l’intérieur, selon les mêmes règles que la surface habitable existante. On ne compte donc ni l’épaisseur des murs, des cloisons et des escaliers, ni les endroits où le plafond est à moins de 1,80 m, ni les espaces annexes comme le garage, la cave, les combles non aménagés, les balcons, les terrasses ou la véranda.</p>
+                </div>
                 <div class="unit-wrap">
-                  <input class="input" type="number" min="0" inputmode="numeric" id="f-emprise" name="emprise" aria-describedby="err-emprise unit-emprise" placeholder="60">
+                  <input class="input" type="number" min="0" inputmode="numeric" id="f-surface" name="surface" aria-labelledby="lbl-surface opt-surface" aria-describedby="err-surface unit-surface" placeholder="40">
+                  <span class="unit" id="unit-surface">m²</span>
+                </div>
+                <div class="f-err" id="err-surface" data-err="surface" hidden></div>
+              </div>
+              <div class="field" data-surface="empriseExistante">
+                <div class="lbl-ligne"><label class="lbl" id="lbl-empriseExistante" for="f-empriseExistante">Emprise au sol du bâti existant</label> <span class="lbl lbl-fin"><span class="lbl-opt" id="opt-empriseExistante">(si concerné)</span><button type="button" class="aide" data-aide aria-controls="def-empriseExistante" aria-expanded="false" aria-label="Qu’est-ce que l’emprise au sol du bâti existant ?">?</button></span>
+                  <p class="f-def reveal" id="def-empriseExistante" hidden>L’emprise au sol, c’est la surface au sol occupée par une construction vue du dessus. On l’explique souvent avec une image : c’est l’ombre que ferait le bâtiment sur le terrain si le soleil était exactement à la verticale. Contrairement à la surface habitable, on mesure par l’extérieur et on compte tout ce qui dépasse : les murs avec leur épaisseur, les balcons, les auvents sur poteaux, une terrasse surélevée, ou encore le bassin d’une piscine. On ne compte pas les simples débords de toit sans poteaux, les petits éléments décoratifs de façade, ni une terrasse de plain-pied posée au niveau du sol. Ici, indiquez l’emprise de toutes les constructions déjà présentes sur le terrain, additionnées.</p>
+                </div>
+                <div class="unit-wrap">
+                  <input class="input" type="number" min="0" inputmode="numeric" id="f-empriseExistante" name="empriseExistante" aria-labelledby="lbl-empriseExistante opt-empriseExistante" aria-describedby="err-empriseExistante unit-empriseExistante" placeholder="90">
+                  <span class="unit" id="unit-empriseExistante">m²</span>
+                </div>
+                <div class="f-err" id="err-empriseExistante" data-err="empriseExistante" hidden></div>
+              </div>
+              <div class="field" data-surface="emprise">
+                <div class="lbl-ligne"><label class="lbl" id="lbl-emprise" for="f-emprise">Emprise au sol du bâti après projet</label> <span class="lbl lbl-fin"><span class="lbl-opt" id="opt-emprise">(si concerné)</span><button type="button" class="aide" data-aide aria-controls="def-emprise" aria-expanded="false" aria-label="Qu’est-ce que l’emprise au sol du bâti après projet ?">?</button></span>
+                  <p class="f-def reveal" id="def-emprise" hidden>L’emprise au sol, c’est la surface au sol occupée par une construction vue du dessus. On l’explique souvent avec une image : c’est l’ombre que ferait le bâtiment sur le terrain si le soleil était exactement à la verticale. Contrairement à la surface habitable, on mesure par l’extérieur et on compte tout ce qui dépasse : les murs avec leur épaisseur, les balcons, les auvents sur poteaux, une terrasse surélevée, ou encore le bassin d’une piscine. On ne compte pas les simples débords de toit sans poteaux, les petits éléments décoratifs de façade, ni une terrasse de plain-pied posée au niveau du sol. Ici, indiquez l’emprise de l’ensemble des constructions une fois le projet réalisé, existant conservé compris.</p>
+                </div>
+                <div class="unit-wrap">
+                  <input class="input" type="number" min="0" inputmode="numeric" id="f-emprise" name="emprise" aria-labelledby="lbl-emprise opt-emprise" aria-describedby="err-emprise unit-emprise" placeholder="130">
                   <span class="unit" id="unit-emprise">m²</span>
                 </div>
                 <div class="f-err" id="err-emprise" data-err="emprise" hidden></div>
               </div>
               <div class="field" data-surface="surfaceTerrain">
-                <label class="lbl" for="f-surfaceTerrain"><span data-lbl>Surface du terrain</span> <span class="lbl-opt" data-lbl-opt hidden>(facultatif)</span></label>
+                <div class="lbl-ligne"><label class="lbl" id="lbl-surfaceTerrain" for="f-surfaceTerrain">Surface de la parcelle</label> <span class="lbl lbl-fin"><span class="lbl-opt" id="opt-surfaceTerrain">(si concerné)</span><button type="button" class="aide" data-aide aria-controls="def-surfaceTerrain" aria-expanded="false" aria-label="Qu’est-ce que la surface de la parcelle ?">?</button></span>
+                  <p class="f-def reveal" id="def-surfaceTerrain" hidden>La surface de la parcelle, c’est la superficie totale de votre terrain, constructions comprises, telle qu’elle figure sur le plan cadastral, l’acte de propriété ou le compromis de vente. Si le projet porte sur plusieurs parcelles, additionnez-les.</p>
+                </div>
                 <div class="unit-wrap">
-                  <input class="input" type="number" min="0" inputmode="numeric" id="f-surfaceTerrain" name="surfaceTerrain" aria-describedby="err-surfaceTerrain unit-surfaceTerrain" placeholder="800">
+                  <input class="input" type="number" min="0" inputmode="numeric" id="f-surfaceTerrain" name="surfaceTerrain" aria-labelledby="lbl-surfaceTerrain opt-surfaceTerrain" aria-describedby="err-surfaceTerrain unit-surfaceTerrain" placeholder="800">
                   <span class="unit" id="unit-surfaceTerrain">m²</span>
                 </div>
                 <div class="f-err" id="err-surfaceTerrain" data-err="surfaceTerrain" hidden></div>

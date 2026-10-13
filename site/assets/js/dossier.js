@@ -16,19 +16,8 @@
   const el = (tag, cls, texte) => { const n = document.createElement(tag); if (cls) n.className = cls; if (texte !== undefined) n.textContent = texte; return n; };
   const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
   const fmtTaille = (o) => (o >= 1048576 ? (o / 1048576).toFixed(1).replace('.', ',') + ' Mo' : Math.max(1, Math.round(o / 1024)) + ' Ko');
-  // Surfaces selon le type et l'état du bien (mêmes règles que contact.js) : [clé de colonne, libellé].
-  const surfacesPour = (type, bien) => {
-    const appart = bien === 'Appartement'; const L = [];
-    switch (type) {
-      case 'Construction': L.push(['surface', 'Surface créée']); if (bien === 'Terrain bâti') L.push(['surface_existante', 'Surface du bâti existant']); L.push(['emprise', 'Emprise au sol du projet'], ['surface_terrain', 'Surface du terrain']); break;
-      case 'Extension': L.push(['surface_existante', 'Surface existante'], ['surface', 'Surface créée'], ['emprise', 'Emprise au sol de l\u2019extension']); if (!appart) L.push(['surface_terrain', 'Surface du terrain']); break;
-      case 'Rénovation': case 'Aménagement intérieur': L.push(['surface_existante', 'Surface existante'], ['surface', 'Surface créée']); break;
-      case 'Aménagement extérieur': L.push(['emprise', 'Surface aménagée']); if (!appart) L.push(['surface_terrain', 'Surface du terrain']); break;
-      case 'Démolition': L.push(['surface_existante', 'Surface à démolir']); if (!appart) L.push(['surface_terrain', 'Surface du terrain']); break;
-      default: L.push(['surface_existante', 'Surface existante'], ['surface', 'Surface créée'], ['emprise', 'Emprise au sol']); if (!appart) L.push(['surface_terrain', 'Surface du terrain']);
-    }
-    return L;
-  };
+  // Surfaces du formulaire (même liste que contact.js et la fonction « demande ») : [colonne, libellé].
+  const SURFACES = [['surface_existante', 'Surface habitable existante'], ['surface', 'Surface habitable créée'], ['emprise_existante', 'Emprise au sol du bâti existant'], ['emprise', 'Emprise au sol du bâti après projet'], ['surface_terrain', 'Surface de la parcelle']];
   const nomSur = (nom) => (nom.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 80) || 'fichier');
 
   // ---------- Accès aux données : Supabase, ou démo ----------
@@ -63,7 +52,7 @@
     const projet = {
       id: '261003091422', cree_le: new Date(now - 9 * j).toISOString(), profil: 'Particulier', prenom: 'Jean', nom: 'Dupont', email: 'jean.dupont@exemple.fr',
       telephone: '06 12 34 56 78', type: 'Extension', documents: ['Déclaration préalable', 'Perspective'], adresse: '12 rue des Oliviers', commune: 'Hyères',
-      code_postal: '83400', bien: 'Maison', surface: 25, surface_existante: 110, emprise: 25, surface_terrain: 600,
+      code_postal: '83400', bien: 'Maison', surface: 25, surface_existante: 110, emprise_existante: 90, emprise: 115, surface_terrain: 600,
       calendrier: 'Dans 3 à 6 mois', message: 'Extension du séjour vers le jardin et réfection de la toiture.', source: 'Instagram',
       etape: 'validation', etapes
     };
@@ -218,7 +207,7 @@
       ['Type de projet', aff(d.type, 'type')], ['Documents souhaités', (d.documents || []).map((x) => aff(x, 'documents')).join(', ')],
       ['Adresse', [d.adresse, [d.code_postal, d.commune].filter(Boolean).join(' ')].filter(Boolean).join(', ')],
       ['Référence cadastrale', d.cadastre], ['État actuel', aff(d.bien, 'bien')],
-      ['Surfaces', surfacesPour(d.type, d.bien).filter((sf) => m2(d[sf[0]])).map((sf) => sf[1].toLowerCase().replace(/^surface /, '') + ' ' + m2(d[sf[0]])).join(' · ')],
+      ['Surfaces', SURFACES.filter((sf) => m2(d[sf[0]])).map((sf) => sf[1].toLowerCase() + ' ' + m2(d[sf[0]])).join(' · ')],
       ['Démarrage souhaité', aff(d.calendrier, 'calendrier')], ['Votre message', d.message]
     ].filter((r) => r[1]).forEach((r) => { dl.appendChild(el('dt', '', r[0])); dl.appendChild(el('dd', '', r[1])); });
   };

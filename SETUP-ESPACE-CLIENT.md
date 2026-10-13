@@ -136,11 +136,12 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
 ## Mises à jour à appliquer
 
 - **13 octobre 2026, formulaire v3** — les deux gestes se font dans la même séance, dans cet ordre :
-  1. SQL Editor → coller `supabase/migrations/0002_precisions_autre.sql` → Run (ajoute la colonne `precisions`) ;
+  1. SQL Editor → coller `supabase/migrations/0002_precisions_autre.sql` → Run, puis `0003_emprise_existante.sql`
+     → Run (colonnes `precisions` et `emprise_existante`) ;
   2. redéployer la fonction `demande` avec le `index.ts` à jour.
   Ne pas redéployer la fonction avant la migration : chaque enregistrement échouerait et toutes les demandes
   partiraient par FormSubmit, sans dossier. Tant que rien n'est fait, l'ancienne fonction refuse les nouveaux
-  états du bien (« Terrain bâti », « Annexe, dépendance ou garage », « Autre ») — ces demandes partent par
+  états du bien (« Terrain bâti », « Immeuble », « Annexe, dépendance ou garage », « Autre ») — ces demandes partent par
   FormSubmit — et les précisions des autres choix « Autre » (type, documents, démarrage, source) ne sont pas
   transmises : le mail n'indique que « Autre ».
 

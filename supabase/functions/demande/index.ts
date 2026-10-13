@@ -41,14 +41,14 @@ const DOCS = ["Permis de construire", "Déclaration préalable", "Permis d'amén
 // États possibles du bien selon le type de projet (mêmes règles que contact.js).
 const BIENS_PAR_TYPE: Record<string, string[]> = {
   "Construction": ["Terrain nu", "Terrain bâti", "Autre"],
-  "Rénovation": ["Maison", "Appartement", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
-  "Extension": ["Maison", "Appartement", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
-  "Démolition": ["Maison", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
-  "Aménagement intérieur": ["Maison", "Appartement", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
-  "Aménagement extérieur": ["Maison", "Appartement", "Local ou bâtiment pro", "Terrain nu", "Autre"],
-  "Autre": ["Terrain nu", "Terrain bâti", "Maison", "Appartement", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
+  "Rénovation": ["Maison", "Appartement", "Immeuble", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
+  "Extension": ["Maison", "Appartement", "Immeuble", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
+  "Démolition": ["Maison", "Immeuble", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
+  "Aménagement intérieur": ["Maison", "Appartement", "Immeuble", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
+  "Aménagement extérieur": ["Maison", "Appartement", "Immeuble", "Local ou bâtiment pro", "Terrain nu", "Autre"],
+  "Autre": ["Terrain nu", "Terrain bâti", "Maison", "Appartement", "Immeuble", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
 };
-const BIENS = ["Terrain nu", "Terrain bâti", "Maison", "Appartement", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"];
+const BIENS = ["Terrain nu", "Terrain bâti", "Maison", "Appartement", "Immeuble", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"];
 // Précisions libres saisies pour les choix « Autre » (champs du formulaire → clés enregistrées).
 const PRECISIONS: [string, string][] = [["typeAutre", "type"], ["bienAutre", "bien"], ["docsAutre", "documents"], ["calendrierAutre", "calendrier"], ["sourceAutre", "source"]];
 const CALENDRIERS = ["Dès que possible", "Dans 3 à 6 mois", "Dans 6 à 12 mois", "Plus tard", "Pas encore défini", "Autre"];
@@ -62,7 +62,7 @@ const EXTENSIONS: Record<string, string> = {
 type Demande = {
   profil: string; societe: string; activite: string; prenom: string; nom: string; email: string; telephone: string;
   type: string; docs: string[]; adresse: string; commune: string; codePostal: string; cadastre: string; bien: string;
-  surface: string; surfaceExistante: string; emprise: string; surfaceTerrain: string;
+  surface: string; surfaceExistante: string; empriseExistante: string; emprise: string; surfaceTerrain: string;
   budget: string; calendrier: string; message: string; source: string;
   precisions: Record<string, string>;
 };
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
     adresse: texte(form, "adresse", 300), commune: texte(form, "commune", 120), codePostal: texte(form, "codePostal", 10),
     cadastre: texte(form, "cadastre", 120), bien: choix(form, "bien", BIENS),
     surface: nombre(form, "surface"), surfaceExistante: nombre(form, "surfaceExistante"),
-    emprise: nombre(form, "emprise"), surfaceTerrain: nombre(form, "surfaceTerrain"),
+    empriseExistante: nombre(form, "empriseExistante"), emprise: nombre(form, "emprise"), surfaceTerrain: nombre(form, "surfaceTerrain"),
     budget: "", calendrier: choix(form, "calendrier", CALENDRIERS),
     message: texte(form, "message", 5000), source: choix(form, "source", SOURCES),
     precisions: {},
@@ -246,39 +246,12 @@ Deno.serve(async (req) => {
 
 // ---------- Outils ------------------------------------------------------------
 
-// Surfaces du formulaire selon le type et l'état du bien (mêmes règles que contact.js) : [clé, libellé].
-function surfacesPour(type: string, bien: string): [keyof Demande, string][] {
-  const appart = bien === "Appartement";
-  const L: [keyof Demande, string][] = [];
-  switch (type) {
-    case "Construction":
-      L.push(["surface", "Surface créée"]);
-      if (bien === "Terrain bâti") L.push(["surfaceExistante", "Surface du bâti existant"]);
-      L.push(["emprise", "Emprise au sol du projet"], ["surfaceTerrain", "Surface du terrain"]);
-      break;
-    case "Extension":
-      L.push(["surfaceExistante", "Surface existante"], ["surface", "Surface créée"], ["emprise", "Emprise au sol de l'extension"]);
-      if (!appart) L.push(["surfaceTerrain", "Surface du terrain"]);
-      break;
-    case "Rénovation":
-    case "Aménagement intérieur":
-      L.push(["surfaceExistante", "Surface existante"], ["surface", "Surface créée, le cas échéant"]);
-      break;
-    case "Aménagement extérieur":
-      L.push(["emprise", "Surface aménagée (terrasse, piscine, abri…)"]);
-      if (!appart) L.push(["surfaceTerrain", "Surface du terrain"]);
-      break;
-    case "Démolition":
-      L.push(["surfaceExistante", "Surface à démolir"]);
-      if (!appart) L.push(["surfaceTerrain", "Surface du terrain"]);
-      break;
-    default:
-      L.push(["surfaceExistante", "Surface existante"], ["surface", "Surface créée"], ["emprise", "Emprise au sol"]);
-      if (!appart) L.push(["surfaceTerrain", "Surface du terrain"]);
-  }
-  return L;
-}
-
+// Surfaces du formulaire, toutes facultatives (même liste que contact.js et dossier.js) : [clé, libellé].
+const SURFACES: [keyof Demande, string][] = [
+  ["surfaceExistante", "Surface habitable existante"], ["surface", "Surface habitable créée"],
+  ["empriseExistante", "Emprise au sol du bâti existant"], ["emprise", "Emprise au sol du bâti après projet"],
+  ["surfaceTerrain", "Surface de la parcelle"],
+];
 
 // Nettoyage d'une valeur texte : caractères de contrôle retirés, espaces normalisés, longueur bornée.
 function propre(v: string, max: number): string {
@@ -323,7 +296,7 @@ function ligneProjet(d: Demande) {
     prenom: d.prenom, nom: d.nom, email: d.email, telephone: txt(d.telephone),
     type: d.type, documents: d.docs, adresse: txt(d.adresse), commune: d.commune, code_postal: txt(d.codePostal),
     cadastre: txt(d.cadastre), bien: txt(d.bien),
-    surface: num(d.surface), surface_existante: num(d.surfaceExistante), emprise: num(d.emprise), surface_terrain: num(d.surfaceTerrain),
+    surface: num(d.surface), surface_existante: num(d.surfaceExistante), emprise_existante: num(d.empriseExistante), emprise: num(d.emprise), surface_terrain: num(d.surfaceTerrain),
     budget: txt(d.budget), calendrier: txt(d.calendrier), message: txt(d.message), source: txt(d.source),
     precisions: d.precisions,
   };
@@ -424,7 +397,7 @@ function recap(d: Demande): [string, string][] {
     ["Type de projet", aff(d, d.type, "type")], ["Documents souhaités", d.docs.map((x) => aff(d, x, "documents")).join(", ")],
     ["Adresse du projet", d.adresse], ["Commune", d.commune], ["Code postal", d.codePostal], ["Référence cadastrale", d.cadastre],
     ["État actuel du bien", aff(d, d.bien, "bien")],
-    ...surfacesPour(d.type, d.bien).map(([cle, libelle]) => [libelle, m2(String(d[cle]))] as [string, string]),
+    ...SURFACES.map(([cle, libelle]) => [libelle, m2(String(d[cle]))] as [string, string]),
     ["Démarrage souhaité", aff(d, d.calendrier, "calendrier")], ["Message", d.message], ["Source", aff(d, d.source, "source")],
   ];
 }

@@ -19,58 +19,23 @@
   // ---- Règles de cohérence : états possibles selon le type de projet (« Autre » toujours possible) ----
   const BIENS_PAR_TYPE = {
     'Construction': ['Terrain nu', 'Terrain bâti', 'Autre'],
-    'Rénovation': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre'],
-    'Extension': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre'],
-    'Démolition': ['Maison', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre'],
-    'Aménagement intérieur': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre'],
-    'Aménagement extérieur': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Terrain nu', 'Autre'],
-    'Autre': ['Terrain nu', 'Terrain bâti', 'Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre']
+    'Rénovation': ['Maison', 'Appartement', 'Immeuble', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre'],
+    'Extension': ['Maison', 'Appartement', 'Immeuble', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre'],
+    'Démolition': ['Maison', 'Immeuble', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre'],
+    'Aménagement intérieur': ['Maison', 'Appartement', 'Immeuble', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre'],
+    'Aménagement extérieur': ['Maison', 'Appartement', 'Immeuble', 'Local ou bâtiment pro', 'Terrain nu', 'Autre'],
+    'Autre': ['Terrain nu', 'Terrain bâti', 'Maison', 'Appartement', 'Immeuble', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre']
   };
   // Choix « Autre » → champ de précision (nom de l'input) ; la précision est obligatoire sauf pour la source.
   const AUTRE = { type: 'typeAutre', bien: 'bienAutre', docs: 'docsAutre', calendrier: 'calendrierAutre', source: 'sourceAutre' };
 
-  // Surfaces demandées selon le type et l'état du bien : { cle, libelle, requis }.
-  // Obligatoires : la surface qui détermine l'autorisation (créée pour une construction, existante pour une rénovation,
-  // un aménagement intérieur ou une démolition, les deux pour une extension) ; jamais de terrain pour un appartement.
-  const surfacesPour = (type, bien) => {
-    const appart = bien === 'Appartement';
-    const L = [];
-    const add = (cle, libelle, requis) => L.push({ cle, libelle, requis });
-    switch (type) {
-      case 'Construction':
-        add('surface', 'Surface créée', true);
-        if (bien === 'Terrain bâti') add('surfaceExistante', 'Surface du bâti existant', false);
-        add('emprise', 'Emprise au sol du projet', false);
-        add('surfaceTerrain', 'Surface du terrain', false);
-        break;
-      case 'Extension':
-        add('surfaceExistante', 'Surface existante', true);
-        add('surface', 'Surface créée', true);
-        add('emprise', 'Emprise au sol de l’extension', false);
-        if (!appart) add('surfaceTerrain', 'Surface du terrain', false);
-        break;
-      case 'Rénovation':
-      case 'Aménagement intérieur':
-        add('surfaceExistante', 'Surface existante', true);
-        add('surface', 'Surface créée, le cas échéant', false);
-        break;
-      case 'Aménagement extérieur':
-        add('emprise', 'Surface aménagée (terrasse, piscine, abri…)', false);
-        if (!appart) add('surfaceTerrain', 'Surface du terrain', false);
-        break;
-      case 'Démolition':
-        add('surfaceExistante', 'Surface à démolir', true);
-        if (!appart) add('surfaceTerrain', 'Surface du terrain', false);
-        break;
-      default:
-        add('surfaceExistante', 'Surface existante', false);
-        add('surface', 'Surface créée', false);
-        add('emprise', 'Emprise au sol', false);
-        if (!appart) add('surfaceTerrain', 'Surface du terrain', false);
-    }
-    return L;
-  };
-  const SURFACES = ['surface', 'surfaceExistante', 'emprise', 'surfaceTerrain'];
+  // Surfaces, toutes facultatives (« si concerné »), avec une définition derrière le bouton « ? » : [clé, libellé].
+  // Même liste dans la fonction « demande » (e-mails) et dans dossier.js (récapitulatif de l'espace client).
+  const SURFACES = [
+    ['surfaceExistante', 'Surface habitable existante'], ['surface', 'Surface habitable créée'],
+    ['empriseExistante', 'Emprise au sol du bâti existant'], ['emprise', 'Emprise au sol du bâti après projet'],
+    ['surfaceTerrain', 'Surface de la parcelle']
+  ];
 
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
@@ -118,7 +83,6 @@
   let s = initial();
 
   const val = (name) => (form.elements[name] ? form.elements[name].value : '');
-  const surfacesActives = () => surfacesPour(s.type, s.bien);
   const estAutre = (g) => (g === 'docs' ? s.docs.includes('Autre') : s[g] === 'Autre');
   // Valeur affichée : « Autre : précision » quand le choix est « Autre »
   const aff = (v, g) => (v === 'Autre' && val(AUTRE[g]).trim() ? 'Autre : ' + val(AUTRE[g]).trim() : v);
@@ -144,11 +108,7 @@
       if (!/^\d{5}$/.test(val('codePostal').trim())) e.codePostal = '5 chiffres';
     }
     if (step === 3) {
-      surfacesActives().forEach((sf) => {
-        const v = val(sf.cle).trim();
-        if (sf.requis && !(Number(v) > 0)) e[sf.cle] = 'Indiquez une surface approximative';
-        else if (v && !(Number(v) >= 0)) e[sf.cle] = 'Nombre invalide';
-      });
+      SURFACES.forEach(([cle]) => { const v = val(cle).trim(); if (v && !(Number(v) >= 0)) e[cle] = 'Nombre invalide'; });
     }
     if (step === 4) {
       if (!s.docs.length) e.docs = 'Choisissez au moins un document';
@@ -175,7 +135,7 @@
     add('Type de projet', aff(s.type, 'type')); add('État actuel du bien', aff(s.bien, 'bien'));
     add('Documents souhaités', s.docs.map((d) => aff(d, 'docs')).join(', '));
     add('Adresse du projet', val('adresse')); add('Commune', val('commune')); add('Code postal', val('codePostal')); add('Référence cadastrale', val('cadastre'));
-    surfacesActives().forEach((sf) => add(sf.libelle + ' (m²)', val(sf.cle)));
+    SURFACES.forEach(([cle, libelle]) => add(libelle + ' (m²)', val(cle)));
     add('Démarrage souhaité', aff(s.calendrier, 'calendrier'));
     add('Message', val('message')); add('Source', aff(s.source, 'source'));
     add('_subject', 'Nouveau projet — ' + aff(s.type, 'type') + ' · ' + (s.docs[0] ? aff(s.docs[0], 'docs') : 'à définir') + ' · ' + val('commune') + ' (' + val('nom') + ')');
@@ -209,6 +169,18 @@
     }
   };
 
+  // Bouton « ? » : ouvre ou ferme la définition d'un champ, une seule à la fois. Sur grand écran, la définition
+  // s'affiche par-dessus le formulaire (la hauteur des écrans ne change pas) : elle se ferme aussi par Échap,
+  // par un clic ailleurs (sur elle comprise, puisqu'elle peut recouvrir d'autres champs) ou quand le focus part.
+  const aides = $$('[data-aide]', form);
+  const superpose = window.matchMedia('(min-width: 981px)');
+  const defDe = (b) => document.getElementById(b.getAttribute('aria-controls'));
+  const fermerAides = (sauf) => aides.forEach((b) => {
+    if (b === sauf || b.getAttribute('aria-expanded') !== 'true') return;
+    b.setAttribute('aria-expanded', 'false');
+    montrerBloc(defDe(b), false);
+  });
+
   const setErr = (key, msg) => {
     $$('[data-err="' + key + '"]', form).forEach((n) => { n.textContent = msg || ''; n.hidden = !msg; });
     const inp = form.elements[key];
@@ -236,7 +208,7 @@
         ['Nom', (val('prenom') + ' ' + val('nom')).trim()], ['Email', val('email')], ['Téléphone', val('telephone')]]],
       ['Votre projet', 1, [['Type de projet', aff(s.type, 'type')], ['État actuel du bien', aff(s.bien, 'bien')]]],
       ['Le lieu', 2, [['Adresse', val('adresse')], ['Commune', [val('codePostal'), val('commune')].filter((x) => x.trim()).join(' ')], ['Référence cadastrale', val('cadastre')]]],
-      ['Les surfaces', 3, surfacesActives().map((sf) => [sf.libelle, val(sf.cle).trim() ? val(sf.cle).trim() + ' m²' : ''])],
+      ['Les surfaces', 3, SURFACES.map(([cle, libelle]) => [libelle, val(cle).trim() ? val(cle).trim() + ' m²' : ''])],
       ['Vos besoins', 4, [['Documents souhaités', s.docs.map((d) => aff(d, 'docs')).join(', ')]]],
       ['Détails', 5, [['Démarrage souhaité', aff(s.calendrier, 'calendrier')], ['Votre projet', val('message')], ['Pièces jointes', s.fichiers.map((f) => f.name).join(', ')]]],
       ['Comment nous avez-vous connus', 6, [['Source', aff(s.source, 'source')]]]
@@ -302,25 +274,12 @@
       if (inp) inp.toggleAttribute('aria-required', visible && g !== 'source');
     });
 
-    // Surfaces : seules celles du projet, dans l'ordre logique, libellés adaptés, mention « facultatif »
-    const actives = surfacesActives();
-    SURFACES.forEach((cle) => {
-      const bloc = $('[data-surface="' + cle + '"]', form);
-      const sf = actives.find((x) => x.cle === cle);
-      bloc.hidden = !sf;
-      bloc.className = 'field' + (sf ? ' ordre-' + (actives.indexOf(sf) + 1) : '');
-      if (sf) {
-        $('[data-lbl]', bloc).textContent = sf.libelle;
-        $('[data-lbl-opt]', bloc).hidden = sf.requis;
-      }
-      if (form.elements[cle]) form.elements[cle].toggleAttribute('aria-required', !!(sf && sf.requis));
-    });
-
-    // Aide contextuelle sur les autorisations (surfaces actives seulement, seuils selon le type)
-    const vActive = (cle) => (actives.some((x) => x.cle === cle) ? Number(val(cle)) || 0 : 0);
-    const creee = vActive('surface'), empriseSol = vActive('emprise'), existante = vActive('surfaceExistante');
+    // Aide contextuelle sur les autorisations : surface habitable créée et emprise ajoutée (après projet moins existant), seuils selon le type
+    const nb = (cle) => Number(val(cle)) || 0;
+    const creee = nb('surface'), existante = nb('surfaceExistante');
+    const empriseAjoutee = nb('emprise') ? Math.max(0, nb('emprise') - nb('empriseExistante')) : 0;
     const seuil = s.type === 'Construction' ? 20 : 40;
-    const depasse = Math.max(creee, empriseSol) > seuil;
+    const depasse = Math.max(creee, empriseAjoutee) > seuil;
     const total150 = s.type !== 'Construction' && creee > 20 && existante + creee > 150;
     const dp = s.docs.includes('Déclaration préalable');
     const docHint = s.docs.includes('Je ne sais pas encore') ? "Pas d'inquiétude : nous déterminons ensemble l'autorisation nécessaire selon la surface créée et la zone du PLU."
@@ -359,7 +318,7 @@
     if (s.step === DERNIERE) { rendreRecapFinal(); majDefile(); }
 
     ['societe', 'prenom', 'nom', 'email', 'telephone', 'type', 'typeAutre', 'bien', 'bienAutre', 'adresse', 'commune', 'codePostal',
-      'surface', 'surfaceExistante', 'emprise', 'surfaceTerrain', 'docs', 'docsAutre', 'calendrier', 'calendrierAutre', 'message', 'fichiers']
+      'surface', 'surfaceExistante', 'empriseExistante', 'emprise', 'surfaceTerrain', 'docs', 'docsAutre', 'calendrier', 'calendrierAutre', 'message', 'fichiers']
       .forEach((k) => setErr(k, errs[k]));
 
     if (el.back) { el.back.hidden = s.step === 0; el.back.disabled = s.envoi; }
@@ -375,6 +334,7 @@
   // ---- Navigation entre écrans ----
   const cibleDe = (cle) => (form.elements[cle] && form.elements[cle].focus ? form.elements[cle] : $('.chip[data-group="' + cle + '"]:not([hidden])', form));
   const allerA = (step) => {
+    fermerAides();
     if (el.steps[step]) el.steps[step].scrollTop = 0; // récapitulatif : repartir du haut
     s.step = step; s.tried = false; render();
     if (el.progress && el.progress.getBoundingClientRect().top < 0) el.progress.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
@@ -416,8 +376,7 @@
     const fd = new FormData();
     ['prenom', 'nom', 'email', 'telephone', 'adresse', 'commune', 'codePostal', 'cadastre', 'message', '_honey']
       .forEach((k) => fd.append(k, val(k)));
-    const actives = surfacesActives();
-    SURFACES.forEach((k) => fd.append(k, actives.some((sf) => sf.cle === k) ? val(k) : ''));
+    SURFACES.forEach(([k]) => fd.append(k, val(k)));
     fd.append('societe', pro ? val('societe') : ''); fd.append('activite', pro ? val('activite') : '');
     fd.append('profil', s.profil); fd.append('type', s.type); fd.append('bien', s.bien);
     fd.append('calendrier', s.calendrier); fd.append('source', s.source);
@@ -492,7 +451,10 @@
   };
 
   // « Nouvelle demande » : état et champs vidés, retour au premier écran (avec son focus).
-  const reset = () => { s = initial(); form.reset(); allerA(0); };
+  const reset = () => {
+    s = initial(); form.reset();
+    allerA(0);
+  };
 
   // ---- Écouteurs ----
   const ORDRE_DOCS = $$('.chip[data-group="docs"]', form).map((c) => c.dataset.value);
@@ -507,6 +469,18 @@
     if (g === 'type' && !(BIENS_PAR_TYPE[s.type] || []).includes(s.bien)) s.bien = '';
     render();
   }));
+  aides.forEach((b) => b.addEventListener('click', () => {
+    const ouvrir = b.getAttribute('aria-expanded') !== 'true';
+    fermerAides(b);
+    b.setAttribute('aria-expanded', ouvrir ? 'true' : 'false');
+    montrerBloc(defDe(b), ouvrir);
+  }));
+  document.addEventListener('click', (e) => { if (superpose.matches && !e.target.closest('[data-aide]')) fermerAides(); });
+  form.addEventListener('focusin', (e) => { if (superpose.matches && !e.target.closest('[data-aide]')) fermerAides(); });
+  form.addEventListener('keydown', (e) => {
+    const ouverte = e.key === 'Escape' && aides.find((b) => b.getAttribute('aria-expanded') === 'true');
+    if (ouverte) { fermerAides(); ouverte.focus(); }
+  });
   if (el.steps[DERNIERE]) el.steps[DERNIERE].addEventListener('scroll', majDefile, { passive: true });
   window.addEventListener('resize', majDefile);
   if (el.next) el.next.addEventListener('click', next);

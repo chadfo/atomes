@@ -215,11 +215,11 @@ atom-logo canvas{position:absolute;inset:0}
   .steps .step--recap[data-defile="haut"]::after,.steps .step--recap[data-defile="milieu"]::after,.steps .step--recap[data-defile="milieu"]::before,.steps .step--recap[data-defile="bas"]::before{opacity:1}
 }
 .field{display:flex;flex-direction:column;gap:8px}
+.field > .f-hint{margin:0}
 .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:22px}
 .grid-commune{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:22px}
 .grid-commune .field{min-width:0}
-.grid-surfaces{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:16px 22px}
-.grid-surfaces .ordre-1{order:1}.grid-surfaces .ordre-2{order:2}.grid-surfaces .ordre-3{order:3}.grid-surfaces .ordre-4{order:4}
+.grid-surfaces{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:16px 22px}
 .grid-profil{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 
 /* Choix (boutons-puces) */
@@ -227,7 +227,7 @@ atom-logo canvas{position:absolute;inset:0}
 .chip{background:transparent;color:rgba(var(--ink-rgb),.75);border:1px solid rgba(var(--ink-rgb),.25);padding:11px 14px;font:500 11.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s,border-color .15s}
 .chip:hover{border-color:rgba(var(--ink-rgb),.75)}
 .chip.is-on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.chip:focus-visible,.btn:focus-visible,.file-chip button:focus-visible,.recap-sec .link-more:focus-visible,.proj-more:focus-visible{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:3px}
+.chip:focus-visible,.btn:focus-visible,.aide:focus-visible,.file-chip button:focus-visible,.recap-sec .link-more:focus-visible,.proj-more:focus-visible{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:3px}
 .progress:focus{outline:none}
 .grid-profil .chip{padding:13px 14px;text-align:left}
 
@@ -245,6 +245,20 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .unit{position:absolute;right:14px;top:50%;transform:translateY(-50%);font:400 12px var(--mono);color:rgba(var(--ink-rgb),.45);pointer-events:none}
 .f-err{font:400 11.5px var(--mono);color:var(--err)}
 .f-hint{font:400 13px/1.55 var(--font);color:rgba(var(--ink-rgb),.55);text-wrap:pretty}
+/* Bouton « ? » à côté d'un libellé : ouvre la définition du champ (.f-def), placée sous le libellé. Sur grand écran,
+   elle s'affiche par-dessus le formulaire, sur toute la largeur des surfaces, pour ne pas changer la hauteur commune
+   des écrans (voir .steps) ; en dessous de 980 px, elle s'insère dans la page. */
+.lbl-ligne{font:500 11.5px/20px var(--mono)} /* même police que l’étiquette : l’espace avant « (si concerné) » a la bonne largeur */
+.lbl-fin{white-space:nowrap}
+.aide{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-left:6px;padding:0;vertical-align:middle;border:1px solid rgba(var(--ink-rgb),.35);background:transparent;color:rgba(var(--ink-rgb),.6);font:500 11px/1 var(--mono);cursor:pointer;transition:border-color .15s,color .15s}
+.aide:hover,.aide[aria-expanded="true"]{border-color:var(--ink);color:var(--ink)}
+.f-def{margin:8px 0 0;padding:12px 14px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),.25);font:400 13px/1.55 var(--font);color:rgba(var(--ink-rgb),.8);text-wrap:pretty}
+@media (min-width:981px){
+  .grid-surfaces{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid-surfaces .lbl-ligne{position:relative}
+  .grid-surfaces .f-def{position:absolute;z-index:5;top:100%;left:0;width:calc(200% + 22px);box-sizing:border-box;margin-top:6px}
+  .grid-surfaces .field:nth-of-type(even) .f-def{left:auto;right:0}
+}
 
 /* Blocs qui apparaissent après une réponse (société, état du bien) */
 @keyframes reveler{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}

@@ -97,16 +97,20 @@ La touche Entrée passe à l'écran suivant.
    Téléphone (facultatif, ≥ 10 chiffres si rempli).
 2. **Votre projet** — Type de projet* (Construction, Rénovation, Extension, Démolition, Aménagement intérieur,
    Aménagement extérieur, Autre), puis État actuel du bien* limité aux cas cohérents : Construction → terrain nu,
-   terrain bâti ; Rénovation, Extension, Aménagement intérieur → maison, appartement, local pro, annexe /
-   dépendance / garage ; Aménagement extérieur → maison, appartement, local pro, terrain nu ; Démolition →
-   maison, local pro, annexe ; type « Autre » → tous les états. L'état « Autre » est toujours proposé, avec un
+   terrain bâti ; Rénovation, Extension, Aménagement intérieur → maison, appartement, immeuble, local pro,
+   annexe / dépendance / garage ; Aménagement extérieur → maison, appartement, immeuble, local pro, terrain nu ;
+   Démolition → maison, immeuble, local pro, annexe ; type « Autre » → tous les états. L'état « Autre » est toujours proposé, avec un
    champ de précision obligatoire (de même pour le type).
-3. **Le lieu** — Adresse* · Commune* · Code postal* (5 chiffres) · Référence cadastrale.
-4. **Les surfaces** — seules celles du projet, dans l'ordre logique, libellés adaptés (ex. « Surface à démolir »,
-   « Surface du bâti existant »), jamais de surface du terrain pour un appartement. Obligatoires : surface créée
-   (Construction), surface existante (Rénovation, Aménagement intérieur, Démolition), les deux pour une
-   Extension (règle des 150 m² après travaux). Les autres sont facultatives (rénovation de façade : rien à
-   saisir en surface créée).
+3. **Le lieu** — Adresse ou emplacement* (une rue, un lieu-dit ou un lotissement suffisent si le terrain n'a pas
+   encore de numéro) · Commune* · Code postal* (5 chiffres) · Référence cadastrale.
+4. **Les surfaces** — cinq champs fixes, tous facultatifs (« si concerné ») : Surface habitable existante,
+   Surface habitable créée, Emprise au sol du bâti existant, Emprise au sol du bâti après projet, Surface de la
+   parcelle (colonnes `surface_existante`, `surface`, `emprise_existante`, `emprise`, `surface_terrain`). Un
+   bouton « ? » à côté de chaque libellé ouvre la définition du champ (textes de Simon pour la surface habitable
+   et l'emprise au sol), une seule à la fois. Sur grand écran, elle s'affiche par-dessus le formulaire, sur toute la
+   largeur des surfaces, pour ne pas changer la hauteur commune des écrans ; elle se ferme par le « ? », Échap, un
+   clic ou quand le focus part. En dessous de 980 px, elle s'insère sous le libellé. Les aides de l'écran suivant se fondent sur la surface habitable créée et sur l'emprise
+   ajoutée (après projet moins existant).
 5. **Vos besoins** — Documents souhaités (choix multiple, ≥ 1*, tous visibles) : Permis de construire,
    Déclaration préalable, Permis d'aménager, Permis de démolir, Dossier de consultation des entreprises,
    Perspective, Réalisation de plans, Avis d'architecte / étude simple, Autre (précision obligatoire), Je ne
@@ -132,8 +136,8 @@ les écrans s'affichent en flux normal, sans défilement interne.
 Les précisions des choix « Autre » sont enregistrées dans `projets.precisions` (jsonb : type, bien, documents,
 calendrier, source), affichées « Autre : … » dans les e-mails, l'objet du mail et l'espace client.
 Les règles de cohérence vivent dans `contact.js` : `BIENS_PAR_TYPE` est dupliqué dans la fonction `demande`
-(validation), `surfacesPour` dans la fonction (libellés de l'e-mail) et dans `dossier.js` (récapitulatif) : modifier
-les trois ensemble.
+(validation) ; la liste des surfaces (`SURFACES`, clés et libellés) l'est dans la fonction (e-mails) et dans
+`dossier.js` (récapitulatif) : modifier les trois ensemble.
 
 **Envoi** : si `config.js` est rempli, la fonction `demande` (dossier + espace client + e-mails), FormSubmit en
 secours ; sinon FormSubmit seul (`POST https://formsubmit.co/ajax/contact@atomes.studio`, ou formulaire
