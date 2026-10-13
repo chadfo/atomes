@@ -1,6 +1,6 @@
 // =============================================================================
 // atomes.studio — fonction « demande » (Supabase Edge Function, Deno)
-// Reçoit le formulaire de contact (multipart : champs + pièces jointes) et :
+// Reçoit le formulaire de devis, devis.html (multipart : champs + pièces jointes) et :
 //   1. crée le dossier dans la table projets (id = AAMMJJHHMMSS, heure de Paris),
 //      la timeline est créée par le déclencheur SQL ;
 //   2. dépose les pièces jointes dans le bucket privé « dossiers/<id>/client/ » ;
@@ -35,10 +35,10 @@ const MAX_ESSAIS_ID = 10;
 const MAX_PAR_EMAIL_24H = 3;                 // limites simples contre les envois en masse
 const MAX_GLOBAL_1H = 30;
 
-// Valeurs fermées du formulaire (doivent rester identiques à contact.html).
+// Valeurs fermées du formulaire (doivent rester identiques à devis.html).
 const TYPES = ["Construction", "Rénovation", "Extension", "Démolition", "Aménagement intérieur", "Aménagement extérieur", "Autre"];
 const DOCS = ["Permis de construire", "Déclaration préalable", "Permis d'aménager", "Permis de démolir", "Dossier de consultation des entreprises", "Perspective", "Réalisation de plans", "Avis d'architecte / étude simple", "Autre", "Je ne sais pas encore"];
-// États possibles du bien selon le type de projet (mêmes règles que contact.js).
+// États possibles du bien selon le type de projet (mêmes règles que devis.js).
 const BIENS_PAR_TYPE: Record<string, string[]> = {
   "Construction": ["Terrain nu", "Terrain bâti", "Autre"],
   "Rénovation": ["Maison", "Appartement", "Immeuble", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
 
 // ---------- Outils ------------------------------------------------------------
 
-// Surfaces du formulaire, toutes facultatives (même liste que contact.js et dossier.js) : [clé, libellé].
+// Surfaces du formulaire, toutes facultatives (même liste que devis.js et dossier.js) : [clé, libellé].
 const SURFACES: [keyof Demande, string][] = [
   ["surfaceExistante", "Surface habitable existante"], ["surface", "Surface habitable créée"],
   ["empriseExistante", "Emprise au sol du bâti existant"], ["emprise", "Emprise au sol du bâti après projet"],

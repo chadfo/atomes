@@ -1,13 +1,14 @@
 # CLAUDE.md — atomes.studio
 
-Site vitrine de l'agence d'architecture Atomes studio (Simon Charles, architecte HMONP, Toulon / Hyères). Quatre pages : index, projets, a-propos, contact. HTML statique + CSS + JS vanilla, sans build. Hébergé sur GitHub Pages, domaine atomes.studio. Lire README.md pour la structure, la charte et le contrat du formulaire.
+Site vitrine de l'agence d'architecture Atomes studio (Simon Charles, architecte HMONP, Toulon / Hyères). Cinq pages : index, projets, a-propos, contact (message simple), devis (demande de devis). HTML statique + CSS + JS vanilla, sans build. Hébergé sur GitHub Pages, domaine atomes.studio. Lire README.md pour la structure, la charte et le contrat du formulaire.
 
 ## Règles
 - Palette stricte : fond #171512, encre #ece7de, blanc #ffffff pour actif/hover, surfaces #1e1b17 (#221e19 au survol des projets), erreurs #d8896b. Pas d'autre couleur, pas d'arrondi, pas d'ombre.
 - Typo : Archivo (titres, textes) + IBM Plex Mono (étiquettes en capitales, letter-spacing .12em). Google Fonts.
 - Français, ton sobre. Ne pas réécrire les textes existants sans demande explicite.
 - Responsive : nav hamburger < 640 px ; sections image/texte empilées < 980 px.
-- Le formulaire de contact (huit écrans, récapitulatif avant envoi) envoie vers la fonction `demande`, FormSubmit en secours. Garder le format de l'objet du mail `Nouveau projet — Type · Document · Commune (Nom)` ; pour un choix « Autre », la valeur devient `Autre : précision`. Chaque choix fermé (type, état du bien, documents, démarrage, source) a une option « Autre » avec un champ de précision, enregistré dans `projets.precisions`. Les règles de cohérence type → état du bien vivent dans `contact.js` (`BIENS_PAR_TYPE`, dupliqué dans la fonction `demande`) ; les cinq surfaces (`SURFACES`, toutes facultatives, avec définition derrière un bouton « ? ») sont listées dans `contact.js`, la fonction et `dossier.js` : modifier les trois ensemble, ainsi que les listes fermées (DOCS, CALENDRIERS, SOURCES). Pas de question sur le budget (choix de Simon).
+- Le formulaire de devis (devis.html, huit écrans, récapitulatif avant envoi) envoie vers la fonction `demande`, FormSubmit en secours. Garder le format de l'objet du mail `Nouveau projet — Type · Document · Commune (Nom)` ; pour un choix « Autre », la valeur devient `Autre : précision`. Chaque choix fermé (type, état du bien, documents, démarrage, source) a une option « Autre » avec un champ de précision, enregistré dans `projets.precisions`. Les règles de cohérence type → état du bien vivent dans `devis.js` (`BIENS_PAR_TYPE`, dupliqué dans la fonction `demande`) ; les cinq surfaces (`SURFACES`, toutes facultatives, avec définition derrière un bouton « ? ») sont listées dans `devis.js`, la fonction et `dossier.js` : modifier les trois ensemble, ainsi que les listes fermées (DOCS, CALENDRIERS, SOURCES). Pas de question sur le budget (choix de Simon).
+- La page Contact (contact.html) sert aux prises de contact simples, distinctes des devis : question « Votre demande concerne-t-elle un devis ? » (oui → bouton vers devis.html), sinon coordonnées et message envoyés par FormSubmit à contact@atomes.studio, sans dossier. Objet `Nouveau message — Prénom Nom` (ou `— Société (Prénom Nom)`), à garder distinct de `Nouveau projet — …`. Menu : Accueil, Projets, À propos, Contact, Devis.
 - Garder .nojekyll, robots.txt, sitemap.xml, favicon.png, l'image OG et les meta de chaque page.
 - Le logo `<atom-logo>` (site/assets/js/atom-logo.js) est à conserver tel quel.
 
@@ -15,7 +16,7 @@ Site vitrine de l'agence d'architecture Atomes studio (Simon Charles, architecte
 - Pas de style inline : tout dans `site/assets/css/site.css` (jetons `:root`, composants partagés, puis une partie par page). Utiliser les jetons (`var(--ink)`, `rgba(var(--ink-rgb),.55)`, `var(--pad-x)`…).
 - Pas de `box-sizing:border-box` global (la mise en page d'origine n'en a pas) ; le poser explicitement là où il faut.
 - Images : `site/images/<nom>.webp`, avec `alt` descriptif, `width`/`height` et `loading="lazy"` hors premier écran. Galerie d'un projet : `<template>` en fin de section dans projets.html.
-- JS : un fichier par page (`projets.js`, `contact.js`), chargé en `defer`, sans dépendance.
+- JS : un fichier par page (`projets.js`, `contact.js`, `devis.js`), chargé en `defer`, sans dépendance.
 - `_archive/claude-design/` est la version d'origine (Claude Design) : référence uniquement, ne pas la modifier ni la publier.
 
 ## Démarrer
@@ -29,7 +30,7 @@ Dépôt `chadfo/atomes`, branche `main` ; `site/` est déployé par `.github/wor
 - Identifiant de dossier : `AAMMJJHHMMSS` à l'heure de Paris, généré côté serveur (seconde suivante en cas de collision). Ne pas changer ce format.
 - Fichiers : bucket privé `dossiers`, chemins `<id>/client/…` et `<id>/agence/…`. Jamais de bucket public, jamais la clé `service_role` dans `site/`.
 - Front : `site/dossier/` + `assets/js/dossier.js` (supabase-js UMD depuis jsDelivr, version épinglée). Construire le DOM avec `textContent`, jamais `innerHTML` avec des données utilisateur. Mode démo : `?demo`.
-- Le formulaire garde FormSubmit en secours : ne pas retirer ce chemin.
+- Le formulaire de devis garde FormSubmit en secours : ne pas retirer ce chemin.
 
 ## État et suite
 - Priorité 1 faite (octobre 2026) : images en vraies balises `<img>`, suppression de support.js / image-slot.js / JSON base64, styles extraits en CSS, formulaire et accordéon réécrits en JS vanilla.

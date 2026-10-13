@@ -125,7 +125,7 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
 
 ## 6. Tester
 
-1. `npx serve site`, ouvrir http://localhost:3000/contact.html (ce port exactement, sinon ajouter l'adresse
+1. `npx serve site`, ouvrir http://localhost:3000/devis.html (ce port exactement, sinon ajouter l'adresse
    affichée à `ORIGINES_AUTORISEES`), envoyer une demande avec une adresse e-mail à toi (différente de
    contact@atomes.studio) et une pièce jointe.
 2. Vérifier : l'écran « Demande envoyée » affiche un numéro de dossier ; deux e-mails arrivent (accusé de
@@ -140,7 +140,8 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
      `0003_emprise_existante.sql` → Run (colonnes `precisions` et `emprise_existante`). Sans effet sur ce qui est
      en ligne : peut se faire à l'avance.
   2. Publier le site (VS Code → Sync Changes) et attendre le vert dans l'onglet Actions de GitHub, puis une
-     dizaine de minutes : les navigateurs gardent l'ancien `contact.js` en cache jusqu'à 10 minutes.
+     dizaine de minutes : les navigateurs peuvent garder l'ancienne page en cache jusqu'à 10 minutes. Le
+     formulaire de devis est désormais sur devis.html ; contact.html devient une page de message simple.
   3. Aussitôt après, redéployer la fonction `demande` avec le `index.ts` à jour.
 
   Ne pas redéployer la fonction avant la migration : chaque enregistrement échouerait et toutes les demandes

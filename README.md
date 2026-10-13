@@ -11,11 +11,13 @@ site/                      ← racine publiée (tout ce dossier va à la racine 
   index.html               Accueil
   projets.html             Projets (accordéon, galerie par projet)
   a-propos.html            À propos
-  contact.html             Formulaire de demande en huit écrans
+  contact.html             Contact : question « devis ? », puis message simple (FormSubmit, sans dossier)
+  devis.html               Demande de devis en huit écrans (dossier + espace client)
   assets/css/site.css      Feuille de style commune : jetons de la charte + composants + pages
   assets/js/atom-logo.js   Logo animé <atom-logo> (à conserver tel quel)
   assets/js/projets.js     Accordéon et galeries de la page Projets
-  assets/js/contact.js     Logique du formulaire (étapes, validation, envoi FormSubmit)
+  assets/js/contact.js     Page Contact (question devis, validation, envoi FormSubmit)
+  assets/js/devis.js       Formulaire de devis (écrans, validation, envoi vers la fonction demande)
   images/                  Toutes les photos (.webp)
   favicon.png · a5ce3393-….png (image OG) · robots.txt · sitemap.xml · .nojekyll
 _archive/claude-design/    Version d'origine produite avec Claude Design (référence, non publiée)
@@ -59,9 +61,11 @@ Il n'y a rien à installer ni à compiler : on édite les fichiers de `site/` et
 | index.html | Hero plein écran, 4 blocs « philosophie » (image à gauche, 300 px min), CTA | hero, philo-01…04 |
 | projets.html | 7 projets en accordéon (un seul ouvert : 35vw, 78vh sous 640 px ; fermé : 400 px), flèches + compteur | proj-0N (+ -a…-d) |
 | a-propos.html | Portrait + texte, formation, signature | portrait, signature |
-| contact.html | Formulaire en huit écrans | contact-photo |
+| contact.html | Question « devis ? » puis message simple | philo-02 |
+| devis.html | Formulaire de devis en huit écrans | contact-photo |
 
-Toutes les pages partagent : nav sticky (logo animé + 4 liens, lien actif `aria-current="page"` en blanc),
+Toutes les pages partagent : nav sticky (logo animé + 5 liens : Accueil, Projets, À propos, Contact, Devis ;
+lien actif `aria-current="page"` en blanc),
 pied de page 2 colonnes en IBM Plex Mono (à droite : adresse postale, mail, Instagram, chacun précédé d'une
 icône), fond `#171512`.
 
@@ -87,7 +91,21 @@ icône), fond `#171512`.
 - **Espacements** : padding horizontal des pages `clamp(20px,5vw,48px)` ; nav padding 24 px ; gaps de
   formulaire 22 px.
 
-## Formulaire de contact (contact.html + assets/js/contact.js)
+## Page Contact (contact.html + assets/js/contact.js)
+
+Prise de contact simple (entreprises, partenaires, presse…), distincte des demandes de devis.
+- Question d'abord : « Votre demande concerne-t-elle un devis ? » (Oui | Non).
+- **Oui** : court texte et bouton « Faire une demande de devis → » vers devis.html.
+- **Non** : Prénom* · Nom* · Email* · Téléphone (facultatif, ≥ 10 chiffres si rempli) · Société ou organisme
+  (facultatif) · Votre message* (10 à 5 000 caractères), puis « Envoyer le message ».
+- Envoi par FormSubmit (`POST https://formsubmit.co/ajax/contact@atomes.studio`), sans dossier ni Supabase.
+  Objet : `Nouveau message — Prénom Nom` ou `Nouveau message — Société (Prénom Nom)`, à garder distinct de
+  l'objet des devis (`Nouveau projet — …`). Champ `email` = adresse de réponse, `_template=table`, `_honey`.
+- Sur grand écran, les deux panneaux sont superposés (même principe que les écrans du devis) : la section et
+  l'image ne bougent pas quand on répond ; les erreurs s'affichent sur la ligne du libellé.
+- Les boutons « Nous contacter » de l'accueil mènent ici ; la question oriente les demandes de devis.
+
+## Formulaire de devis (devis.html + assets/js/devis.js)
 
 Huit écrans, un sujet par écran, barre de progression (8 segments 2 px), étiquette « 0N — Titre » et
 « 0N / 08 », validation par écran, boutons Retour / Continuer → ; l'envoi n'est possible qu'au récapitulatif.
@@ -130,24 +148,24 @@ La touche Entrée passe à l'écran suivant.
 
 Sur grand écran (> 980 px), les huit écrans sont superposés dans une grille (`.steps`, écrans inactifs en
 `visibility:hidden`, écran actif `.is-on`) dont la hauteur est figée à celle du plus haut écran au repos (l'écran
-Détails) : contact.js la mesure (`caleHauteur`, variable `--h-ecrans`) en masquant les blocs qui se déplient, au
+Détails) : devis.js la mesure (`caleHauteur`, variable `--h-ecrans`) en masquant les blocs qui se déplient, au
 premier rendu, après le chargement des polices et à chaque redimensionnement. La section, l'image et les boutons
 gardent donc la même place tout au long du formulaire, quoi qu'on remplisse. Ce qui se déplie ensuite (précisions
 « Autre », pièces jointes, messages d'erreur) et le récapitulatif (positionné en absolu, hors de la mesure)
 défilent à l'intérieur de l'écran, avec une barre fine et des voiles dégradés en haut et en bas (`data-defile`
-posé par contact.js : haut, milieu, bas, aucun) ; `scroll-padding` garde l'élément focalisé hors des voiles.
+posé par devis.js : haut, milieu, bas, aucun) ; `scroll-padding` garde l'élément focalisé hors des voiles.
 L'écran Surfaces ne défile pas : ses définitions s'affichent par-dessus le formulaire. En dessous de 980 px
 (image au-dessus, hauteur fixe), les écrans s'affichent en flux normal, sans défilement interne.
 
 Les précisions des choix « Autre » sont enregistrées dans `projets.precisions` (jsonb : type, bien, documents,
 calendrier, source), affichées « Autre : … » dans les e-mails, l'objet du mail et l'espace client.
-Les règles de cohérence vivent dans `contact.js` : `BIENS_PAR_TYPE` est dupliqué dans la fonction `demande`
+Les règles de cohérence vivent dans `devis.js` : `BIENS_PAR_TYPE` est dupliqué dans la fonction `demande`
 (validation) ; la liste des surfaces (`SURFACES`, clés et libellés) l'est dans la fonction (e-mails) et dans
 `dossier.js` (récapitulatif) : modifier les trois ensemble.
 
 **Envoi** : si `config.js` est rempli, la fonction `demande` (dossier + espace client + e-mails), FormSubmit en
 secours ; sinon FormSubmit seul (`POST https://formsubmit.co/ajax/contact@atomes.studio`, ou formulaire
-multipart natif avec `_next = contact.html?envoye=1` s'il y a des pièces jointes). Champs envoyés sous leur
+multipart natif avec `_next = devis.html?envoye=1` s'il y a des pièces jointes). Champs envoyés sous leur
 libellé français (voir `champs()`), plus `_template=table`, `_captcha=false`.
 **Objet du mail** : `Nouveau projet — <Type> · <1er document> · <Commune> (<Nom>)`, format contractuel.
 

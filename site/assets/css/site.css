@@ -181,7 +181,8 @@ atom-logo canvas{position:absolute;inset:0}
 .sign img{width:220px;height:90px;display:block;object-fit:contain}
 
 /* ==========================================================================
-   Contact — formulaire de demande en huit écrans
+   Devis — formulaire de demande en huit écrans (devis.html)
+   .contact-sec, .intro et les styles de formulaire servent aussi à la page Contact (plus bas).
    ========================================================================== */
 .contact-sec{align-items:flex-start;flex:1}
 @media (max-width:980px){
@@ -198,7 +199,7 @@ atom-logo canvas{position:absolute;inset:0}
 .progress-lbl > span:last-child{color:rgba(var(--ink-rgb),.4)}
 
 /* Écrans : un seul est affiché (.is-on). Sur grand écran, ils sont superposés dans une grille dont la hauteur est figée
-   à celle du plus haut écran au repos (--h-ecrans, mesurée par contact.js sans les blocs qui se déplient) : la section,
+   à celle du plus haut écran au repos (--h-ecrans, mesurée par devis.js sans les blocs qui se déplient) : la section,
    l'image et les boutons gardent la même place tout au long du formulaire. Ce qui se déplie ensuite (précisions
    « Autre », pièces jointes, messages) et le récapitulatif défilent à l'intérieur de l'écran, avec des voiles dégradés
    en haut et en bas tant qu'il reste du contenu (data-defile) ; scroll-padding garde l'élément focalisé hors des voiles.
@@ -301,6 +302,23 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .sent-lbl{font:500 11.5px var(--mono);letter-spacing:.14em;color:rgba(var(--ink-rgb),.5);margin-bottom:16px}
 .sent p{margin:0;font:500 20px/1.5 var(--font);text-wrap:pretty}
 .sent .btn--ghost{margin-top:28px;padding:12px 20px}
+
+/* ==========================================================================
+   Contact — message simple (contact.html)
+   Question « devis ? », puis un panneau selon la réponse : lien vers le devis, ou coordonnées et message.
+   Sur grand écran, les deux panneaux sont superposés et gardent la hauteur du plus haut : la section et
+   l'image ne bougent pas quand on répond. Les messages d'erreur s'affichent sur la ligne du libellé.
+   ========================================================================== */
+.panneau{display:none;flex-direction:column;gap:22px}
+.panneau.is-on{display:flex}
+.panneau > .f-hint{margin:0}
+.lbl-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.lbl-row .f-err{text-align:right}
+@media (min-width:981px){
+  .panneaux{display:grid}
+  .panneaux .panneau{grid-area:1/1;display:flex;visibility:hidden}
+  .panneaux .panneau.is-on{visibility:visible}
+}
 
 /* ==========================================================================
    Espace client (espace/index.html)
