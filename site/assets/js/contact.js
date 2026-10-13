@@ -1,33 +1,91 @@
-// Page Contact — formulaire de demande en 3 étapes, envoi via FormSubmit.
-// Comportement, libellés et format de l'objet du mail sont contractuels :
-// `Nouveau projet — <Type> · <1er document> · <Commune> (<Nom>)`.
+// Page Contact — formulaire de demande en six écrans, envoi vers la fonction « demande »
+// (création du dossier et de l'espace client) avec FormSubmit en secours.
+// Format de l'objet du mail contractuel : `Nouveau projet — <Type> · <1er document> · <Commune> (<Nom>)`.
 (() => {
   const form = document.getElementById('demande');
   if (!form) return;
 
   const ENDPOINT_AJAX = 'https://formsubmit.co/ajax/contact@atomes.studio';
   const ENDPOINT_FORM = 'https://formsubmit.co/contact@atomes.studio';
-  const STEPS = ['Vous', 'Le projet', 'Détails'];
   const MAX_BYTES = 10 * 1024 * 1024;
-  // Si config.js renseigne la fonction « demande », l'envoi crée le dossier et l'espace client ;
-  // sinon (ou en cas de panne), envoi historique via FormSubmit.
+  const MAX_FICHIERS = 10;
   const cfg = window.ATOMES_CONFIG || {};
   const API = cfg.apiUrl ? cfg : null;
-  const MAX_FICHIERS = 10;
+
+  const STEPS = ['Vous', 'Votre projet', 'Le lieu', 'Les surfaces', 'Vos besoins', 'Détails'];
+  const DERNIERE = STEPS.length - 1;
+
+  // ---- Règles de cohérence : états possibles selon le type de projet ----
+  const BIENS_PAR_TYPE = {
+    'Construction': ['Terrain nu', 'Terrain déjà bâti'],
+    'Rénovation': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe ou dépendance'],
+    'Extension': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe ou dépendance'],
+    'Démolition': ['Maison', 'Local ou bâtiment pro', 'Annexe ou dépendance'],
+    'Aménagement intérieur': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe ou dépendance'],
+    'Aménagement extérieur': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Terrain nu'],
+    'Autre': ['Terrain nu', 'Terrain déjà bâti', 'Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe ou dépendance']
+  };
+
+  // Surfaces demandées selon le type et l'état du bien : { cle, libelle, requis }.
+  // Obligatoires : la surface qui détermine l'autorisation (créée pour une construction, existante pour une rénovation,
+  // un aménagement intérieur ou une démolition, les deux pour une extension) ; jamais de terrain pour un appartement.
+  const surfacesPour = (type, bien) => {
+    const appart = bien === 'Appartement';
+    const L = [];
+    const add = (cle, libelle, requis) => L.push({ cle, libelle, requis });
+    switch (type) {
+      case 'Construction':
+        add('surface', 'Surface créée', true);
+        if (bien === 'Terrain déjà bâti') add('surfaceExistante', 'Surface du bâti existant', false);
+        add('emprise', 'Emprise au sol du projet', false);
+        add('surfaceTerrain', 'Surface du terrain', false);
+        break;
+      case 'Extension':
+        add('surfaceExistante', 'Surface existante', true);
+        add('surface', 'Surface créée', true);
+        add('emprise', 'Emprise au sol de l’extension', false);
+        if (!appart) add('surfaceTerrain', 'Surface du terrain', false);
+        break;
+      case 'Rénovation':
+      case 'Aménagement intérieur':
+        add('surfaceExistante', 'Surface existante', true);
+        add('surface', 'Surface créée, le cas échéant', false);
+        break;
+      case 'Aménagement extérieur':
+        add('emprise', 'Surface aménagée (terrasse, piscine, abri…)', false);
+        if (!appart) add('surfaceTerrain', 'Surface du terrain', false);
+        break;
+      case 'Démolition':
+        add('surfaceExistante', 'Surface à démolir', true);
+        if (!appart) add('surfaceTerrain', 'Surface du terrain', false);
+        break;
+      default:
+        add('surfaceExistante', 'Surface existante', false);
+        add('surface', 'Surface créée', false);
+        add('emprise', 'Emprise au sol', false);
+        if (!appart) add('surfaceTerrain', 'Surface du terrain', false);
+    }
+    return L;
+  };
+  const SURFACES = ['surface', 'surfaceExistante', 'emprise', 'surfaceTerrain'];
+  const EXT_OK = /\.(jpe?g|png|gif|webp|heic|heif|pdf)$/i;
 
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
   const el = {
+    progress: $('.progress', form),
     bars: $$('.progress-bars span', form),
     stepNum: $$('[data-step-num]', form),
     stepTitle: $('[data-step-title]', form),
     steps: $$('.step', form),
     pro: $('[data-pro]', form),
+    blocBien: $('[data-bloc-bien]', form),
     docHint: $('[data-doc-hint]', form),
     message: form.elements.message,
     recap1: $('[data-recap-1]', form),
     recap2: $('[data-recap-2]', form),
+    recap3: $('[data-recap-3]', form),
     dropzone: $('.dropzone', form),
     fileInput: $('input[type="file"]', form),
     filesLabel: $('[data-files-label]', form),
@@ -42,21 +100,26 @@
     sentNum: $('[data-sent-num]'),
     sentMailOk: $('[data-sent-mail-ok]'),
     sentMailKo: $('[data-sent-mail-ko]'),
+    sentCompteKo: $('[data-sent-compte-ko]'),
     sentFichiers: $('[data-sent-fichiers]'),
     sentFichiersListe: $('[data-sent-fichiers-liste]'),
     apiNote: $('[data-api-note]'),
+    liveStatus: $('[data-live-status]', form),
+    liveAlert: $('[data-live-alert]', form),
     reset: $('[data-reset]')
   };
 
   const initial = () => ({
-    step: 0, profil: 'Particulier', type: 'Construction', docs: [], bien: 'Terrain nu',
-    fichiers: [], fichiersRefuses: '', survol: false, tried: false, sent: false, envoi: false, erreurEnvoi: '', dossier: '', mails: null, fichiersEchoues: []
+    step: 0, profil: 'Particulier', type: '', bien: '', docs: [], calendrier: '', source: '',
+    fichiers: [], fichiersRefuses: '', survol: false, tried: false, sent: false, envoi: false, erreurEnvoi: '',
+    dossier: '', mails: null, fichiersEchoues: [], compte: true
   });
   let s = initial();
 
   const val = (name) => (form.elements[name] ? form.elements[name].value : '');
+  const surfacesActives = () => surfacesPour(s.type, s.bien);
 
-  // ---- Validation (par étape) ----
+  // ---- Validation, un écran à la fois ----
   const validate = (step) => {
     const e = {};
     if (step === 0) {
@@ -67,33 +130,46 @@
       if (val('telephone').trim() && val('telephone').replace(/\D/g, '').length < 10) e.telephone = 'Numéro invalide';
     }
     if (step === 1) {
-      if (!s.docs.length) e.docs = 'Choisissez au moins un document';
-      if (!val('commune').trim()) e.commune = 'Champ requis';
-      if (!val('adresse').trim()) e.adresse = 'Champ requis';
-      if (!/^\d{5}$/.test(val('codePostal').trim())) e.codePostal = '5 chiffres';
-      if (![val('surface'), val('surfaceExistante'), val('emprise'), val('surfaceTerrain')].some((v) => Number(v) > 0)) e.surface = 'Indiquez au moins une surface approximative';
+      if (!s.type) e.type = 'Choisissez un type de projet';
+      else if (!s.bien) e.bien = 'Précisez l’état actuel du bien';
     }
     if (step === 2) {
+      if (!val('adresse').trim()) e.adresse = 'Champ requis';
+      if (!val('commune').trim()) e.commune = 'Champ requis';
+      if (!/^\d{5}$/.test(val('codePostal').trim())) e.codePostal = '5 chiffres';
+    }
+    if (step === 3) {
+      surfacesActives().forEach((sf) => {
+        const v = val(sf.cle).trim();
+        if (sf.requis && !(Number(v) > 0)) e[sf.cle] = 'Indiquez une surface approximative';
+        else if (v && !(Number(v) >= 0)) e[sf.cle] = 'Nombre invalide';
+      });
+    }
+    if (step === 4) {
+      if (!s.docs.length) e.docs = 'Choisissez au moins un document';
+    }
+    if (step === 5) {
+      if (!s.calendrier) e.calendrier = 'Indiquez le démarrage souhaité';
       if (val('message').trim().length < 10) e.message = 'Décrivez votre projet en quelques mots (10 caractères min.)';
+      else if (val('message').length > 5000) e.message = '5 000 caractères maximum.';
       if (s.fichiers.reduce((a, f) => a + f.size, 0) > MAX_BYTES) e.fichiers = 'Pièces jointes trop lourdes — 10 Mo max au total.';
       if (s.fichiers.length > MAX_FICHIERS) e.fichiers = MAX_FICHIERS + ' pièces jointes maximum.';
     }
     return e;
   };
 
-  // ---- Champs envoyés (libellés français, ordre et objet contractuels) ----
+  // ---- Champs envoyés à FormSubmit (libellés français, objet contractuel) ----
   const champs = () => {
     const out = [];
-    const add = (k, v) => { if (v !== undefined && v !== null && String(v).trim() !== '' && v !== '—') out.push([k, String(v)]); };
+    const add = (k, v) => { if (v !== undefined && v !== null && String(v).trim() !== '') out.push([k, String(v)]); };
     add('Profil', s.profil);
     if (s.profil === 'Professionnel') { add('Société', val('societe')); add('Activité', val('activite')); }
     add('Prénom', val('prenom')); add('Nom', val('nom')); add('email', val('email')); add('Téléphone', val('telephone'));
-    add('Type de projet', s.type); add('Documents souhaités', s.docs.join(', '));
+    add('Type de projet', s.type); add('État actuel du bien', s.bien); add('Documents souhaités', s.docs.join(', '));
     add('Adresse du projet', val('adresse')); add('Commune', val('commune')); add('Code postal', val('codePostal')); add('Référence cadastrale', val('cadastre'));
-    add('État actuel du projet', s.bien);
-    add('Surface habitable créée (m²)', val('surface')); add('Surface habitable existante (m²)', val('surfaceExistante')); add('Emprise du projet (m²)', val('emprise')); add('Surface du terrain (m²)', val('surfaceTerrain'));
-    add('Budget travaux', val('budget')); add('Démarrage souhaité', val('calendrier'));
-    add('Message', val('message')); add('Source', val('source'));
+    surfacesActives().forEach((sf) => add(sf.libelle + ' (m²)', val(sf.cle)));
+    add('Démarrage souhaité', s.calendrier);
+    add('Message', val('message')); add('Source', s.source);
     add('_subject', 'Nouveau projet — ' + s.type + ' · ' + (s.docs[0] || 'à définir') + ' · ' + val('commune') + ' (' + val('nom') + ')');
     add('_template', 'table'); add('_captcha', 'false');
     if (val('_honey')) add('_honey', val('_honey'));
@@ -101,27 +177,34 @@
   };
 
   // ---- Pièces jointes ----
-  const accepte = (f) => f.type.indexOf('image/') === 0 || f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+  const accepte = (f) => EXT_OK.test(f.name);
   const ajouterFichiers = (nouveaux) => {
     const acceptes = [], refuses = [];
     Array.from(nouveaux).forEach((f) => (accepte(f) ? acceptes : refuses).push(f));
     const cles = new Set(s.fichiers.map((f) => f.name + '|' + f.size));
     const ajout = acceptes.filter((f) => !cles.has(f.name + '|' + f.size));
     s.fichiers = s.fichiers.concat(ajout);
-    s.fichiersRefuses = refuses.length ? 'Format non pris en charge (images et PDF uniquement) : ' + refuses.map((f) => f.name).join(', ') : '';
+    s.fichiersRefuses = refuses.length ? 'Format non pris en charge (JPG, PNG, GIF, WEBP, HEIC et PDF uniquement) : ' + refuses.map((f) => f.name).join(', ') : '';
     s.survol = false;
     render();
   };
 
   // ---- Rendu ----
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Un bloc qui apparaît (société, état du bien) se révèle en douceur et entre dans la vue si besoin.
+  const montrerBloc = (bloc, visible) => {
+    if (!bloc || bloc.hidden === !visible) return;
+    bloc.hidden = !visible;
+    if (visible) {
+      if (!reduceMotion) { bloc.classList.remove('is-new'); void bloc.offsetWidth; bloc.classList.add('is-new'); }
+      if (bloc.getBoundingClientRect().bottom > window.innerHeight) bloc.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+    }
+  };
+
   const setErr = (key, msg) => {
     $$('[data-err="' + key + '"]', form).forEach((n) => { n.textContent = msg || ''; n.hidden = !msg; });
-    const cibles = key === 'surface' ? ['surface', 'surfaceExistante', 'emprise', 'surfaceTerrain'] : [key];
-    cibles.forEach((name) => {
-      const inp = form.elements[name];
-      if (!inp || !inp.setAttribute) return;
-      if (msg) inp.setAttribute('aria-invalid', 'true'); else inp.removeAttribute('aria-invalid');
-    });
+    const inp = form.elements[key];
+    if (inp && inp.setAttribute) { if (msg) inp.setAttribute('aria-invalid', 'true'); else inp.removeAttribute('aria-invalid'); }
   };
 
   const render = () => {
@@ -132,8 +215,9 @@
     if (el.sent) el.sent.hidden = !s.sent;
     if (el.sentDossier) { el.sentDossier.hidden = !s.dossier; if (el.sentNum) el.sentNum.textContent = s.dossier; }
     const mailClient = !!(s.mails && s.mails.client);
-    if (el.sentMailOk) el.sentMailOk.hidden = !mailClient;
-    if (el.sentMailKo) el.sentMailKo.hidden = mailClient;
+    if (el.sentMailOk) el.sentMailOk.hidden = !mailClient || !s.compte;
+    if (el.sentMailKo) el.sentMailKo.hidden = mailClient || !s.compte;
+    if (el.sentCompteKo) el.sentCompteKo.hidden = s.compte;
     if (el.sentFichiers) {
       const fe = s.fichiersEchoues || [];
       el.sentFichiers.hidden = !fe.length;
@@ -146,26 +230,56 @@
     if (el.stepTitle) el.stepTitle.textContent = STEPS[s.step];
     el.steps.forEach((st, i) => { st.hidden = i !== s.step; });
 
+    // Puces : sélection, et cohérence type → états possibles du bien
+    const biensPossibles = BIENS_PAR_TYPE[s.type] || [];
     $$('.chip', form).forEach((c) => {
       const g = c.dataset.group, v = c.dataset.value;
       const on = g === 'docs' ? s.docs.includes(v) : s[g] === v;
       c.classList.toggle('is-on', on);
       c.setAttribute('aria-pressed', on ? 'true' : 'false');
+      if (g === 'bien') c.hidden = !biensPossibles.includes(v);
     });
-    if (el.pro) el.pro.hidden = s.profil !== 'Professionnel';
+    montrerBloc(el.pro, s.profil === 'Professionnel');
+    if (form.elements.societe) form.elements.societe.toggleAttribute('aria-required', s.profil === 'Professionnel');
+    montrerBloc(el.blocBien, !!s.type);
 
-    const surface = val('surface');
+    // Surfaces : seules celles du projet, libellés adaptés, mention « facultatif »
+    const actives = surfacesActives();
+    SURFACES.forEach((cle) => {
+      const bloc = $('[data-surface="' + cle + '"]', form);
+      const sf = actives.find((x) => x.cle === cle);
+      bloc.hidden = !sf;
+      bloc.className = 'field' + (sf ? ' ordre-' + (actives.indexOf(sf) + 1) : '');
+      if (sf) {
+        $('[data-lbl]', bloc).textContent = sf.libelle;
+        $('[data-lbl-opt]', bloc).hidden = sf.requis;
+      }
+      if (form.elements[cle]) form.elements[cle].toggleAttribute('aria-required', !!(sf && sf.requis));
+    });
+
+    const vActive = (cle) => (actives.some((x) => x.cle === cle) ? Number(val(cle)) || 0 : 0);
+    const creee = vActive('surface'), empriseSol = vActive('emprise'), existante = vActive('surfaceExistante');
+    const seuil = s.type === 'Construction' ? 20 : 40;
+    const depasse = Math.max(creee, empriseSol) > seuil;
+    const total150 = s.type !== 'Construction' && creee > 20 && existante + creee > 150;
+    const dp = s.docs.includes('Déclaration préalable');
     const docHint = s.docs.includes('Je ne sais pas encore') ? "Pas d'inquiétude : nous déterminons ensemble l'autorisation nécessaire selon la surface créée et la zone du PLU."
-      : s.docs.includes('Déclaration préalable') && Number(surface) > 40 ? 'Au-delà de 40 m² créés (20 m² hors zone urbaine), un permis de construire est généralement requis. Nous vérifierons avec vous.'
-      : s.docs.includes('Perspective') && s.docs.length === 1 ? 'Une perspective seule (image 3D de votre projet) ne nécessite pas de dossier administratif.' : '';
+      : dp && total150 ? 'Au-delà de 150 m² de surface totale après travaux, un permis de construire et le recours à un architecte sont obligatoires. Nous vérifierons avec vous.'
+      : dp && depasse && s.type === 'Construction' ? 'Au-delà de 20 m² de surface ou d’emprise au sol, une construction neuve relève du permis de construire. Nous vérifierons avec vous.'
+      : dp && depasse ? 'Au-delà de 40 m² créés (20 m² hors zone urbaine), un permis de construire est généralement requis. Nous vérifierons avec vous.'
+      : s.docs.includes('Perspective') && s.docs.length === 1 ? 'Une perspective seule (image 3D de votre projet) ne nécessite pas de dossier administratif.'
+      : s.docs.includes("Avis d'architecte / étude simple") && s.docs.length === 1 ? 'Une étude simple donne lieu à un rendez-vous et à une note d’avis, sans dossier administratif.'
+      : s.docs.includes('Réalisation de plans') && s.docs.length === 1 ? 'Nous réalisons les plans (relevé de l’existant, état projeté) sans dossier administratif.' : '';
     if (el.docHint) { el.docHint.textContent = docHint; el.docHint.hidden = !docHint; }
+    if (el.liveStatus && el.liveStatus.textContent !== docHint) el.liveStatus.textContent = docHint;
 
     const hasAuto = s.docs.some((d) => /Permis|Déclaration/.test(d));
     if (el.message) el.message.placeholder = hasAuto ? 'Programme souhaité (pièces, usages), contraintes connues, état de l’existant, échéances…' : 'Ce que vous imaginez, vos références, vos contraintes…';
 
     if (el.recap1) el.recap1.textContent = s.profil + ' · ' + val('prenom') + ' ' + val('nom') + ' · ' + val('email');
-    if (el.recap2) el.recap2.textContent = s.type + ' · ' + (s.docs.join(', ') || 'document à définir') + ' · ' + val('commune')
-      + (surface ? ' · ' + surface + ' m² créés' : val('emprise') ? ' · ' + val('emprise') + ' m² d’emprise' : '');
+    if (el.recap2) el.recap2.textContent = [s.type, s.bien, val('commune')].filter(Boolean).join(' · ');
+    const sfTxt = actives.filter((sf) => val(sf.cle)).map((sf) => val(sf.cle) + ' m² ' + sf.libelle.toLowerCase().replace(/^surface /, '').replace(/ \(.*\)$/, '').replace(/, le cas échéant$/, '')).join(', ');
+    if (el.recap3) el.recap3.textContent = [s.docs.join(', ') || 'document à définir', s.calendrier, sfTxt].filter(Boolean).join(' · ');
 
     if (el.dropzone) el.dropzone.classList.toggle('is-over', s.survol);
     const nf = s.fichiers.length;
@@ -176,7 +290,7 @@
       s.fichiers.forEach((f, i) => {
         const chip = document.createElement('span');
         chip.className = 'file-chip';
-        chip.appendChild(document.createTextNode(f.name));
+        const nomF = document.createElement('span'); nomF.textContent = f.name; chip.appendChild(nomF);
         const btn = document.createElement('button');
         btn.type = 'button'; btn.textContent = '×'; btn.setAttribute('aria-label', 'Retirer ' + f.name);
         btn.addEventListener('click', () => { s.fichiers = s.fichiers.filter((_, j) => j !== i); s.fichiersRefuses = ''; render(); });
@@ -185,35 +299,51 @@
       });
     }
     if (el.filesRefused) { el.filesRefused.textContent = s.fichiersRefuses; el.filesRefused.hidden = !s.fichiersRefuses; }
+    const alerte = [s.fichiersRefuses, s.erreurEnvoi].filter(Boolean).join(' ');
+    if (el.liveAlert && el.liveAlert.textContent !== alerte) el.liveAlert.textContent = alerte;
 
-    ['societe', 'prenom', 'nom', 'email', 'telephone', 'docs', 'commune', 'adresse', 'codePostal', 'surface', 'message', 'fichiers']
+    ['societe', 'prenom', 'nom', 'email', 'telephone', 'type', 'bien', 'adresse', 'commune', 'codePostal',
+      'surface', 'surfaceExistante', 'emprise', 'surfaceTerrain', 'docs', 'calendrier', 'message', 'fichiers']
       .forEach((k) => setErr(k, errs[k]));
 
     if (el.back) el.back.hidden = s.step === 0;
-    if (el.next) el.next.hidden = s.step === 2;
+    if (el.next) el.next.hidden = s.step === DERNIERE;
     if (el.submit) {
-      el.submit.hidden = s.step !== 2;
+      el.submit.hidden = s.step !== DERNIERE;
       el.submit.disabled = s.envoi;
       el.submit.textContent = s.envoi ? 'Envoi en cours…' : 'Envoyer la demande';
     }
     if (el.sendErr) { el.sendErr.textContent = s.erreurEnvoi; el.sendErr.hidden = !s.erreurEnvoi; }
   };
 
-  // ---- Navigation entre étapes ----
-  const next = () => {
-    if (Object.keys(validate(s.step)).length) { s.tried = true; render(); return; }
-    s.step += 1; s.tried = false; render();
+  // ---- Navigation entre écrans ----
+  const cibleDe = (cle) => form.elements[cle] && form.elements[cle].focus ? form.elements[cle] : $('.chip[data-group="' + cle + '"]:not([hidden])', form);
+  const allerA = (step) => {
+    s.step = step; s.tried = false; render();
+    if (el.progress && el.progress.getBoundingClientRect().top < 0) el.progress.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
+    const premier = window.innerWidth > 640 ? $('.step:not([hidden]) .input, .step:not([hidden]) .chip:not([hidden])', form) : null;
+    (premier || el.progress).focus({ preventScroll: true });
   };
-  const back = () => { s.step -= 1; s.tried = false; render(); };
+  const next = () => {
+    const erreurs = Object.keys(validate(s.step));
+    if (erreurs.length) {
+      s.tried = true; render();
+      if (el.liveAlert) el.liveAlert.textContent = erreurs.length + (erreurs.length > 1 ? ' champs à corriger' : ' champ à corriger');
+      const cible = cibleDe(erreurs[0]); if (cible) cible.focus();
+      return;
+    }
+    allerA(s.step + 1);
+  };
+  const back = () => allerA(s.step - 1);
 
   // ---- Envoi ----
   const submit = (e) => {
     e.preventDefault();
-    // Entrée dans un champ des étapes 1 ou 2 : pas d'envoi (le bouton « Envoyer » n'est actif qu'à l'étape 3).
-    if (s.step !== 2) return;
+    // Entrée dans un champ d'un écran intermédiaire : pas d'envoi (le bouton « Envoyer » n'est actif qu'au dernier).
+    if (s.step !== DERNIERE) { next(); return; }
     if (s.envoi) return;
-    // Sécurité : toutes les étapes doivent être valides ; sinon retour à la première étape en défaut.
-    const enDefaut = [0, 1, 2].find((st) => Object.keys(validate(st)).length);
+    // Sécurité : tous les écrans doivent être valides ; sinon retour au premier en défaut.
+    const enDefaut = STEPS.map((_, i) => i).find((st) => Object.keys(validate(st)).length);
     if (enDefaut !== undefined) { s.step = enDefaut; s.tried = true; render(); return; }
     s.envoi = true; s.erreurEnvoi = ''; s.tried = false; render();
     if (API) { envoyerApi().then(traiterReponseApi, () => envoyerFormSubmit()); return; }
@@ -226,11 +356,13 @@
   const envoyerApi = () => {
     const pro = s.profil === 'Professionnel';
     const fd = new FormData();
-    ['prenom', 'nom', 'email', 'telephone', 'adresse', 'commune', 'codePostal', 'cadastre',
-      'surface', 'surfaceExistante', 'emprise', 'surfaceTerrain', 'budget', 'calendrier', 'message', 'source', '_honey']
+    ['prenom', 'nom', 'email', 'telephone', 'adresse', 'commune', 'codePostal', 'cadastre', 'message', '_honey']
       .forEach((k) => fd.append(k, val(k)));
+    const actives = surfacesActives();
+    SURFACES.forEach((k) => fd.append(k, actives.some((sf) => sf.cle === k) ? val(k) : ''));
     fd.append('societe', pro ? val('societe') : ''); fd.append('activite', pro ? val('activite') : '');
     fd.append('profil', s.profil); fd.append('type', s.type); fd.append('bien', s.bien);
+    fd.append('calendrier', s.calendrier); fd.append('source', s.source);
     s.docs.forEach((d) => fd.append('docs', d));
     s.fichiers.forEach((f) => fd.append('fichiers', f, f.name));
     const headers = API.supabaseAnonKey ? { apikey: API.supabaseAnonKey, Authorization: 'Bearer ' + API.supabaseAnonKey } : {};
@@ -242,7 +374,7 @@
 
   const traiterReponseApi = (j) => {
     if (j && j.ok) {
-      s.envoi = false; s.sent = true; s.dossier = j.id || ''; s.mails = j.mails || {}; s.fichiersEchoues = j.fichiers_echoues || [];
+      s.envoi = false; s.sent = true; s.dossier = j.id || ''; s.mails = j.mails || {}; s.fichiersEchoues = j.fichiers_echoues || []; s.compte = j.compte !== false;
       // L'agence n'a pas reçu la notification : on la double par FormSubmit (sans pièces, avec le numéro de dossier).
       if (j.id && j.mails && j.mails.agence === false) {
         const fd = new FormData();
@@ -250,8 +382,12 @@
         fd.append('Dossier', j.id);
         fetch(ENDPOINT_AJAX, { method: 'POST', headers: { 'Accept': 'application/json' }, body: fd }).catch(() => {});
       }
+    } else if (j && j.erreur === 'Champs invalides') {
+      // La fonction en ligne ne connaît pas encore ces valeurs (déploiement décalé) : FormSubmit prend le relais.
+      envoyerFormSubmit();
+      return;
     } else {
-      s.envoi = false; s.erreurEnvoi = (j && j.erreur ? j.erreur + '. ' : '') + 'L\u2019envoi a échoué. Réessayez ou écrivez-nous directement à contact@atomes.studio.';
+      s.envoi = false; s.erreurEnvoi = (j && j.erreur ? j.erreur + '. ' : '') + 'L’envoi a échoué. Réessayez ou écrivez-nous directement à contact@atomes.studio.';
     }
     render();
     if (s.sent && el.sent) el.sent.focus();
@@ -299,13 +435,16 @@
   const reset = () => { s = initial(); form.reset(); render(); };
 
   // ---- Écouteurs ----
+  const ORDRE_DOCS = $$('.chip[data-group="docs"]', form).map((c) => c.dataset.value);
   form.addEventListener('submit', submit);
   form.addEventListener('input', () => render());
   form.addEventListener('change', () => render());
   $$('.chip', form).forEach((c) => c.addEventListener('click', () => {
     const g = c.dataset.group, v = c.dataset.value;
-    if (g === 'docs') s.docs = s.docs.includes(v) ? s.docs.filter((x) => x !== v) : s.docs.concat(v);
+    if (g === 'docs') { s.docs = s.docs.includes(v) ? s.docs.filter((x) => x !== v) : s.docs.concat(v); s.docs.sort((x, y) => ORDRE_DOCS.indexOf(x) - ORDRE_DOCS.indexOf(y)); }
+    else if (g === 'source') s.source = s.source === v ? '' : v;
     else s[g] = v;
+    if (g === 'type' && !(BIENS_PAR_TYPE[s.type] || []).includes(s.bien)) s.bien = '';
     render();
   }));
   if (el.next) el.next.addEventListener('click', next);

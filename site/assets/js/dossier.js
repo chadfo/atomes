@@ -16,6 +16,19 @@
   const el = (tag, cls, texte) => { const n = document.createElement(tag); if (cls) n.className = cls; if (texte !== undefined) n.textContent = texte; return n; };
   const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
   const fmtTaille = (o) => (o >= 1048576 ? (o / 1048576).toFixed(1).replace('.', ',') + ' Mo' : Math.max(1, Math.round(o / 1024)) + ' Ko');
+  // Surfaces selon le type et l'état du bien (mêmes règles que contact.js) : [clé de colonne, libellé].
+  const surfacesPour = (type, bien) => {
+    const appart = bien === 'Appartement'; const L = [];
+    switch (type) {
+      case 'Construction': L.push(['surface', 'Surface créée']); if (bien === 'Terrain déjà bâti') L.push(['surface_existante', 'Surface du bâti existant']); L.push(['emprise', 'Emprise au sol du projet'], ['surface_terrain', 'Surface du terrain']); break;
+      case 'Extension': L.push(['surface_existante', 'Surface existante'], ['surface', 'Surface créée'], ['emprise', 'Emprise au sol de l\u2019extension']); if (!appart) L.push(['surface_terrain', 'Surface du terrain']); break;
+      case 'Rénovation': case 'Aménagement intérieur': L.push(['surface_existante', 'Surface existante'], ['surface', 'Surface créée']); break;
+      case 'Aménagement extérieur': L.push(['emprise', 'Surface aménagée']); if (!appart) L.push(['surface_terrain', 'Surface du terrain']); break;
+      case 'Démolition': L.push(['surface_existante', 'Surface à démolir']); if (!appart) L.push(['surface_terrain', 'Surface du terrain']); break;
+      default: L.push(['surface_existante', 'Surface existante'], ['surface', 'Surface créée'], ['emprise', 'Emprise au sol']); if (!appart) L.push(['surface_terrain', 'Surface du terrain']);
+    }
+    return L;
+  };
   const nomSur = (nom) => (nom.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(0, 80) || 'fichier');
 
   // ---------- Accès aux données : Supabase, ou démo ----------
@@ -49,9 +62,9 @@
     ].map((e, i) => ({ cle: e[0], ordre: i + 1, libelle: e[1], description: e[2], statut: e[3], fait_le: e[4] ? new Date(e[4]).toISOString() : null }));
     const projet = {
       id: '261003091422', cree_le: new Date(now - 9 * j).toISOString(), profil: 'Particulier', prenom: 'Jean', nom: 'Dupont', email: 'jean.dupont@exemple.fr',
-      telephone: '06 12 34 56 78', type: 'Rénovation', documents: ['Déclaration préalable', 'Perspective'], adresse: '12 rue des Oliviers', commune: 'Hyères',
-      code_postal: '83400', bien: 'Maison existante', surface: 25, surface_existante: 110, emprise: null, surface_terrain: 600,
-      budget: '50 000 – 100 000 €', calendrier: 'Dans 3 à 6 mois', message: 'Extension du séjour vers le jardin et réfection de la toiture.', source: 'Instagram',
+      telephone: '06 12 34 56 78', type: 'Extension', documents: ['Déclaration préalable', 'Perspective'], adresse: '12 rue des Oliviers', commune: 'Hyères',
+      code_postal: '83400', bien: 'Maison', surface: 25, surface_existante: 110, emprise: 25, surface_terrain: 600,
+      calendrier: 'Dans 3 à 6 mois', message: 'Extension du séjour vers le jardin et réfection de la toiture.', source: 'Instagram',
       etape: 'validation', etapes
     };
     const docs = {
@@ -203,8 +216,8 @@
       ['Type de projet', d.type], ['Documents souhaités', (d.documents || []).join(', ')],
       ['Adresse', [d.adresse, [d.code_postal, d.commune].filter(Boolean).join(' ')].filter(Boolean).join(', ')],
       ['Référence cadastrale', d.cadastre], ['État actuel', d.bien],
-      ['Surfaces', [['créée', d.surface], ['existante', d.surface_existante], ['emprise', d.emprise], ['terrain', d.surface_terrain]].filter((s) => m2(s[1])).map((s) => s[0] + ' ' + m2(s[1])).join(' · ')],
-      ['Budget travaux', d.budget], ['Démarrage souhaité', d.calendrier], ['Votre message', d.message]
+      ['Surfaces', surfacesPour(d.type, d.bien).filter((sf) => m2(d[sf[0]])).map((sf) => sf[1].toLowerCase().replace(/^surface /, '') + ' ' + m2(d[sf[0]])).join(' · ')],
+      ['Démarrage souhaité', d.calendrier], ['Votre message', d.message]
     ].filter((r) => r[1]).forEach((r) => { dl.appendChild(el('dt', '', r[0])); dl.appendChild(el('dd', '', r[1])); });
   };
 
@@ -242,10 +255,10 @@
     const fichiers = Array.from(depot.files || []);
     depot.value = '';
     if (!courant || !fichiers.length) return;
-    const refuses = fichiers.filter((f) => !(f.type.indexOf('image/') === 0 || f.type === 'application/pdf' || /\.pdf$/i.test(f.name)));
+    const refuses = fichiers.filter((f) => !/\.(jpe?g|png|gif|webp|heic|heif|pdf)$/i.test(f.name));
     const lourds = fichiers.filter((f) => f.size > 50 * 1024 * 1024);
     if (refuses.length || lourds.length) {
-      depotErr.textContent = refuses.length ? 'Format non pris en charge (images et PDF uniquement) : ' + refuses.map((f) => f.name).join(', ') : 'Fichier trop lourd (50 Mo max) : ' + lourds.map((f) => f.name).join(', ');
+      depotErr.textContent = refuses.length ? 'Format non pris en charge (JPG, PNG, GIF, WEBP, HEIC et PDF uniquement) : ' + refuses.map((f) => f.name).join(', ') : 'Fichier trop lourd (50 Mo max) : ' + lourds.map((f) => f.name).join(', ');
       depotErr.hidden = false;
       return;
     }
@@ -259,7 +272,7 @@
       .then(() => {
         const n = resultats.filter((r) => r.ok).length;
         const ko = resultats.filter((r) => !r.ok);
-        depotInfo.textContent = n ? n + ' fichier' + (n > 1 ? 's' : '') + ' déposé' + (n > 1 ? 's' : '') : 'Images et PDF, 50 Mo max par fichier';
+        depotInfo.textContent = n ? n + ' fichier' + (n > 1 ? 's' : '') + ' déposé' + (n > 1 ? 's' : '') : 'Photos (JPG, PNG, WEBP, HEIC) et PDF, 50 Mo max par fichier';
         if (ko.length) {
           depotErr.textContent = 'Non déposé : ' + ko.map((r) => r.nom + (r.doublon ? ' (un fichier du même nom existe déjà, renommez-le)' : ' (échec, réessayez ou envoyez-le à contact@atomes.studio)')).join(', ');
           depotErr.hidden = false;

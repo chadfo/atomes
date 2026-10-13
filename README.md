@@ -89,31 +89,41 @@ icône), fond `#171512`.
 
 ## Formulaire de contact (contact.html + assets/js/contact.js)
 
-3 étapes avec barre de progression (3 segments 2 px), étiquette « 0N — Titre » et « 0N / 03 », validation
-par étape, boutons Retour / Continuer → / Envoyer la demande.
+Six écrans, un sujet par écran, barre de progression (6 segments 2 px), étiquette « 0N — Titre » et
+« 0N / 06 », validation par écran, boutons Retour / Continuer → / Envoyer la demande.
 
-**01 Vous** — Particulier | Professionnel (si pro : Société *obligatoire*, Activité) · Prénom* · Nom* · Email* ·
-Téléphone (facultatif, ≥ 10 chiffres si rempli).
+1. **Vous** — Particulier | Professionnel (si pro : Société *obligatoire*, Activité) · Prénom* · Nom* · Email* ·
+   Téléphone (facultatif, ≥ 10 chiffres si rempli).
+2. **Votre projet** — Type de projet* (Construction, Rénovation, Extension, Démolition, Aménagement intérieur,
+   Aménagement extérieur, Autre), puis État actuel du bien* limité aux cas cohérents : Construction → terrain nu
+   ou terrain déjà bâti ; Rénovation, Extension, Aménagement intérieur → maison, appartement, local pro, annexe ;
+   Aménagement extérieur → maison, appartement, local pro, terrain nu ; Démolition → maison, local pro, annexe ;
+   Autre → tout.
+3. **Le lieu** — Adresse* · Commune* · Code postal* (5 chiffres) · Référence cadastrale.
+4. **Les surfaces** — seules celles du projet, libellés adaptés (ex. « Surface à démolir », « Surface du bâti
+   existant »), jamais de surface du terrain pour un appartement. Obligatoires : surface créée (Construction),
+   surface existante (Rénovation, Aménagement intérieur, Démolition), les deux pour une Extension (règle des
+   150 m² après travaux). Les autres sont facultatives (rénovation de façade : rien à saisir en surface créée).
+   Aides contextuelles sur les seuils : 20 m² (construction neuve), 40 m² (extension en zone urbaine), 150 m²
+   de surface totale après travaux (permis de construire et architecte obligatoires).
+5. **Vos besoins** — Documents souhaités (choix multiple, ≥ 1*, tous visibles) : Permis de construire,
+   Déclaration préalable, Permis d'aménager, Permis de démolir, Dossier de consultation des entreprises,
+   Perspective, Réalisation de plans, Avis d'architecte / étude simple, Autre, Je ne sais pas encore, toujours
+   renvoyés dans cet ordre (le premier donne l'objet du mail). « Je ne sais pas encore » → message rassurant ;
+   Perspective, plans ou étude simple seuls → « pas de dossier administratif ».
+6. **Détails** — Démarrage souhaité* (Dès que possible / 3–6 mois / 6–12 mois / Plus tard / Pas encore défini) ·
+   Description* (10 à 5 000 caractères) · Pièces jointes (JPG, PNG, GIF, WEBP, HEIC, PDF ; 10 fichiers et 10 Mo max) · Comment nous
+   avez-vous connus (facultatif) · Récapitulatif 3 lignes. Pas de question sur le budget.
 
-**02 Le projet** — Adresse du projet* · Commune* · Code postal* (5 chiffres) · Référence cadastrale · Type de
-projet (choix unique) · Documents souhaités (choix multiple, ≥ 1*) · État actuel du projet · Surfaces en m²
-(au moins une*). Tous les champs restent visibles quel que soit le choix : **pas de logique conditionnelle,
-c'est voulu.** Aides contextuelles sous « Documents » : DP + surface créée > 40 m² → « un PC est généralement
-requis » ; « Je ne sais pas encore » → message rassurant ; Perspective seule → « pas de dossier administratif ».
+Les règles de cohérence (`BIENS_PAR_TYPE`, `surfacesPour`) vivent dans `contact.js` et sont dupliquées dans la
+fonction `demande` (validation et libellés de l'e-mail) et dans `dossier.js` (récapitulatif) : modifier les trois.
+La touche Entrée passe à l'écran suivant ; l'envoi n'est possible qu'au dernier écran.
 
-**03 Détails** — Budget travaux · Démarrage souhaité · Description* (≥ 10 caractères) · Pièces jointes
-(images et PDF, glisser-déposer, 10 Mo max au total) · Comment nous avez-vous connus · Récapitulatif 2 lignes.
-
-**Envoi** : FormSubmit vers contact@atomes.studio.
-- Sans pièce jointe : `POST https://formsubmit.co/ajax/contact@atomes.studio`, `Accept: application/json`,
-  puis écran « Demande envoyée ».
-- Avec pièces jointes : formulaire multipart natif vers `https://formsubmit.co/contact@atomes.studio`, champs
-  `attachment`, `attachment1`…, `_next = contact.html?envoye=1` (la page lit ce paramètre au chargement pour
-  afficher la confirmation et le retire de l'URL).
-- Champs envoyés sous leur libellé français (voir `champs()` dans `contact.js`), plus `_template=table`,
-  `_captcha=false`.
-- **Objet du mail** : `Nouveau projet — <Type> · <1er document> · <Commune> (<Nom>)`. Ce format est
-  contractuel : un futur outil de gestion l'utilisera pour créer automatiquement un dossier projet.
+**Envoi** : si `config.js` est rempli, la fonction `demande` (dossier + espace client + e-mails), FormSubmit en
+secours ; sinon FormSubmit seul (`POST https://formsubmit.co/ajax/contact@atomes.studio`, ou formulaire
+multipart natif avec `_next = contact.html?envoye=1` s'il y a des pièces jointes). Champs envoyés sous leur
+libellé français (voir `champs()`), plus `_template=table`, `_captcha=false`.
+**Objet du mail** : `Nouveau projet — <Type> · <1er document> · <Commune> (<Nom>)`, format contractuel.
 
 ## Publication
 

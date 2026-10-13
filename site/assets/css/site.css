@@ -181,7 +181,7 @@ atom-logo canvas{position:absolute;inset:0}
 .sign img{width:220px;height:90px;display:block;object-fit:contain}
 
 /* ==========================================================================
-   Contact — formulaire de demande en 3 étapes
+   Contact — formulaire de demande en six écrans
    ========================================================================== */
 .contact-sec{align-items:flex-start;flex:1}
 @media (max-width:980px){
@@ -190,7 +190,7 @@ atom-logo canvas{position:absolute;inset:0}
 .intro{margin:0 0 36px;font:500 clamp(20px,2.2vw,26px)/1.5 var(--font);letter-spacing:-0.01em;max-width:560px;text-wrap:pretty}
 
 .form{display:flex;flex-direction:column;gap:26px;max-width:560px}
-.progress{display:flex;flex-direction:column;gap:12px}
+.progress{display:flex;flex-direction:column;gap:12px;scroll-margin-top:96px}
 .progress-bars{display:flex;gap:4px}
 .progress-bars span{flex:1;height:2px;background:rgba(var(--ink-rgb),.18)}
 .progress-bars span.is-on{background:var(--ink)}
@@ -203,6 +203,7 @@ atom-logo canvas{position:absolute;inset:0}
 .grid-commune{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:22px}
 .grid-commune .field{min-width:0}
 .grid-surfaces{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:16px 22px}
+.grid-surfaces .ordre-1{order:1}.grid-surfaces .ordre-2{order:2}.grid-surfaces .ordre-3{order:3}.grid-surfaces .ordre-4{order:4}
 .grid-profil{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 
 /* Choix (boutons-puces) */
@@ -210,12 +211,15 @@ atom-logo canvas{position:absolute;inset:0}
 .chip{background:transparent;color:rgba(var(--ink-rgb),.75);border:1px solid rgba(var(--ink-rgb),.25);padding:11px 14px;font:500 11.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s,border-color .15s}
 .chip:hover{border-color:rgba(var(--ink-rgb),.75)}
 .chip.is-on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip:focus-visible,.btn:focus-visible,.file-chip button:focus-visible,.proj-more:focus-visible{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:3px}
+.progress:focus{outline:none}
 .grid-profil .chip{padding:13px 14px;text-align:left}
 
 /* Champs */
 .input{background:transparent;border:1px solid rgba(var(--ink-rgb),.25);color:var(--ink);padding:13px 14px;font:400 15px var(--font);border-radius:0;width:100%;box-sizing:border-box;outline:none}
 .input:focus{border-color:rgba(var(--ink-rgb),.75)}
 textarea.input{line-height:1.6;resize:vertical}
+@media (max-width:640px){.input{font-size:16px}} /* évite le zoom automatique d'iOS au focus */
 select.input{color-scheme:dark}
 input::placeholder,textarea::placeholder{color:rgba(var(--ink-rgb),.35)}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
@@ -226,6 +230,10 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .f-err{font:400 11.5px var(--mono);color:var(--err)}
 .f-hint{font:400 13px/1.55 var(--font);color:rgba(var(--ink-rgb),.55);text-wrap:pretty}
 
+/* Blocs qui apparaissent après une réponse (société, état du bien) */
+@keyframes reveler{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.reveal.is-new{animation:reveler .35s ease-out}
+@media (prefers-reduced-motion:reduce){.reveal.is-new{animation:none}}
 /* Pièces jointes */
 .dropzone{display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer;border:1px dashed rgba(var(--ink-rgb),.3);background:transparent;transition:border-color .2s ease,background .2s ease}
 .dropzone:hover{border-color:rgba(var(--ink-rgb),.6)}
@@ -234,7 +242,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .dropzone-cta{font:500 11.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),.6);pointer-events:none}
 .dropzone-info{font:400 13px var(--font);color:rgba(var(--ink-rgb),.5);pointer-events:none}
 .files{display:flex;flex-wrap:wrap;gap:8px}
-.file-chip{display:flex;align-items:center;gap:10px;border:1px solid rgba(var(--ink-rgb),.25);padding:7px 10px 7px 12px;font:400 12.5px var(--font);color:rgba(var(--ink-rgb),.85)}
+.file-chip{display:flex;align-items:center;gap:10px;max-width:100%;min-width:0;border:1px solid rgba(var(--ink-rgb),.25);padding:7px 10px 7px 12px;font:400 12.5px var(--font);color:rgba(var(--ink-rgb),.85)}
+.file-chip span{min-width:0;overflow-wrap:anywhere}
 .file-chip button{background:transparent;border:none;color:rgba(var(--ink-rgb),.5);font:400 15px/1 var(--font);cursor:pointer;padding:0 5px;margin:-5px;min-width:24px;min-height:24px;display:inline-flex;align-items:center;justify-content:center}
 .file-chip button:hover{color:var(--ink)}
 

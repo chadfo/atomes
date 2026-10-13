@@ -7,7 +7,7 @@ Site vitrine de l'agence d'architecture Atomes studio (Simon Charles, architecte
 - Typo : Archivo (titres, textes) + IBM Plex Mono (étiquettes en capitales, letter-spacing .12em). Google Fonts.
 - Français, ton sobre. Ne pas réécrire les textes existants sans demande explicite.
 - Responsive : nav hamburger < 640 px ; sections image/texte empilées < 980 px.
-- Le formulaire de contact envoie via FormSubmit (contact@atomes.studio). Ne pas changer les libellés des champs ni le format de l'objet du mail `Nouveau projet — Type · Document · Commune (Nom)` : un outil interne s'en servira.
+- Le formulaire de contact (six écrans) envoie vers la fonction `demande`, FormSubmit en secours. Garder le format de l'objet du mail `Nouveau projet — Type · Document · Commune (Nom)`. Les règles de cohérence type → état du bien → surfaces vivent dans `contact.js` (`BIENS_PAR_TYPE`, `surfacesPour`) et `BIENS_PAR_TYPE` est dupliqué dans la fonction : modifier les deux ensemble, ainsi que les listes fermées (DOCS, CALENDRIERS, SOURCES). Pas de question sur le budget (choix de Simon).
 - Garder .nojekyll, robots.txt, sitemap.xml, favicon.png, l'image OG et les meta de chaque page.
 - Le logo `<atom-logo>` (site/assets/js/atom-logo.js) est à conserver tel quel.
 
