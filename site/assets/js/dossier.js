@@ -198,7 +198,7 @@
   const rendreRecap = (d) => {
     const dl = $('[data-recap]');
     dl.textContent = '';
-    const m2 = (v) => (v === null || v === undefined || v === '' ? '' : v + ' m²');
+    const m2 = (v) => (v === null || v === undefined || v === '' ? '' : v + ' m²');
     const prec = d.precisions || {};
     const aff = (v, cle) => (v === 'Autre' && prec[cle] ? 'Autre : ' + prec[cle] : v);
     [
@@ -207,7 +207,7 @@
       ['Type de projet', aff(d.type, 'type')], ['Documents souhaités', (d.documents || []).map((x) => aff(x, 'documents')).join(', ')],
       ['Adresse', [d.adresse, [d.code_postal, d.commune].filter(Boolean).join(' ')].filter(Boolean).join(', ')],
       ['Référence cadastrale', d.cadastre], ['État actuel', aff(d.bien, 'bien')],
-      ['Surfaces', SURFACES.filter((sf) => m2(d[sf[0]])).map((sf) => sf[1].toLowerCase() + ' ' + m2(d[sf[0]])).join(' · ')],
+      ['Surfaces', SURFACES.filter((sf) => m2(d[sf[0]])).map((sf) => sf[1] + ' : ' + m2(d[sf[0]])).join('\n')], // une surface par ligne (dd en pre-line)
       ['Démarrage souhaité', aff(d.calendrier, 'calendrier')], ['Votre message', d.message]
     ].filter((r) => r[1]).forEach((r) => { dl.appendChild(el('dt', '', r[0])); dl.appendChild(el('dd', '', r[1])); });
   };

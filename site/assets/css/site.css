@@ -197,29 +197,34 @@ atom-logo canvas{position:absolute;inset:0}
 .progress-lbl{display:flex;justify-content:space-between;gap:12px;font:500 11.5px var(--mono);letter-spacing:.12em;text-transform:uppercase}
 .progress-lbl > span:last-child{color:rgba(var(--ink-rgb),.4)}
 
-/* Écrans : un seul est affiché (.is-on). Sur grand écran, ils sont superposés dans une grille et prennent tous la
-   hauteur du plus haut : la section et l'image gardent la même hauteur tout au long du formulaire, et le
-   récapitulatif défile à l'intérieur de cette hauteur au lieu d'allonger la page. */
+/* Écrans : un seul est affiché (.is-on). Sur grand écran, ils sont superposés dans une grille dont la hauteur est figée
+   à celle du plus haut écran au repos (--h-ecrans, mesurée par contact.js sans les blocs qui se déplient) : la section,
+   l'image et les boutons gardent la même place tout au long du formulaire. Ce qui se déplie ensuite (précisions
+   « Autre », pièces jointes, messages) et le récapitulatif défilent à l'intérieur de l'écran, avec des voiles dégradés
+   en haut et en bas tant qu'il reste du contenu (data-defile) ; scroll-padding garde l'élément focalisé hors des voiles.
+   L'écran Surfaces ne défile pas : ses définitions s'affichent par-dessus le formulaire. */
 .step{display:none;flex-direction:column;gap:22px}
 .step.is-on{display:flex}
 @media (min-width:981px){
-  .steps{position:relative;display:grid}
+  .steps{position:relative;display:grid;height:var(--h-ecrans,auto);grid-template-rows:minmax(0,1fr)}
+  .steps.is-mesure{height:auto}
+  .steps.is-mesure [data-bloc-autre],.steps.is-mesure .files,.steps.is-mesure .f-err{display:none}
   .steps .step{grid-area:1/1;display:flex;visibility:hidden}
   .steps .step.is-on{visibility:visible}
-  .steps .step--recap{position:absolute;inset:0 -4px;padding:0 4px;gap:0;overflow-y:scroll;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(var(--ink-rgb),.3) transparent}
-  .steps .step--recap > * + *{margin-top:22px}
-  /* Voiles dégradés en haut et en bas du récapitulatif tant qu'il reste du contenu à faire défiler (data-defile posé par contact.js) */
-  .steps .step--recap::before,.steps .step--recap::after{content:'';position:sticky;left:0;right:0;flex-shrink:0;height:48px;pointer-events:none;opacity:0;transition:opacity .2s}
-  .steps .step--recap::before{top:0;margin-bottom:-48px;background:linear-gradient(to bottom,var(--bg),transparent)}
-  .steps .step--recap::after{bottom:0;margin-top:-48px;background:linear-gradient(to top,var(--bg),transparent)}
-  .steps .step--recap[data-defile="haut"]::after,.steps .step--recap[data-defile="milieu"]::after,.steps .step--recap[data-defile="milieu"]::before,.steps .step--recap[data-defile="bas"]::before{opacity:1}
+  .steps .step:not(.step--surfaces){min-height:0;margin:0 -4px;padding:0 4px;gap:0;overflow-y:auto;overflow-x:hidden;scroll-padding-block:48px;scrollbar-width:thin;scrollbar-color:rgba(var(--ink-rgb),.3) transparent}
+  .steps .step:not(.step--surfaces) > * + *{margin-top:22px}
+  .steps .step--recap{position:absolute;inset:0;overflow-y:scroll} /* hors de la mesure : ne compte pas dans la hauteur commune */
+  .steps .step:not(.step--surfaces)::before,.steps .step:not(.step--surfaces)::after{content:'';position:sticky;left:0;right:0;flex-shrink:0;height:48px;pointer-events:none;opacity:0;transition:opacity .2s}
+  .steps .step:not(.step--surfaces)::before{top:0;margin-bottom:-48px;background:linear-gradient(to bottom,var(--bg),transparent)}
+  .steps .step:not(.step--surfaces)::after{bottom:0;margin-top:-48px;background:linear-gradient(to top,var(--bg),transparent)}
+  .steps .step[data-defile="haut"]::after,.steps .step[data-defile="milieu"]::after,.steps .step[data-defile="milieu"]::before,.steps .step[data-defile="bas"]::before{opacity:1}
 }
 .field{display:flex;flex-direction:column;gap:8px}
 .field > .f-hint{margin:0}
 .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:22px}
 .grid-commune{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:22px}
 .grid-commune .field{min-width:0}
-.grid-surfaces{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:16px 22px}
+.grid-surfaces{display:grid;grid-template-columns:minmax(0,1fr);gap:16px 22px} /* une colonne ; deux au-dessus de 980 px */
 .grid-profil{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 
 /* Choix (boutons-puces) */
@@ -247,7 +252,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .f-hint{font:400 13px/1.55 var(--font);color:rgba(var(--ink-rgb),.55);text-wrap:pretty}
 /* Bouton « ? » à côté d'un libellé : ouvre la définition du champ (.f-def), placée sous le libellé. Sur grand écran,
    elle s'affiche par-dessus le formulaire, sur toute la largeur des surfaces, pour ne pas changer la hauteur commune
-   des écrans (voir .steps) ; en dessous de 980 px, elle s'insère dans la page. */
+   des écrans (voir .steps) ; en dessous de 980 px (surfaces sur une colonne), elle s'insère dans la page. */
 .lbl-ligne{font:500 11.5px/20px var(--mono)} /* même police que l’étiquette : l’espace avant « (si concerné) » a la bonne largeur */
 .lbl-fin{white-space:nowrap}
 .aide{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-left:6px;padding:0;vertical-align:middle;border:1px solid rgba(var(--ink-rgb),.35);background:transparent;color:rgba(var(--ink-rgb),.6);font:500 11px/1 var(--mono);cursor:pointer;transition:border-color .15s,color .15s}

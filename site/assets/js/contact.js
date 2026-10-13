@@ -155,6 +155,8 @@
     s.fichiersRefuses = refuses.length ? 'Format non pris en charge (JPG, PNG, GIF, WEBP, HEIC et PDF uniquement) : ' + refuses.map((f) => f.name).join(', ') : '';
     s.survol = false;
     render();
+    const vue = s.fichiersRefuses ? el.filesRefused : el.files;
+    if (superpose.matches && vue && !vue.hidden) vue.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
   };
 
   // ---- Rendu ----
@@ -165,13 +167,16 @@
     bloc.hidden = !visible;
     if (visible) {
       if (!reduceMotion) { bloc.classList.remove('is-new'); void bloc.offsetWidth; bloc.classList.add('is-new'); }
-      if (bloc.getBoundingClientRect().bottom > window.innerHeight) bloc.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+      const ecran = superpose.matches && bloc.closest('.step');
+      const bas = Math.min(window.innerHeight, ecran ? ecran.getBoundingClientRect().bottom : Infinity);
+      if (bloc.getBoundingClientRect().bottom > bas) bloc.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
     }
   };
 
   // Bouton « ? » : ouvre ou ferme la définition d'un champ, une seule à la fois. Sur grand écran, la définition
-  // s'affiche par-dessus le formulaire (la hauteur des écrans ne change pas) : elle se ferme aussi par Échap,
-  // par un clic ailleurs (sur elle comprise, puisqu'elle peut recouvrir d'autres champs) ou quand le focus part.
+  // s'affiche par-dessus le formulaire (la hauteur des écrans ne change pas) : elle se ferme aussi par un clic
+  // ailleurs (sur elle comprise, puisqu'elle peut recouvrir d'autres champs) ou quand le focus part. Échap la ferme
+  // partout, sur toutes les tailles, et ne ramène le focus au « ? » que s'il était perdu (Safari ne le donne pas au clic).
   const aides = $$('[data-aide]', form);
   const superpose = window.matchMedia('(min-width: 981px)');
   const defDe = (b) => document.getElementById(b.getAttribute('aria-controls'));
@@ -181,16 +186,31 @@
     montrerBloc(defDe(b), false);
   });
 
+  // Grand écran : hauteur commune des écrans, figée à celle du plus haut écran au repos. Les blocs qui se déplient
+  // (précisions « Autre », pièces jointes, messages) sont masqués le temps de la mesure : ce qui se déplie ensuite
+  // défile dans l'écran au lieu d'agrandir la section. Mesure au premier rendu, après le chargement des polices et à
+  // chaque redimensionnement ; jamais quand le formulaire est masqué (écran « Demande envoyée »).
+  const boiteEcrans = $('.steps', form);
+  let hauteurCalee = false;
+  const caleHauteur = () => {
+    hauteurCalee = false;
+    if (!boiteEcrans || form.hidden || !superpose.matches) return;
+    boiteEcrans.classList.add('is-mesure');
+    const h = Math.ceil(boiteEcrans.getBoundingClientRect().height);
+    boiteEcrans.classList.remove('is-mesure');
+    if (h > 0) { boiteEcrans.style.setProperty('--h-ecrans', h + 'px'); hauteurCalee = true; }
+  };
+
   const setErr = (key, msg) => {
     $$('[data-err="' + key + '"]', form).forEach((n) => { n.textContent = msg || ''; n.hidden = !msg; });
     const inp = form.elements[key];
     if (inp && inp.setAttribute) { if (msg) inp.setAttribute('aria-invalid', 'true'); else inp.removeAttribute('aria-invalid'); }
   };
 
-  // Sur grand écran, le récapitulatif défile dans la hauteur commune des écrans : on note où en est le défilement
-  // (haut, milieu, bas, ou aucun s'il tient en entier) pour afficher les voiles dégradés qui signalent la suite.
+  // Sur grand écran, l'écran courant défile dans la hauteur commune quand son contenu la dépasse : on note où en est
+  // le défilement (haut, milieu, bas, ou aucun s'il tient en entier) pour afficher les voiles dégradés qui signalent la suite.
   const majDefile = () => {
-    const st = el.steps[DERNIERE];
+    const st = el.steps[s.step];
     if (!st) return;
     const max = st.scrollHeight - st.clientHeight;
     st.dataset.defile = max <= 1 ? 'aucun' : st.scrollTop <= 1 ? 'haut' : st.scrollTop >= max - 1 ? 'bas' : 'milieu';
@@ -274,10 +294,11 @@
       if (inp) inp.toggleAttribute('aria-required', visible && g !== 'source');
     });
 
-    // Aide contextuelle sur les autorisations : surface habitable créée et emprise ajoutée (après projet moins existant), seuils selon le type
+    // Aide contextuelle sur les autorisations : surface habitable créée et emprise ajoutée (après projet moins existant ;
+    // existant vide = inconnu, sauf terrain nu), seuils selon le type
     const nb = (cle) => Number(val(cle)) || 0;
     const creee = nb('surface'), existante = nb('surfaceExistante');
-    const empriseAjoutee = nb('emprise') ? Math.max(0, nb('emprise') - nb('empriseExistante')) : 0;
+    const empriseAjoutee = val('emprise').trim() && (val('empriseExistante').trim() || s.bien === 'Terrain nu') ? Math.max(0, nb('emprise') - nb('empriseExistante')) : 0;
     const seuil = s.type === 'Construction' ? 20 : 40;
     const depasse = Math.max(creee, empriseAjoutee) > seuil;
     const total150 = s.type !== 'Construction' && creee > 20 && existante + creee > 150;
@@ -315,7 +336,7 @@
     const alerte = [s.fichiersRefuses, s.erreurEnvoi].filter(Boolean).join(' ');
     if (el.liveAlert && el.liveAlert.textContent !== alerte) el.liveAlert.textContent = alerte;
 
-    if (s.step === DERNIERE) { rendreRecapFinal(); majDefile(); }
+    if (s.step === DERNIERE) rendreRecapFinal();
 
     ['societe', 'prenom', 'nom', 'email', 'telephone', 'type', 'typeAutre', 'bien', 'bienAutre', 'adresse', 'commune', 'codePostal',
       'surface', 'surfaceExistante', 'empriseExistante', 'emprise', 'surfaceTerrain', 'docs', 'docsAutre', 'calendrier', 'calendrierAutre', 'message', 'fichiers']
@@ -329,6 +350,8 @@
       el.submit.textContent = s.envoi ? 'Envoi en cours…' : 'Envoyer la demande';
     }
     if (el.sendErr) { el.sendErr.textContent = s.erreurEnvoi; el.sendErr.hidden = !s.erreurEnvoi; }
+    if (!hauteurCalee) caleHauteur();
+    majDefile();
   };
 
   // ---- Navigation entre écrans ----
@@ -346,6 +369,8 @@
     s.tried = true; render();
     if (el.liveAlert) el.liveAlert.textContent = erreurs.length + (erreurs.length > 1 ? ' champs à corriger' : ' champ à corriger');
     const cible = cibleDe(erreurs[0]); if (cible) cible.focus();
+    const msg = $('[data-err="' + erreurs[0] + '"]', form);
+    if (superpose.matches && msg && !msg.hidden) msg.scrollIntoView({ block: 'nearest' });
   };
   const next = () => {
     const erreurs = Object.keys(validate(s.step));
@@ -476,13 +501,19 @@
     montrerBloc(defDe(b), ouvrir);
   }));
   document.addEventListener('click', (e) => { if (superpose.matches && !e.target.closest('[data-aide]')) fermerAides(); });
-  form.addEventListener('focusin', (e) => { if (superpose.matches && !e.target.closest('[data-aide]')) fermerAides(); });
-  form.addEventListener('keydown', (e) => {
+  document.addEventListener('focusin', (e) => { if (superpose.matches && !e.target.closest('[data-aide]')) fermerAides(); });
+  document.addEventListener('keydown', (e) => {
     const ouverte = e.key === 'Escape' && aides.find((b) => b.getAttribute('aria-expanded') === 'true');
-    if (ouverte) { fermerAides(); ouverte.focus(); }
+    if (!ouverte) return;
+    const perdu = !document.activeElement || document.activeElement === document.body;
+    fermerAides();
+    if (perdu) ouverte.focus();
   });
-  if (el.steps[DERNIERE]) el.steps[DERNIERE].addEventListener('scroll', majDefile, { passive: true });
-  window.addEventListener('resize', majDefile);
+  el.steps.forEach((st) => st.addEventListener('scroll', majDefile, { passive: true }));
+  window.addEventListener('resize', () => { caleHauteur(); majDefile(); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { caleHauteur(); majDefile(); });
+  // Le champ fichier est masqué hors de l'écran qui défile : au focus clavier, amener la zone de dépôt dans la vue.
+  if (el.fileInput) el.fileInput.addEventListener('focus', () => { if (superpose.matches && el.dropzone) el.dropzone.scrollIntoView({ block: 'nearest' }); });
   if (el.next) el.next.addEventListener('click', next);
   if (el.back) el.back.addEventListener('click', back);
   if (el.reset) el.reset.addEventListener('click', reset);

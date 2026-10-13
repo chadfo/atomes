@@ -108,9 +108,11 @@ La touche Entrée passe à l'écran suivant.
    parcelle (colonnes `surface_existante`, `surface`, `emprise_existante`, `emprise`, `surface_terrain`). Un
    bouton « ? » à côté de chaque libellé ouvre la définition du champ (textes de Simon pour la surface habitable
    et l'emprise au sol), une seule à la fois. Sur grand écran, elle s'affiche par-dessus le formulaire, sur toute la
-   largeur des surfaces, pour ne pas changer la hauteur commune des écrans ; elle se ferme par le « ? », Échap, un
-   clic ou quand le focus part. En dessous de 980 px, elle s'insère sous le libellé. Les aides de l'écran suivant se fondent sur la surface habitable créée et sur l'emprise
-   ajoutée (après projet moins existant).
+   largeur des surfaces, pour ne pas changer la hauteur commune des écrans ; elle se ferme par le « ? », un clic ou
+   quand le focus part. Échap la ferme partout (et ne ramène le focus au « ? » que s'il était perdu). En dessous de
+   980 px, les surfaces passent sur une colonne et la définition s'insère sous le libellé. Les aides de l'écran
+   suivant se fondent sur la surface habitable créée et sur l'emprise ajoutée (après projet moins existant, si
+   l'emprise existante est renseignée ou pour un terrain nu).
 5. **Vos besoins** — Documents souhaités (choix multiple, ≥ 1*, tous visibles) : Permis de construire,
    Déclaration préalable, Permis d'aménager, Permis de démolir, Dossier de consultation des entreprises,
    Perspective, Réalisation de plans, Avis d'architecte / étude simple, Autre (précision obligatoire), Je ne
@@ -127,11 +129,15 @@ La touche Entrée passe à l'écran suivant.
    demande ». Pas de question sur le budget.
 
 Sur grand écran (> 980 px), les huit écrans sont superposés dans une grille (`.steps`, écrans inactifs en
-`visibility:hidden`, écran actif `.is-on`) et prennent tous la hauteur du plus haut (l'écran Détails) : la section,
-l'image et les boutons gardent la même place tout au long du formulaire. Le récapitulatif est positionné en absolu
-dans cette hauteur et défile à l'intérieur, avec une barre fine et des voiles dégradés en haut et en bas
-(`data-defile` posé par contact.js : haut, milieu, bas, aucun). En dessous de 980 px (image au-dessus, hauteur fixe),
-les écrans s'affichent en flux normal, sans défilement interne.
+`visibility:hidden`, écran actif `.is-on`) dont la hauteur est figée à celle du plus haut écran au repos (l'écran
+Détails) : contact.js la mesure (`caleHauteur`, variable `--h-ecrans`) en masquant les blocs qui se déplient, au
+premier rendu, après le chargement des polices et à chaque redimensionnement. La section, l'image et les boutons
+gardent donc la même place tout au long du formulaire, quoi qu'on remplisse. Ce qui se déplie ensuite (précisions
+« Autre », pièces jointes, messages d'erreur) et le récapitulatif (positionné en absolu, hors de la mesure)
+défilent à l'intérieur de l'écran, avec une barre fine et des voiles dégradés en haut et en bas (`data-defile`
+posé par contact.js : haut, milieu, bas, aucun) ; `scroll-padding` garde l'élément focalisé hors des voiles.
+L'écran Surfaces ne défile pas : ses définitions s'affichent par-dessus le formulaire. En dessous de 980 px
+(image au-dessus, hauteur fixe), les écrans s'affichent en flux normal, sans défilement interne.
 
 Les précisions des choix « Autre » sont enregistrées dans `projets.precisions` (jsonb : type, bien, documents,
 calendrier, source), affichées « Autre : … » dans les e-mails, l'objet du mail et l'espace client.

@@ -25,7 +25,7 @@ de dossier.
 1. Créer un compte sur supabase.com, puis un projet : nom `atomes`, région **West EU (Paris)** ou
    **Central EU (Frankfurt)**, mot de passe de base de données à conserver.
 2. Menu **SQL Editor** → New query → coller tout le contenu de chaque fichier de `supabase/migrations/`, dans
-   l'ordre (`0001_…`, puis `0002_…`), → Run à chaque fois. Le résultat doit être « Success ».
+   l'ordre (`0001_…`, `0002_…`, puis `0003_…`), → Run à chaque fois. Le résultat doit être « Success ».
 3. **Authentication → Sign In / Providers → Email** : laisser le provider Email activé (c'est lui qui
    envoie les liens de connexion). Laisser « Confirm email » tel quel : les comptes sont créés déjà
    confirmés par la fonction.
@@ -135,15 +135,26 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
 
 ## Mises à jour à appliquer
 
-- **13 octobre 2026, formulaire v3** — les deux gestes se font dans la même séance, dans cet ordre :
-  1. SQL Editor → coller `supabase/migrations/0002_precisions_autre.sql` → Run, puis `0003_emprise_existante.sql`
-     → Run (colonnes `precisions` et `emprise_existante`) ;
-  2. redéployer la fonction `demande` avec le `index.ts` à jour.
+- **13 octobre 2026, formulaires v3 et v4** — trois gestes, dans la même séance, dans cet ordre :
+  1. SQL Editor → coller `supabase/migrations/0002_precisions_autre.sql` → Run, puis
+     `0003_emprise_existante.sql` → Run (colonnes `precisions` et `emprise_existante`). Sans effet sur ce qui est
+     en ligne : peut se faire à l'avance.
+  2. Publier le site (VS Code → Sync Changes) et attendre le vert dans l'onglet Actions de GitHub, puis une
+     dizaine de minutes : les navigateurs gardent l'ancien `contact.js` en cache jusqu'à 10 minutes.
+  3. Aussitôt après, redéployer la fonction `demande` avec le `index.ts` à jour.
+
   Ne pas redéployer la fonction avant la migration : chaque enregistrement échouerait et toutes les demandes
-  partiraient par FormSubmit, sans dossier. Tant que rien n'est fait, l'ancienne fonction refuse les nouveaux
-  états du bien (« Terrain bâti », « Immeuble », « Annexe, dépendance ou garage », « Autre ») — ces demandes partent par
-  FormSubmit — et les précisions des autres choix « Autre » (type, documents, démarrage, source) ne sont pas
-  transmises : le mail n'indique que « Autre ».
+  partiraient par FormSubmit, sans dossier. Ni avant la publication du site : l'ancien formulaire, encore en
+  ligne, n'a pas de secours en cas de « Champs invalides » ; une grande partie de ses demandes (« Maison
+  existante », « Appartement existant », type ou document « Autre »…) serait refusée avec un message d'erreur,
+  sans dossier ni FormSubmit.
+
+  Entre les étapes 2 et 3, la fonction en ligne (celle de la première mise en ligne) accepte les demandes du
+  nouveau formulaire mais perd l'état du bien (sauf « Terrain nu » et « Local ou bâtiment pro »), l'emprise au sol
+  du bâti existant, le démarrage « Autre » et les précisions des choix « Autre » (le mail n'indique que
+  « Autre ») ; les besoins « Réalisation de plans » et « Avis d'architecte / étude simple » sont ignorés, et une
+  demande qui ne coche qu'eux part par FormSubmit, sans dossier. Dans le mail, « Emprise du projet » correspond
+  alors à l'emprise après projet. Relire les demandes reçues pendant cet intervalle.
 
 ## Au quotidien (version 1, sans espace admin)
 
