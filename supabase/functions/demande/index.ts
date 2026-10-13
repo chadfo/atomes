@@ -313,7 +313,7 @@ async function envoyerMail(m: { to: string; subject: string; html: string; reply
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 const ko = (o: number) => (o >= 1048576 ? (o / 1048576).toFixed(1).replace(".", ",") + " Mo" : Math.max(1, Math.round(o / 1024)) + " Ko");
 const KICKER = "font-size:11px;line-height:16px;letter-spacing:2px;text-transform:uppercase;color:#8d8d8d";
-const LOGO_URL = `${SITE_URL}/images/logo-signature.png`;
+const LOGO_URL = `${SITE_URL}/images/logo-signature.gif`;
 
 // Signature commune à tous les e-mails de l'agence (même bloc que emails/signature.html).
 const SIGNATURE = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Helvetica,Arial,sans-serif;color:#141414">

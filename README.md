@@ -145,7 +145,7 @@ Mise en place détaillée dans **SETUP-ESPACE-CLIENT.md**. Résumé :
 - Un champ caché anti-robots (`_honey`) est présent dans le formulaire.
 - `emails/` : la signature commune à tous les e-mails de l'agence (`signature.html`, à coller aussi dans le
   webmail) et le modèle Supabase du lien de connexion (`supabase-magic-link.html`). La fonction `demande`
-  embarque la même signature. Logo : `site/images/logo-signature.png` (136 px, encre sombre sur fond transparent, dessiné d’après `<atom-logo>`) ; `logo-mail.png` est l’ancien badge, à supprimer quand plus aucun e-mail envoyé n’y fait référence.
+  embarque la même signature. Logo : `site/images/logo-signature.gif` (animation du logo d’après `<atom-logo>`, 120 px, boucle de 10 s, encre sombre sur fond blanc) ; `logo-signature.png` en est la version fixe et `logo-mail.png` l’ancien badge, à supprimer quand plus aucun e-mail envoyé n’y fait référence.
 
 ## Suite prévue
 
