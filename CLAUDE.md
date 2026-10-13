@@ -29,10 +29,11 @@ Dépôt `chadfo/atomes`, branche `main` ; `site/` est déployé par `.github/wor
 - Backend : Supabase (Postgres + Auth par lien e-mail + Storage privé + Edge Function `demande`) et Resend pour les e-mails. Schéma et règles dans `supabase/migrations/`, fonction dans `supabase/functions/demande/index.ts`, guide dans SETUP-ESPACE-CLIENT.md.
 - Identifiant de dossier : `AAMMJJHHMMSS` à l'heure de Paris, généré côté serveur (seconde suivante en cas de collision). Ne pas changer ce format.
 - Fichiers : bucket privé `dossiers`, chemins `<id>/client/…` et `<id>/agence/…`. Jamais de bucket public, jamais la clé `service_role` dans `site/`.
-- Front : `site/dossier/` + `assets/js/dossier.js` (supabase-js UMD depuis jsDelivr, version épinglée). Construire le DOM avec `textContent`, jamais `innerHTML` avec des données utilisateur. Mode démo : `?demo`.
+- Front : `site/dossier/` + `assets/js/dossier.js` (espace client) et `site/admin/` + `assets/js/admin.js` (espace agence), supabase-js UMD depuis jsDelivr, version épinglée. Construire le DOM avec `textContent`, jamais `innerHTML` avec des données utilisateur. Mode démo : `?demo` (et `dossier/?demo=signature|paiement|production|validation|suivi|clos`).
+- Parcours v2 (migration 0004, voulu par Simon) : 11 étapes dont 3 optionnelles (suivi administratif, masquées sans l'option) ; actions du client : répondre aux questions (étape 2), signer le devis (« bon pour accord », signature électronique simple), payer par carte via Stripe uniquement (pas de virement), valider les documents ou demander une modification (retour à la production). Avis clients en suspens (pas de fiche Google). Toute écriture du client et toute action de l'agence qui prévient le client passent par la fonction `espace` (Verify JWT désactivé, session vérifiée dedans) ; la timeline ne se modifie que par `projets.etape` (déclencheur `recalculer_etapes`). Les listes d'étapes de la démo (dossier.js, admin.js) reprennent le modèle SQL : les tenir alignées.
 - Le formulaire de devis garde FormSubmit en secours : ne pas retirer ce chemin.
 
 ## État et suite
 - Priorité 1 faite (octobre 2026) : images en vraies balises `<img>`, suppression de support.js / image-slot.js / JSON base64, styles extraits en CSS, formulaire et accordéon réécrits en JS vanilla.
-- Espace client v1 écrit (octobre 2026), en attente de la configuration Supabase / Resend par Simon (voir SETUP-ESPACE-CLIENT.md) puis test de bout en bout.
-- Suite : espace admin (`site/admin/`), notifications au client à chaque changement d'étape, anti-spam.
+- Espace client en service (octobre 2026) ; parcours v2 et espace agence écrits le 13 octobre 2026 (migration 0004, fonction `espace`, Stripe à configurer : SETUP-ESPACE-CLIENT.md § 7).
+- Suite : avis clients (quand la fiche Google existera), anti-spam (Turnstile) si besoin.

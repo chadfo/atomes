@@ -157,11 +157,70 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
   demande qui ne coche qu'eux part par FormSubmit, sans dossier. Dans le mail, « Emprise du projet » correspond
   alors à l'emprise après projet. Relire les demandes reçues pendant cet intervalle.
 
-## Au quotidien (version 1, sans espace admin)
+- **Parcours client v2 : 11 étapes, actions du client, espace agence, paiement Stripe**, dans cet ordre :
+  1. SQL Editor → coller `supabase/migrations/0004_parcours_client.sql` → Run. Les dossiers existants passent
+     au nouveau modèle d'étapes (dates conservées). Sans risque pour le site en ligne : l'ancienne page de
+     l'espace client affiche les nouvelles étapes.
+  2. Déployer la fonction `espace` (voir « 7. Fonction espace et Stripe » ci-dessous), Verify JWT désactivé.
+  3. Publier le site (Sync Changes) : l'espace client affiche les actions, l'espace agence est sur
+     https://atomes.studio/admin/.
+  4. Stripe : d'abord en mode test (carte 4242 4242 4242 4242), puis passage en mode réel (§ 7).
 
-- **Faire avancer un dossier** : Table Editor → `projets` → colonne `etape` : mettre la clé de l'étape en cours
-  (`traitement`, `devis`, `validation`, `paiement`, `pieces`, `etude`, `livraison`, ou `termine`). Les étapes
-  précédentes passent automatiquement à « fait » avec la date, le client voit la timeline à jour.
+## 7. Fonction espace et Stripe (parcours client v2)
+
+La fonction `espace` reçoit les actions du client (répondre aux questions, signer le devis, payer, valider
+les documents ou demander une modification) et celles de l'agence (questions, envoi du devis, étapes, option
+de suivi), envoie les e-mails correspondants et reçoit la confirmation de paiement de Stripe.
+
+1. **Edge Functions → Deploy a new function → Via editor**, nom `espace`, coller le contenu de
+   `supabase/functions/espace/index.ts`, Deploy. Puis, dans ses détails, **désactiver « Verify JWT »** : la
+   fonction vérifie elle-même la session du client ou de l'agence, et Stripe n'envoie pas de session.
+2. Les secrets `RESEND_API_KEY` et `SB_SECRET_KEY` sont déjà là (communs aux fonctions).
+3. **Stripe, compte** : créer le compte sur stripe.com (entreprise, SIRET, IBAN pour les virements de Stripe
+   vers ton compte). Rester d'abord en **mode test** (interrupteur « Test mode » en haut du tableau de bord).
+4. **Clé** : Developers → API keys → « Secret key » (`sk_test_…` en mode test) → dans Supabase, Edge
+   Functions → Secrets : `STRIPE_SECRET_KEY` = cette clé.
+5. **Webhook** : Developers → Webhooks → Add endpoint :
+   - Endpoint URL : `https://zvgkvovqmxmpdijubmaz.supabase.co/functions/v1/espace`
+   - Événements : `checkout.session.completed` (et `checkout.session.async_payment_succeeded`)
+   - Créer, puis « Signing secret » → Reveal (`whsec_…`) → secret Supabase `STRIPE_WEBHOOK_SECRET`.
+6. **Tester** : sur un dossier de test, envoyer un devis depuis l'espace agence, le signer dans l'espace
+   client, payer avec la carte de test 4242 4242 4242 4242 (date future, n'importe quel code). Le dossier
+   passe seul à « Production de vos documents » et les deux e-mails « Paiement reçu » partent.
+7. **Passage en réel** : désactiver le mode test, refaire les étapes 4 et 5 en mode réel (clé `sk_live_…`,
+   nouveau webhook avec son propre `whsec_…`) et remplacer les deux secrets dans Supabase. Facultatif :
+   Settings → Customer emails → « Successful payments » pour que Stripe envoie aussi son reçu au client.
+
+Tant que `STRIPE_SECRET_KEY` est vide, le bouton « Payer par carte » affiche « Le paiement en ligne n'est pas
+encore activé » ; l'espace agence permet alors de marquer un dossier comme payé (paiement reçu hors du site).
+
+## Au quotidien : l'espace agence (https://atomes.studio/admin/)
+
+Connexion avec ton compte agence (§ 5), par lien e-mail. La liste montre les dossiers en cours ; le filtre
+« À traiter » ne garde que ceux où c'est à toi d'agir. Dans la fiche d'un dossier :
+
+- **Questions au client** : une ou plusieurs questions, à réponse libre ou à choisir (une proposition par
+  ligne, au moins deux). Le client reçoit un e-mail et répond dans son espace ; tu reçois ses réponses par
+  e-mail et dans la fiche.
+- **Devis** : choisir le PDF, le montant à payer à la signature (acompte ou total) et son libellé, puis
+  « Envoyer le devis au client ». Le dossier passe à « Validation de votre devis » ; le client lit le devis,
+  le signe (« bon pour accord », nom, date, adresse IP et empreinte du PDF sont enregistrés) puis paie par
+  carte. Le dossier passe alors seul en production.
+- **Documents** : déposer les documents produits, puis « Documents prêts : demander la validation ». Le client
+  valide (dossier clos, ou dépôt avec l'option de suivi) ou demande une modification (retour en production,
+  message reçu par e-mail).
+- **Suivi administratif** : cocher la case pour faire apparaître les étapes 8 à 10 chez le client, puis faire
+  avancer le dossier avec « Passer ici ». Un e-mail part au client quand le dossier avance vers les documents à
+  valider, le dossier déposé, la démarche validée ou le dossier clos.
+- **Note pour le client** : précision affichée sous l'étape en cours, à la place de sa description.
+- « Passer ici » permet aussi de revenir en arrière en cas d'erreur (les étapes suivantes repassent à venir).
+
+## Au quotidien : en dépannage, depuis le tableau de bord Supabase
+
+- **Faire avancer un dossier** (de préférence depuis l'espace agence, qui prévient le client) : Table Editor →
+  `projets` → colonne `etape` : `traitement`, `devis`, `signature`, `paiement`, `production`, `validation`,
+  `depot`, `instruction`, `accordee` ou `clos` (les trois avant-dernières demandent `suivi_administratif` = true).
+  Les étapes précédentes passent automatiquement à « fait » avec la date ; aucun e-mail ne part dans ce cas.
 - **Transmettre un document au client** (devis, plans…) : Storage → `dossiers` → `<numéro>` → `agence` →
   Upload file. Il apparaît aussitôt dans l'espace du client sous « Documents de l'agence ». Les dossiers
   `<numéro>/client` et `<numéro>/agence` sont créés par la fonction à la réception ; s'ils manquent
@@ -203,5 +262,8 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
 - Les sauvegardes quotidiennes de la base sont incluses dans l'offre Pro. En gratuit, exporter de temps en
   temps : Table Editor → `projets` → Export (CSV), idem pour `etapes` ; les fichiers se téléchargent depuis
   Storage.
-- Prochaine étape prévue : l'espace admin (`site/admin/`) pour faire tout cela sans le tableau de bord
-  Supabase.
+- Paiement : Stripe prélève des frais sur chaque paiement par carte (environ 1,5 % plus 0,25 € pour une carte
+  européenne) et verse le reste sur ton compte bancaire. La signature en ligne est une signature électronique
+  simple : date, nom saisi, adresse IP, navigateur et empreinte SHA-256 du PDF signé sont conservés dans le
+  dossier et envoyés par e-mail au client et à l'agence.
+- Avis clients : en suspens (pas encore de fiche Google). L'étape « Dossier clos » n'a pas encore de bouton.

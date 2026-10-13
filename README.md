@@ -178,7 +178,7 @@ Pages → Source : « GitHub Actions »). Pour publier une modification : dans V
 Actions du dépôt). Garder dans `site/` : `.nojekyll`, `CNAME` (contient `atomes.studio`), `robots.txt`,
 `sitemap.xml`, `favicon.png`, l'image OG `a5ce3393-….png`, et les balises meta / OG de chaque page.
 
-## Espace client (version 1)
+## Espace client et espace agence (parcours v2)
 
 Mise en place détaillée dans **SETUP-ESPACE-CLIENT.md**. Résumé :
 
@@ -189,13 +189,35 @@ Mise en place détaillée dans **SETUP-ESPACE-CLIENT.md**. Résumé :
 - `supabase/functions/demande/index.ts` : fonction appelée par le formulaire. Crée le dossier, dépose les
   pièces, crée ou rattache le compte client (connexion par lien e-mail), envoie l'accusé de réception au
   client et la notification à l'agence (même objet `Nouveau projet — …` qu'avant) via Resend.
-- `site/assets/js/config.js` : URL Supabase, clé anon, URL de la fonction. Vide = le formulaire envoie via
-  FormSubmit comme avant ; rempli = fonction « demande », FormSubmit en secours si elle ne répond pas.
-- `site/dossier/` + `assets/js/dossier.js` : connexion sans mot de passe, liste des dossiers, timeline,
-  documents de l'agence (téléchargement par lien temporaire), dépôt de pièces par le client, récapitulatif
-  de la demande. **Mode démo sans backend pour travailler le design : `dossier/?demo`** (en local :
+- `supabase/migrations/0004_parcours_client.sql` : parcours v2. 11 étapes (`modele_etapes`) : Demande reçue ·
+  Traitement de votre demande (répondre aux questions) · Production de votre devis · Validation de votre devis
+  (signer) · Paiement (payer par carte) · Production de vos documents · Validation de vos documents (valider ou
+  demander une modification) · Dépôt, Suivi, Démarche administrative validée (option de suivi,
+  `projets.suivi_administratif`, masquées sinon) · Dossier clos. Colonnes `optionnelle`, `instantanee` (étape
+  faite dès qu'elle est atteinte, date seule) et `action` (questions, signer, payer, valider) ; statuts recalculés
+  par `recalculer_etapes()` à chaque changement de `projets.etape` ou de l'option (refus si étape optionnelle
+  sans l'option). Tables `questions` et `modifications` ; colonnes du devis, de la signature et du paiement dans
+  `projets`. Le client lit, n'écrit jamais directement (fonction `espace`).
+- `supabase/functions/espace/index.ts` : actions du client (`repondre`, `signer`, `payer`, `paiement`,
+  `valider`, `modifier`) et de l'agence (`questions`, `devis`, `etape`, `option`, `paye`), webhook Stripe
+  (`checkout.session.completed`, signature vérifiée, idempotent), e-mails Resend. « Verify JWT » désactivé :
+  la session est vérifiée dans la fonction. Signature : case « bon pour accord », nom, date, IP, navigateur,
+  empreinte SHA-256 du PDF recalculée au moment de signer. Paiement : Stripe Checkout, carte uniquement.
+- `site/assets/js/config.js` : URL Supabase, clé anon, URL des fonctions `demande` (`apiUrl`) et `espace`
+  (`espaceUrl`). Vide = le formulaire envoie via FormSubmit comme avant ; rempli = fonction « demande »,
+  FormSubmit en secours si elle ne répond pas.
+- `site/dossier/` + `assets/js/dossier.js` : connexion sans mot de passe, liste des dossiers, timeline numérotée
+  et datée (« Depuis le … » pour l'étape en cours), actions à l'étape en cours (questions, signature, paiement,
+  validation ou modification), échanges (réponses, demandes de modification), documents de l'agence, dépôt de
+  pièces, récapitulatif de la demande. **Mode démo sans backend : `dossier/?demo`**, ou `?demo=signature`,
+  `paiement`, `production`, `validation`, `suivi`, `clos` pour partir d'une étape (en local :
   http://localhost:3000/dossier/?demo ; avec `npx serve`, l'adresse `dossier/index.html` est redirigée et perd
   le paramètre).
+- `site/admin/` + `assets/js/admin.js` : espace agence (compte inscrit dans `admins`). Liste filtrable (en
+  cours, à traiter, clos), fiche : étapes (« Passer ici »), option de suivi, note pour le client, questions,
+  envoi du devis (PDF déposé dans `<id>/agence/devis-<id>.pdf`, montant, libellé), état de la signature et du
+  paiement, « Marquer comme payé », documents, demande de validation, modifications demandées.
+  **Mode démo : `admin/?demo`**.
 - Un champ caché anti-robots (`_honey`) est présent dans le formulaire.
 - `emails/` : la signature commune à tous les e-mails de l'agence (`signature.html`, à coller aussi dans le
   webmail) et le modèle Supabase du lien de connexion (`supabase-magic-link.html`). La fonction `demande`

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Espace agence — Atomes studio</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Espace agence Atomes studio : suivi des dossiers clients.">
+<meta name="theme-color" content="#171512">
+<link rel="icon" type="image/png" href="../favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" defer></script>
+<script src="../assets/js/config.js" defer></script>
+<script src="../assets/js/atom-logo.js" defer></script>
+<script src="../assets/js/admin.js" defer></script>
+</head>
+<body>
+<div class="page">
+
+  <nav class="nav" aria-label="Navigation principale">
+    <a class="brand" href="../index.html"><atom-logo></atom-logo><span>atomes<span class="brand-tld">.studio</span></span></a>
+    <input type="checkbox" id="nav-toggle" class="nav-tgl" aria-label="Menu" aria-controls="nav-links">
+    <label for="nav-toggle" class="nav-btn"><span></span><span></span><span></span></label>
+    <div class="nav-links" id="nav-links">
+      <a href="../index.html">Accueil</a>
+      <a href="../projets.html">Projets</a>
+      <a href="../a-propos.html">À propos</a>
+      <a href="../contact.html">Contact</a>
+      <a href="../devis.html">Devis</a>
+    </div>
+  </nav>
+
+  <main class="main">
+    <section class="espace agence">
+      <div class="lbl">Espace agence</div>
+
+      <div data-vue="chargement">
+        <p class="espace-intro">Chargement…</p>
+      </div>
+
+      <div data-vue="config" hidden>
+        <h1>Espace agence</h1>
+        <p class="espace-intro" data-config-msg>L'espace agence n'est pas encore activé : renseignez Supabase dans config.js.</p>
+      </div>
+
+      <!-- Connexion sans mot de passe (compte agence) -->
+      <div data-vue="connexion" hidden>
+        <h1>Connexion</h1>
+        <p class="espace-intro">Entrez l'adresse e-mail du compte agence&nbsp;: vous recevrez un lien de connexion, sans mot de passe.</p>
+        <form class="form espace-form" data-form-connexion novalidate>
+          <div class="field">
+            <label class="lbl" for="a-email">Email</label>
+            <input class="input" type="email" id="a-email" name="email" placeholder="contact@atomes.studio" autocomplete="email" aria-describedby="a-err">
+            <div class="f-err" id="a-err" role="alert" hidden></div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn" data-btn-connexion>Recevoir mon lien de connexion</button>
+          </div>
+        </form>
+        <div class="notice" data-lien-envoye role="status" aria-live="polite"></div>
+      </div>
+
+      <!-- Compte connecté mais pas agence -->
+      <div data-vue="refus" hidden>
+        <h1>Accès réservé</h1>
+        <p class="espace-intro">Ce compte n'a pas accès à l'espace agence. Pour suivre un dossier client, utilisez l'<a href="../dossier/">espace client</a>.</p>
+      </div>
+
+      <!-- Liste des dossiers -->
+      <div data-vue="liste" hidden>
+        <h1>Dossiers</h1>
+        <div class="admin-filtres">
+          <div class="chips" role="group" aria-label="Filtrer les dossiers" data-filtres>
+            <button type="button" class="chip is-on" data-filtre="encours" aria-pressed="true">En cours</button>
+            <button type="button" class="chip" data-filtre="attente" aria-pressed="false">À traiter</button>
+            <button type="button" class="chip" data-filtre="clos" aria-pressed="false">Clos</button>
+            <button type="button" class="chip" data-filtre="tous" aria-pressed="false">Tous</button>
+          </div>
+          <div class="field admin-recherche">
+            <label class="sr-only" for="a-recherche">Rechercher un dossier</label>
+            <input class="input" type="search" id="a-recherche" placeholder="Nom, n° de dossier, commune…" autocomplete="off">
+          </div>
+        </div>
+        <p class="doc-meta" data-compte-liste role="status"></p>
+        <div class="admin-liste" data-liste></div>
+      </div>
+
+      <!-- Un dossier -->
+      <div data-vue="dossier" hidden>
+        <a href="#" class="link-more" data-retour><span aria-hidden="true">←</span> Dossiers</a>
+        <div class="dossier-head">
+          <div class="num" data-d-num></div>
+          <h1 data-d-titre></h1>
+          <p class="espace-intro" data-d-sous></p>
+          <p class="admin-liens" data-d-liens></p>
+        </div>
+        <div class="notice" data-notice role="status" aria-live="polite" tabindex="-1" hidden></div>
+
+        <section class="bloc" aria-labelledby="lbl-av">
+          <div class="lbl bloc-lbl" id="lbl-av">Avancement</div>
+          <label class="case" for="a-suivi"><input type="checkbox" id="a-suivi" data-suivi><span>Suivi administratif (étapes 8 à 10 : dépôt, suivi, démarche validée)</span></label>
+          <ol class="timeline admin-etapes" role="list" data-etapes></ol>
+          <form class="admin-note" data-form-note novalidate>
+            <div class="field">
+              <label class="lbl" for="a-note"><span data-note-lbl>Note pour le client</span> <span class="lbl-opt">(facultatif : remplace la description de l'étape en cours)</span></label>
+              <textarea class="input" id="a-note" rows="2" maxlength="1000" data-note></textarea>
+            </div>
+            <div class="form-actions"><button type="submit" class="btn btn--ghost" data-btn-note>Enregistrer la note</button></div>
+          </form>
+        </section>
+
+        <section class="bloc" aria-labelledby="lbl-q">
+          <div class="lbl bloc-lbl" id="lbl-q">Questions au client</div>
+          <ul class="echanges" role="list" data-questions></ul>
+          <p class="docs-vide" data-questions-vide>Aucune question pour le moment.</p>
+          <form class="admin-form" data-form-questions novalidate>
+            <div class="admin-questions" data-nouvelles></div>
+            <div class="form-actions">
+              <button type="button" class="btn btn--ghost" data-ajouter-question>+ Ajouter une question</button>
+              <button type="submit" class="btn" data-btn-questions>Envoyer au client</button>
+            </div>
+            <div class="f-err" data-err-questions role="alert" hidden></div>
+          </form>
+        </section>
+
+        <section class="bloc" aria-labelledby="lbl-devis">
+          <div class="lbl bloc-lbl" id="lbl-devis">Devis, signature et paiement</div>
+          <dl class="recap-liste" data-devis-etat></dl>
+          <form class="admin-form" data-form-devis novalidate>
+            <div class="field">
+              <span class="lbl" id="lbl-devis-pdf">Devis (PDF)</span>
+              <label class="dropzone" aria-labelledby="lbl-devis-pdf">
+                <span class="dropzone-cta">+ Choisir le PDF</span>
+                <input type="file" class="sr-only" accept=".pdf,application/pdf" data-devis-fichier>
+                <span class="dropzone-info" data-devis-info>Aucun fichier choisi</span>
+              </label>
+            </div>
+            <div class="grid-2">
+              <div class="field">
+                <label class="lbl" for="a-montant">Montant à payer (€)</label>
+                <input class="input" id="a-montant" inputmode="decimal" placeholder="720,00" data-montant>
+              </div>
+              <div class="field">
+                <label class="lbl" for="a-libelle">Libellé</label>
+                <input class="input" id="a-libelle" maxlength="120" placeholder="Acompte de 40 %" data-libelle>
+              </div>
+            </div>
+            <p class="f-hint" data-devis-aide>Le client reçoit un e-mail, lit le devis, le signe en ligne puis paie ce montant par carte.</p>
+            <div class="f-err" data-err-devis role="alert" hidden></div>
+            <div class="form-actions">
+              <button type="button" class="btn btn--ghost" data-btn-paye hidden>Marquer comme payé</button>
+              <button type="submit" class="btn" data-btn-devis>Envoyer le devis au client</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="bloc" aria-labelledby="lbl-docs-agence">
+          <div class="lbl bloc-lbl" id="lbl-docs-agence">Documents de l'agence</div>
+          <ul class="docs" role="list" data-docs-agence></ul>
+          <p class="docs-vide" data-vide-agence hidden>Aucun document déposé.</p>
+          <label class="dropzone">
+            <span class="dropzone-cta">+ Déposer des documents</span>
+            <input type="file" class="sr-only" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.heic,.heif,.dwg,.dxf,.zip" data-depot aria-describedby="a-depot-err">
+            <span class="dropzone-info" data-depot-info>Visibles par le client dans son espace</span>
+          </label>
+          <div class="f-err" id="a-depot-err" data-depot-err role="alert" hidden></div>
+          <div class="form-actions" data-pret hidden>
+            <button type="button" class="btn" data-btn-pret>Documents prêts : demander la validation</button>
+          </div>
+        </section>
+
+        <section class="bloc" aria-labelledby="lbl-docs-client">
+          <div class="lbl bloc-lbl" id="lbl-docs-client">Pièces du client</div>
+          <ul class="docs" role="list" data-docs-client></ul>
+          <p class="docs-vide" data-vide-client hidden>Aucune pièce déposée.</p>
+        </section>
+
+        <section class="bloc" aria-labelledby="lbl-modifs" data-bloc-modifs hidden>
+          <div class="lbl bloc-lbl" id="lbl-modifs">Modifications demandées</div>
+          <ul class="echanges" role="list" data-modifs></ul>
+        </section>
+
+        <section class="bloc" aria-labelledby="lbl-demande">
+          <div class="lbl bloc-lbl" id="lbl-demande">Demande</div>
+          <dl class="recap-liste" data-recap></dl>
+        </section>
+      </div>
+
+      <div class="espace-pied" data-compte hidden>
+        <span class="doc-meta" data-compte-email></span>
+        <button type="button" class="btn btn--ghost" data-deconnexion>Se déconnecter</button>
+      </div>
+      <div class="f-err" data-erreur role="alert" hidden></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div>ATOMES.STUDIO — ARCHITECTURE DU DÉTAIL<br>SIMON CHARLES — ARCHITECTE HMONP · INGÉNIEUR GÉNIE CIVIL ET URBANISME<br><a href="../dossier/">ESPACE CLIENT <span aria-hidden="true">→</span></a></div>
+    <div class="footer-contact">
+      <span class="footer-line"><i class="ico ico-house" aria-hidden="true"></i><span class="sr-only">Adresse — </span>31 RUE CHEVALIER PAUL, 83000 TOULON</span>
+      <a class="footer-line" href="mailto:contact@atomes.studio"><i class="ico ico-mail" aria-hidden="true"></i><span class="sr-only">Mail — </span>CONTACT@ATOMES.STUDIO</a>
+      <a class="footer-line" href="https://www.instagram.com/atomes.studio" target="_blank" rel="noopener"><i class="ico ico-instagram" aria-hidden="true"></i><span class="sr-only">Instagram — </span>@ATOMES.STUDIO</a>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

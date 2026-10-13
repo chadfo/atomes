@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Espace client — Atomes studio</title>
 <meta name="robots" content="noindex, nofollow">
-<meta name="description" content="Espace client Atomes studio : suivi de votre dossier, documents et pièces à déposer.">
+<meta name="description" content="Espace client Atomes studio : suivi de votre dossier, devis à signer, paiement, documents et pièces à déposer.">
 <meta name="theme-color" content="#171512">
 <link rel="icon" type="image/png" href="../favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -79,10 +79,16 @@
           <h1 data-d-titre></h1>
           <p class="espace-intro" data-d-sous></p>
         </div>
+        <div class="notice" data-notice role="status" aria-live="polite" tabindex="-1" hidden></div>
 
         <section class="bloc" aria-labelledby="lbl-avancement">
           <div class="lbl bloc-lbl" id="lbl-avancement">Avancement</div>
           <ol class="timeline" role="list" data-timeline></ol>
+        </section>
+
+        <section class="bloc" aria-labelledby="lbl-echanges" data-bloc-echanges hidden>
+          <div class="lbl bloc-lbl" id="lbl-echanges">Échanges</div>
+          <ul class="echanges" role="list" data-echanges></ul>
         </section>
 
         <section class="bloc" aria-labelledby="lbl-docs-agence">

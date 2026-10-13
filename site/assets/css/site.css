@@ -353,6 +353,41 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .tl-desc{margin:4px 0 0;font:400 13.5px/1.55 var(--font);color:rgba(var(--ink-rgb),.6)}
 .tl-date{font:500 11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),.5);white-space:nowrap;padding-top:3px}
 .tl-en_cours .tl-date{color:var(--white)}
+/* Timeline v2 : numéro d'étape, étape en cours, actions du client (questions, signature, paiement, validation) */
+.tl-num{display:inline-block;min-width:26px;margin-right:6px;font:500 11.5px var(--mono);letter-spacing:.08em;color:rgba(var(--ink-rgb),.45)}
+.tl-statut{display:inline-block;margin-top:8px;font:500 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--white)}
+.tl-action{grid-column:2 / -1;margin-top:16px;display:flex;flex-direction:column;gap:22px;padding:18px 20px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),.16)}
+.tl-action .form-actions{padding-top:0}
+.tl-action .link-more{align-self:flex-start;background:transparent;border:0;padding:4px 0;cursor:pointer}
+.tl-action-intro{margin:0;font:400 14px/1.6 var(--font);color:rgba(var(--ink-rgb),.8);text-wrap:pretty}
+.action-bloc,.questions,.signature{display:flex;flex-direction:column;gap:16px}
+.action-bloc:empty{display:none}
+.question{margin:0;padding:0;border:0;min-width:0;display:flex;flex-direction:column;gap:10px}
+.question-txt{padding:0;font:500 14.5px/1.5 var(--font);color:var(--ink)}
+.choix{display:flex;flex-wrap:wrap;gap:8px}
+.choix-opt{position:relative;cursor:pointer}
+.choix-opt input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.choix-opt span{display:inline-block;border:1px solid rgba(var(--ink-rgb),.25);padding:11px 14px;font:500 11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),.8);transition:background .15s,border-color .15s}
+.choix-opt:hover span{border-color:rgba(var(--ink-rgb),.75)}
+.choix-opt input:checked + span{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.choix-opt input:focus-visible + span{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:3px}
+.case{display:flex;gap:12px;align-items:flex-start;font:400 14px/1.5 var(--font);color:var(--ink);cursor:pointer}
+.case input{-webkit-appearance:none;appearance:none;flex:none;width:16px;height:16px;margin:2px 0 0;border:1px solid rgba(var(--ink-rgb),.6);background:transparent;display:grid;place-content:center;cursor:pointer}
+.case input::after{content:'';width:8px;height:8px;background:var(--ink);transform:scale(0);transition:transform .12s}
+.case input:checked::after{transform:scale(1)}
+.case input:focus-visible{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:3px}
+.montant{margin:0;display:flex;justify-content:space-between;align-items:baseline;gap:8px 16px;flex-wrap:wrap;font:400 14px/1.5 var(--font);color:rgba(var(--ink-rgb),.75)}
+.montant strong{font:600 18px var(--font);color:var(--white)}
+.notice:focus{outline:none}
+.dossier-etat{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.dossier-etat .tl-statut{margin-top:0}
+/* Échanges : réponses aux questions, demandes de modification */
+.echanges{list-style:none;margin:0;padding:0}
+.echanges li{display:flex;flex-direction:column;gap:6px;padding:14px 0;border-top:1px solid rgba(var(--ink-rgb),.16)}
+.echanges li:last-child{border-bottom:1px solid rgba(var(--ink-rgb),.16)}
+.echanges .doc-meta{margin:0}
+.echange-q{margin:0;font:500 14px/1.5 var(--font)}
+.echange-r{margin:0;font:400 14px/1.6 var(--font);color:rgba(var(--ink-rgb),.75);white-space:pre-line;overflow-wrap:anywhere}
 /* Documents */
 .docs{list-style:none;margin:0;padding:0}
 .docs li{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 0;border-top:1px solid rgba(var(--ink-rgb),.16)}
@@ -367,6 +402,44 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .recap-liste dt{font:500 11.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:rgba(var(--ink-rgb),.5);padding-top:2px}
 .recap-liste dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
 .espace-pied{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding-top:24px;border-top:1px solid var(--line)}
+/* ==========================================================================
+   Espace agence (admin/index.html) : liste des dossiers, fiche, actions de l'agence
+   ========================================================================== */
+.espace.agence{max-width:1040px}
+.admin-filtres{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-top:28px}
+.admin-recherche{flex:1 1 240px;max-width:360px}
+.admin-liste{display:flex;flex-direction:column;margin-top:8px}
+.admin-ligne{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1.3fr) auto;gap:6px 20px;align-items:center;padding:16px 0;border-top:1px solid rgba(var(--ink-rgb),.16);color:var(--ink);text-decoration:none}
+.admin-ligne:last-child{border-bottom:1px solid rgba(var(--ink-rgb),.16)}
+.admin-ligne:hover strong{color:var(--white)}
+.admin-ligne:focus-visible{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:3px}
+.admin-ligne .num{display:block;margin-bottom:4px}
+.admin-ligne strong{font:600 15px/1.4 var(--font)}
+.admin-type{font:400 14px/1.4 var(--font);color:rgba(var(--ink-rgb),.75)}
+.admin-etape{font:500 11px/1.5 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:rgba(var(--ink-rgb),.6)}
+.badge{justify-self:end;white-space:nowrap;font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:6px 9px;border:1px solid rgba(var(--ink-rgb),.3);color:rgba(var(--ink-rgb),.7)}
+.badge--agence{border-color:var(--ink);color:var(--white)}
+.badge--client{border-style:dashed}
+.badge--clos{border-color:rgba(var(--ink-rgb),.16);color:rgba(var(--ink-rgb),.45)}
+.admin-liens{display:flex;flex-wrap:wrap;gap:8px 22px;margin:14px 0 0}
+.admin-etapes li{grid-template-columns:12px minmax(0,1fr) auto auto}
+.admin-etapes .link-more{background:transparent;border:0;padding:3px 0;cursor:pointer;white-space:nowrap}
+.admin-etapes .link-more:disabled{opacity:.35;cursor:not-allowed}
+.admin-etapes .is-option .tl-title,.admin-etapes .is-option .tl-num{color:rgba(var(--ink-rgb),.3)}
+.admin-etapes .tl-statut{margin-top:0;padding-top:3px}
+.admin-note,.admin-form{display:flex;flex-direction:column;gap:16px}
+.admin-questions{display:flex;flex-direction:column;gap:16px}
+.admin-question{display:flex;flex-direction:column;gap:12px;padding:16px 18px;border:1px solid rgba(var(--ink-rgb),.16)}
+.admin-question .link-more{align-self:flex-start;background:transparent;border:0;padding:0;cursor:pointer}
+@media (max-width:760px){
+  .admin-ligne{grid-template-columns:minmax(0,1fr) auto}
+  .admin-type,.admin-etape{grid-column:1}
+  .badge{grid-row:1;grid-column:2;align-self:start}
+}
+@media (max-width:640px){
+  .admin-etapes li{grid-template-columns:12px minmax(0,1fr)}
+  .admin-etapes .link-more,.admin-etapes .tl-statut{grid-column:2;justify-self:start}
+}
 /* Écran « Demande envoyée » : numéro de dossier (quand la fonction « demande » est active) */
 .sent-dossier{margin:14px 0 0;font:400 14px/1.6 var(--font);color:rgba(var(--ink-rgb),.7);text-wrap:pretty}
 .sent-dossier a{color:var(--ink)}

@@ -6,5 +6,7 @@
 window.ATOMES_CONFIG = {
   supabaseUrl: 'https://zvgkvovqmxmpdijubmaz.supabase.co',
   supabaseAnonKey: 'sb_publishable_GabjhmLQGgTnSBKA8MHcpw_O_lg_Kca',
-  apiUrl: 'https://zvgkvovqmxmpdijubmaz.supabase.co/functions/v1/demande'
+  apiUrl: 'https://zvgkvovqmxmpdijubmaz.supabase.co/functions/v1/demande',
+  // Actions de l'espace client et de l'espace agence (questions, signature, paiement Stripe, validation)
+  espaceUrl: 'https://zvgkvovqmxmpdijubmaz.supabase.co/functions/v1/espace'
 };
