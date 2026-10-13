@@ -122,6 +122,13 @@ La touche Entrée passe à l'écran suivant.
 8. **Récapitulatif** — toutes les réponses, une section par écran avec un bouton « Modifier », puis « Envoyer la
    demande ». Pas de question sur le budget.
 
+Sur grand écran (> 980 px), les huit écrans sont superposés dans une grille (`.steps`, écrans inactifs en
+`visibility:hidden`, écran actif `.is-on`) et prennent tous la hauteur du plus haut (l'écran Détails) : la section,
+l'image et les boutons gardent la même place tout au long du formulaire. Le récapitulatif est positionné en absolu
+dans cette hauteur et défile à l'intérieur, avec une barre fine et des voiles dégradés en haut et en bas
+(`data-defile` posé par contact.js : haut, milieu, bas, aucun). En dessous de 980 px (image au-dessus, hauteur fixe),
+les écrans s'affichent en flux normal, sans défilement interne.
+
 Les précisions des choix « Autre » sont enregistrées dans `projets.precisions` (jsonb : type, bien, documents,
 calendrier, source), affichées « Autre : … » dans les e-mails, l'objet du mail et l'espace client.
 Les règles de cohérence vivent dans `contact.js` : `BIENS_PAR_TYPE` est dupliqué dans la fonction `demande`

@@ -197,7 +197,23 @@ atom-logo canvas{position:absolute;inset:0}
 .progress-lbl{display:flex;justify-content:space-between;gap:12px;font:500 11.5px var(--mono);letter-spacing:.12em;text-transform:uppercase}
 .progress-lbl > span:last-child{color:rgba(var(--ink-rgb),.4)}
 
-.step{display:flex;flex-direction:column;gap:22px}
+/* Écrans : un seul est affiché (.is-on). Sur grand écran, ils sont superposés dans une grille et prennent tous la
+   hauteur du plus haut : la section et l'image gardent la même hauteur tout au long du formulaire, et le
+   récapitulatif défile à l'intérieur de cette hauteur au lieu d'allonger la page. */
+.step{display:none;flex-direction:column;gap:22px}
+.step.is-on{display:flex}
+@media (min-width:981px){
+  .steps{position:relative;display:grid}
+  .steps .step{grid-area:1/1;display:flex;visibility:hidden}
+  .steps .step.is-on{visibility:visible}
+  .steps .step--recap{position:absolute;inset:0 -4px;padding:0 4px;gap:0;overflow-y:scroll;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(var(--ink-rgb),.3) transparent}
+  .steps .step--recap > * + *{margin-top:22px}
+  /* Voiles dégradés en haut et en bas du récapitulatif tant qu'il reste du contenu à faire défiler (data-defile posé par contact.js) */
+  .steps .step--recap::before,.steps .step--recap::after{content:'';position:sticky;left:0;right:0;flex-shrink:0;height:48px;pointer-events:none;opacity:0;transition:opacity .2s}
+  .steps .step--recap::before{top:0;margin-bottom:-48px;background:linear-gradient(to bottom,var(--bg),transparent)}
+  .steps .step--recap::after{bottom:0;margin-top:-48px;background:linear-gradient(to top,var(--bg),transparent)}
+  .steps .step--recap[data-defile="haut"]::after,.steps .step--recap[data-defile="milieu"]::after,.steps .step--recap[data-defile="milieu"]::before,.steps .step--recap[data-defile="bas"]::before{opacity:1}
+}
 .field{display:flex;flex-direction:column;gap:8px}
 .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:22px}
 .grid-commune{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:22px}
@@ -249,7 +265,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 
 /* Récapitulatif final (dernier écran) : une section par écran avec un bouton « Modifier » ; .recap-liste est partagée avec l'espace client */
 .recap-final{display:flex;flex-direction:column}
-.recap-sec{display:flex;flex-direction:column;gap:12px;padding:16px 0;border-top:1px solid rgba(var(--ink-rgb),.16)}
+.recap-sec{display:flex;flex-direction:column;gap:10px;padding:14px 0;border-top:1px solid rgba(var(--ink-rgb),.16)}
+.recap-final .recap-liste{gap:8px 24px}
 .recap-sec:last-child{border-bottom:1px solid rgba(var(--ink-rgb),.16)}
 .recap-sec-head{display:flex;justify-content:space-between;align-items:baseline;gap:16px}
 .recap-sec .link-more{background:transparent;border:0;padding:6px 0;margin:-6px 0;cursor:pointer;white-space:nowrap}

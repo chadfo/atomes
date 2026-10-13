@@ -215,6 +215,15 @@
     if (inp && inp.setAttribute) { if (msg) inp.setAttribute('aria-invalid', 'true'); else inp.removeAttribute('aria-invalid'); }
   };
 
+  // Sur grand écran, le récapitulatif défile dans la hauteur commune des écrans : on note où en est le défilement
+  // (haut, milieu, bas, ou aucun s'il tient en entier) pour afficher les voiles dégradés qui signalent la suite.
+  const majDefile = () => {
+    const st = el.steps[DERNIERE];
+    if (!st) return;
+    const max = st.scrollHeight - st.clientHeight;
+    st.dataset.defile = max <= 1 ? 'aucun' : st.scrollTop <= 1 ? 'haut' : st.scrollTop >= max - 1 ? 'bas' : 'milieu';
+  };
+
   // Récapitulatif final : une section par écran, avec un bouton « Modifier »
   const rendreRecapFinal = () => {
     const cont = el.recapFinal;
@@ -272,7 +281,7 @@
     el.bars.forEach((b, i) => b.classList.toggle('is-on', i <= s.step));
     el.stepNum.forEach((x) => { x.textContent = '0' + n; });
     if (el.stepTitle) el.stepTitle.textContent = STEPS[s.step];
-    el.steps.forEach((st, i) => { st.hidden = i !== s.step; });
+    el.steps.forEach((st, i) => { st.classList.toggle('is-on', i === s.step); });
 
     // Puces : sélection, et cohérence type → états possibles du bien
     const biensPossibles = BIENS_PAR_TYPE[s.type] || [];
@@ -347,7 +356,7 @@
     const alerte = [s.fichiersRefuses, s.erreurEnvoi].filter(Boolean).join(' ');
     if (el.liveAlert && el.liveAlert.textContent !== alerte) el.liveAlert.textContent = alerte;
 
-    if (s.step === DERNIERE) rendreRecapFinal();
+    if (s.step === DERNIERE) { rendreRecapFinal(); majDefile(); }
 
     ['societe', 'prenom', 'nom', 'email', 'telephone', 'type', 'typeAutre', 'bien', 'bienAutre', 'adresse', 'commune', 'codePostal',
       'surface', 'surfaceExistante', 'emprise', 'surfaceTerrain', 'docs', 'docsAutre', 'calendrier', 'calendrierAutre', 'message', 'fichiers']
@@ -366,9 +375,10 @@
   // ---- Navigation entre écrans ----
   const cibleDe = (cle) => (form.elements[cle] && form.elements[cle].focus ? form.elements[cle] : $('.chip[data-group="' + cle + '"]:not([hidden])', form));
   const allerA = (step) => {
+    if (el.steps[step]) el.steps[step].scrollTop = 0; // récapitulatif : repartir du haut
     s.step = step; s.tried = false; render();
     if (el.progress && el.progress.getBoundingClientRect().top < 0) el.progress.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
-    const premier = window.innerWidth > 640 ? $$('.step:not([hidden]) .input, .step:not([hidden]) .chip:not([hidden])', form).find((n) => n.getClientRects().length) : null;
+    const premier = window.innerWidth > 640 ? $$('.step.is-on .input, .step.is-on .chip:not([hidden])', form).find((n) => n.getClientRects().length) : null;
     (premier || el.progress).focus({ preventScroll: true });
   };
   // Signale les erreurs de l'écran courant : messages, annonce vocale, focus sur la première.
@@ -497,6 +507,8 @@
     if (g === 'type' && !(BIENS_PAR_TYPE[s.type] || []).includes(s.bien)) s.bien = '';
     render();
   }));
+  if (el.steps[DERNIERE]) el.steps[DERNIERE].addEventListener('scroll', majDefile, { passive: true });
+  window.addEventListener('resize', majDefile);
   if (el.next) el.next.addEventListener('click', next);
   if (el.back) el.back.addEventListener('click', back);
   if (el.reset) el.reset.addEventListener('click', reset);

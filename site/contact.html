@@ -58,8 +58,9 @@
             <div class="progress-lbl" role="status"><span><span data-step-num>01</span> — <span data-step-title>Vous</span></span><span><span data-step-num>01</span> / 08</span></div>
           </div>
 
+          <div class="steps">
           <!-- 01 — VOUS -->
-          <div class="step">
+          <div class="step is-on">
             <div class="field">
               <span class="lbl" id="lbl-profil">Vous êtes</span>
               <div class="grid-profil" role="group" aria-labelledby="lbl-profil">
@@ -105,7 +106,7 @@
           </div>
 
           <!-- 02 — VOTRE PROJET -->
-          <div class="step" hidden>
+          <div class="step">
             <div class="field">
               <span class="lbl" id="lbl-type">Type de projet</span>
               <div class="chips" role="group" aria-labelledby="lbl-type" aria-describedby="err-type">
@@ -145,7 +146,7 @@
           </div>
 
           <!-- 03 — LE LIEU -->
-          <div class="step" hidden>
+          <div class="step">
             <div class="field">
               <label class="lbl" for="f-adresse">Adresse du projet</label>
               <input class="input" id="f-adresse" name="adresse" placeholder="N° et rue" autocomplete="address-line1" aria-describedby="err-adresse" aria-required="true">
@@ -170,7 +171,7 @@
           </div>
 
           <!-- 04 — LES SURFACES -->
-          <div class="step" hidden>
+          <div class="step">
             <p class="f-hint" id="hint-surfaces">Surfaces approximatives en m², toutes pièces comprises. Une estimation suffit ; laissez vide les champs facultatifs que vous ne connaissez pas.</p>
             <div class="grid-surfaces" role="group" aria-labelledby="lbl-surfaces" aria-describedby="hint-surfaces">
               <span class="sr-only" id="lbl-surfaces">Surfaces</span>
@@ -210,7 +211,7 @@
           </div>
 
           <!-- 05 — VOS BESOINS -->
-          <div class="step" hidden>
+          <div class="step">
             <div class="field">
               <span class="lbl" id="lbl-docs">Documents souhaités <span class="lbl-opt">(plusieurs choix possibles)</span></span>
               <div class="chips" role="group" aria-labelledby="lbl-docs" aria-describedby="err-docs hint-docs">
@@ -236,7 +237,7 @@
           </div>
 
           <!-- 06 — DÉTAILS -->
-          <div class="step" hidden>
+          <div class="step">
             <div class="field">
               <span class="lbl" id="lbl-calendrier">Démarrage souhaité</span>
               <div class="chips" role="group" aria-labelledby="lbl-calendrier" aria-describedby="err-calendrier">
@@ -273,7 +274,7 @@
           </div>
 
           <!-- 07 — COMMENT NOUS AVEZ-VOUS CONNUS -->
-          <div class="step" hidden>
+          <div class="step">
             <div class="field">
               <span class="lbl" id="lbl-source">Comment nous avez-vous connus ? <span class="lbl-opt">(facultatif)</span></span>
               <div class="chips" role="group" aria-labelledby="lbl-source">
@@ -291,10 +292,11 @@
           </div>
 
           <!-- 08 — RÉCAPITULATIF -->
-          <div class="step" hidden>
+          <div class="step step--recap">
             <p class="f-hint">Vérifiez votre demande avant de l'envoyer. Chaque section peut être modifiée.</p>
             <div class="recap-final" data-recap-final></div>
             <p class="f-hint" data-api-note hidden>En envoyant votre demande, un espace client est créé pour votre adresse e-mail&nbsp;: vous y retrouverez votre demande, vos pièces et nos documents (connexion par lien e-mail, sans mot de passe).</p>
+          </div>
           </div>
 
           <div class="form-actions">
