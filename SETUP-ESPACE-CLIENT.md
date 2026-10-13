@@ -64,7 +64,7 @@ de dossier.
    objet `Votre lien de connexion — Atomes studio` ; corps : onglet **Source**, tout effacer, coller le
    contenu de `emails/supabase-magic-link.html` (même mise en page et même signature que les e-mails de la
    fonction `demande`), puis « Save changes ». Le logo de la signature est
-   `https://atomes.studio/images/logo-mail.png` : il s'affiche dès que le site est publié avec le dossier
+   `https://atomes.studio/images/logo-signature.png` : il s'affiche dès que le site est publié avec le dossier
    `images/` à jour.
 
 ## 3. Déployer la fonction « demande »
