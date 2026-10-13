@@ -24,8 +24,8 @@ de dossier.
 
 1. Créer un compte sur supabase.com, puis un projet : nom `atomes`, région **West EU (Paris)** ou
    **Central EU (Frankfurt)**, mot de passe de base de données à conserver.
-2. Menu **SQL Editor** → New query → coller tout le contenu de `supabase/migrations/0001_espace_client.sql`
-   → Run. Le résultat doit être « Success ».
+2. Menu **SQL Editor** → New query → coller tout le contenu de chaque fichier de `supabase/migrations/`, dans
+   l'ordre (`0001_…`, puis `0002_…`), → Run à chaque fois. Le résultat doit être « Success ».
 3. **Authentication → Sign In / Providers → Email** : laisser le provider Email activé (c'est lui qui
    envoie les liens de connexion). Laisser « Confirm email » tel quel : les comptes sont créés déjà
    confirmés par la fonction.
@@ -132,6 +132,17 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
    réception au client, notification à l'agence) ; dans Supabase, **Table Editor → projets** contient la
    ligne et **Storage → dossiers → <numéro> → client** contient le fichier.
 3. Se connecter sur /dossier/ avec l'adresse du test : timeline et documents apparaissent.
+
+## Mises à jour à appliquer
+
+- **13 octobre 2026, formulaire v3** — les deux gestes se font dans la même séance, dans cet ordre :
+  1. SQL Editor → coller `supabase/migrations/0002_precisions_autre.sql` → Run (ajoute la colonne `precisions`) ;
+  2. redéployer la fonction `demande` avec le `index.ts` à jour.
+  Ne pas redéployer la fonction avant la migration : chaque enregistrement échouerait et toutes les demandes
+  partiraient par FormSubmit, sans dossier. Tant que rien n'est fait, l'ancienne fonction refuse les nouveaux
+  états du bien (« Terrain bâti », « Annexe, dépendance ou garage », « Autre ») — ces demandes partent par
+  FormSubmit — et les précisions des autres choix « Autre » (type, documents, démarrage, source) ne sont pas
+  transmises : le mail n'indique que « Autre ».
 
 ## Au quotidien (version 1, sans espace admin)
 

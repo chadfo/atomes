@@ -20,7 +20,7 @@
   const surfacesPour = (type, bien) => {
     const appart = bien === 'Appartement'; const L = [];
     switch (type) {
-      case 'Construction': L.push(['surface', 'Surface créée']); if (bien === 'Terrain déjà bâti') L.push(['surface_existante', 'Surface du bâti existant']); L.push(['emprise', 'Emprise au sol du projet'], ['surface_terrain', 'Surface du terrain']); break;
+      case 'Construction': L.push(['surface', 'Surface créée']); if (bien === 'Terrain bâti') L.push(['surface_existante', 'Surface du bâti existant']); L.push(['emprise', 'Emprise au sol du projet'], ['surface_terrain', 'Surface du terrain']); break;
       case 'Extension': L.push(['surface_existante', 'Surface existante'], ['surface', 'Surface créée'], ['emprise', 'Emprise au sol de l\u2019extension']); if (!appart) L.push(['surface_terrain', 'Surface du terrain']); break;
       case 'Rénovation': case 'Aménagement intérieur': L.push(['surface_existante', 'Surface existante'], ['surface', 'Surface créée']); break;
       case 'Aménagement extérieur': L.push(['emprise', 'Surface aménagée']); if (!appart) L.push(['surface_terrain', 'Surface du terrain']); break;
@@ -210,14 +210,16 @@
     const dl = $('[data-recap]');
     dl.textContent = '';
     const m2 = (v) => (v === null || v === undefined || v === '' ? '' : v + ' m²');
+    const prec = d.precisions || {};
+    const aff = (v, cle) => (v === 'Autre' && prec[cle] ? 'Autre : ' + prec[cle] : v);
     [
       ['Profil', [d.profil, d.societe, d.activite].filter(Boolean).join(' · ')],
       ['Contact', [d.prenom + ' ' + d.nom, d.email, d.telephone].filter(Boolean).join(' · ')],
-      ['Type de projet', d.type], ['Documents souhaités', (d.documents || []).join(', ')],
+      ['Type de projet', aff(d.type, 'type')], ['Documents souhaités', (d.documents || []).map((x) => aff(x, 'documents')).join(', ')],
       ['Adresse', [d.adresse, [d.code_postal, d.commune].filter(Boolean).join(' ')].filter(Boolean).join(', ')],
-      ['Référence cadastrale', d.cadastre], ['État actuel', d.bien],
+      ['Référence cadastrale', d.cadastre], ['État actuel', aff(d.bien, 'bien')],
       ['Surfaces', surfacesPour(d.type, d.bien).filter((sf) => m2(d[sf[0]])).map((sf) => sf[1].toLowerCase().replace(/^surface /, '') + ' ' + m2(d[sf[0]])).join(' · ')],
-      ['Démarrage souhaité', d.calendrier], ['Votre message', d.message]
+      ['Démarrage souhaité', aff(d.calendrier, 'calendrier')], ['Votre message', d.message]
     ].filter((r) => r[1]).forEach((r) => { dl.appendChild(el('dt', '', r[0])); dl.appendChild(el('dd', '', r[1])); });
   };
 

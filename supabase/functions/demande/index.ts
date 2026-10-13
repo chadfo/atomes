@@ -40,16 +40,18 @@ const TYPES = ["Construction", "Rénovation", "Extension", "Démolition", "Amén
 const DOCS = ["Permis de construire", "Déclaration préalable", "Permis d'aménager", "Permis de démolir", "Dossier de consultation des entreprises", "Perspective", "Réalisation de plans", "Avis d'architecte / étude simple", "Autre", "Je ne sais pas encore"];
 // États possibles du bien selon le type de projet (mêmes règles que contact.js).
 const BIENS_PAR_TYPE: Record<string, string[]> = {
-  "Construction": ["Terrain nu", "Terrain déjà bâti"],
-  "Rénovation": ["Maison", "Appartement", "Local ou bâtiment pro", "Annexe ou dépendance"],
-  "Extension": ["Maison", "Appartement", "Local ou bâtiment pro", "Annexe ou dépendance"],
-  "Démolition": ["Maison", "Local ou bâtiment pro", "Annexe ou dépendance"],
-  "Aménagement intérieur": ["Maison", "Appartement", "Local ou bâtiment pro", "Annexe ou dépendance"],
-  "Aménagement extérieur": ["Maison", "Appartement", "Local ou bâtiment pro", "Terrain nu"],
-  "Autre": ["Terrain nu", "Terrain déjà bâti", "Maison", "Appartement", "Local ou bâtiment pro", "Annexe ou dépendance"],
+  "Construction": ["Terrain nu", "Terrain bâti", "Autre"],
+  "Rénovation": ["Maison", "Appartement", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
+  "Extension": ["Maison", "Appartement", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
+  "Démolition": ["Maison", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
+  "Aménagement intérieur": ["Maison", "Appartement", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
+  "Aménagement extérieur": ["Maison", "Appartement", "Local ou bâtiment pro", "Terrain nu", "Autre"],
+  "Autre": ["Terrain nu", "Terrain bâti", "Maison", "Appartement", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"],
 };
-const BIENS = ["Terrain nu", "Terrain déjà bâti", "Maison", "Appartement", "Local ou bâtiment pro", "Annexe ou dépendance"];
-const CALENDRIERS = ["Dès que possible", "Dans 3 à 6 mois", "Dans 6 à 12 mois", "Plus tard", "Pas encore défini"];
+const BIENS = ["Terrain nu", "Terrain bâti", "Maison", "Appartement", "Local ou bâtiment pro", "Annexe, dépendance ou garage", "Autre"];
+// Précisions libres saisies pour les choix « Autre » (champs du formulaire → clés enregistrées).
+const PRECISIONS: [string, string][] = [["typeAutre", "type"], ["bienAutre", "bien"], ["docsAutre", "documents"], ["calendrierAutre", "calendrier"], ["sourceAutre", "source"]];
+const CALENDRIERS = ["Dès que possible", "Dans 3 à 6 mois", "Dans 6 à 12 mois", "Plus tard", "Pas encore défini", "Autre"];
 const SOURCES = ["Instagram", "Recherche Google", "Bouche-à-oreille", "Un projet vu sur place", "Autre"];
 // Extensions acceptées → type de contenu enregistré (le type annoncé par le navigateur ne fait pas foi).
 const EXTENSIONS: Record<string, string> = {
@@ -62,6 +64,7 @@ type Demande = {
   type: string; docs: string[]; adresse: string; commune: string; codePostal: string; cadastre: string; bien: string;
   surface: string; surfaceExistante: string; emprise: string; surfaceTerrain: string;
   budget: string; calendrier: string; message: string; source: string;
+  precisions: Record<string, string>;
 };
 type Depose = { nom: string; chemin: string; taille: number };
 
@@ -99,7 +102,17 @@ Deno.serve(async (req) => {
     emprise: nombre(form, "emprise"), surfaceTerrain: nombre(form, "surfaceTerrain"),
     budget: "", calendrier: choix(form, "calendrier", CALENDRIERS),
     message: texte(form, "message", 5000), source: choix(form, "source", SOURCES),
+    precisions: {},
   };
+  // Précisions libres, gardées seulement pour les choix « Autre » ; obligatoires sauf pour la source.
+  const autre: Record<string, boolean> = {
+    type: d.type === "Autre", bien: d.bien === "Autre", documents: d.docs.includes("Autre"),
+    calendrier: d.calendrier === "Autre", source: d.source === "Autre",
+  };
+  for (const [champ, cle] of PRECISIONS) {
+    const v = texte(form, champ, 200);
+    if (autre[cle] && v) d.precisions[cle] = v;
+  }
 
   const invalides: string[] = [];
   if (!d.prenom) invalides.push("prenom");
@@ -109,6 +122,7 @@ Deno.serve(async (req) => {
   if (!d.docs.length) invalides.push("docs");
   if (!d.commune) invalides.push("commune");
   if (!d.bien || !(BIENS_PAR_TYPE[d.type] ?? BIENS).includes(d.bien)) invalides.push("bien");
+  for (const [champ, cle] of PRECISIONS) if (autre[cle] && cle !== "source" && !d.precisions[cle]) invalides.push(champ);
   if (d.codePostal && !/^\d{5}$/.test(d.codePostal)) invalides.push("codePostal");
   if (invalides.length) return json({ ok: false, erreur: "Champs invalides", champs: invalides }, 400, cors);
 
@@ -211,7 +225,7 @@ Deno.serve(async (req) => {
       mails.agence = await envoyerMail({
         to: MAIL_AGENCE,
         replyTo: d.email,
-        subject: `Nouveau projet — ${d.type} · ${d.docs[0] || "à définir"} · ${d.commune} (${d.nom})`,
+        subject: ligne(`Nouveau projet — ${aff(d, d.type, "type")} · ${d.docs[0] ? aff(d, d.docs[0], "documents") : "à définir"} · ${d.commune} (${d.nom})`),
         html: htmlAgence(id, d, deposes, echoues, clientId !== null),
       });
       mails.client = await envoyerMail({
@@ -239,7 +253,7 @@ function surfacesPour(type: string, bien: string): [keyof Demande, string][] {
   switch (type) {
     case "Construction":
       L.push(["surface", "Surface créée"]);
-      if (bien === "Terrain déjà bâti") L.push(["surfaceExistante", "Surface du bâti existant"]);
+      if (bien === "Terrain bâti") L.push(["surfaceExistante", "Surface du bâti existant"]);
       L.push(["emprise", "Emprise au sol du projet"], ["surfaceTerrain", "Surface du terrain"]);
       break;
     case "Extension":
@@ -311,6 +325,7 @@ function ligneProjet(d: Demande) {
     cadastre: txt(d.cadastre), bien: txt(d.bien),
     surface: num(d.surface), surface_existante: num(d.surfaceExistante), emprise: num(d.emprise), surface_terrain: num(d.surfaceTerrain),
     budget: txt(d.budget), calendrier: txt(d.calendrier), message: txt(d.message), source: txt(d.source),
+    precisions: d.precisions,
   };
 }
 
@@ -353,6 +368,11 @@ async function envoyerMail(m: { to: string; subject: string; html: string; reply
 }
 
 // ---------- E-mails -----------------------------------------------------------
+
+// Valeur affichée : « Autre : précision » quand le choix est « Autre »
+const aff = (d: Demande, v: string, cle: string) => (v === "Autre" && d.precisions[cle] ? "Autre : " + d.precisions[cle] : v);
+// Objet du mail sur une seule ligne, quel que soit le contenu saisi
+const ligne = (v: string) => v.replace(/\s+/g, " ").trim();
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 const ko = (o: number) => (o >= 1048576 ? (o / 1048576).toFixed(1).replace(".", ",") + " Mo" : Math.max(1, Math.round(o / 1024)) + " Ko");
@@ -401,11 +421,11 @@ function recap(d: Demande): [string, string][] {
   return [
     ["Profil", d.profil], ["Société", d.societe], ["Activité", d.activite],
     ["Prénom", d.prenom], ["Nom", d.nom], ["Email", d.email], ["Téléphone", d.telephone],
-    ["Type de projet", d.type], ["Documents souhaités", d.docs.join(", ")],
+    ["Type de projet", aff(d, d.type, "type")], ["Documents souhaités", d.docs.map((x) => aff(d, x, "documents")).join(", ")],
     ["Adresse du projet", d.adresse], ["Commune", d.commune], ["Code postal", d.codePostal], ["Référence cadastrale", d.cadastre],
-    ["État actuel du bien", d.bien],
+    ["État actuel du bien", aff(d, d.bien, "bien")],
     ...surfacesPour(d.type, d.bien).map(([cle, libelle]) => [libelle, m2(String(d[cle]))] as [string, string]),
-    ["Démarrage souhaité", d.calendrier], ["Message", d.message], ["Source", d.source],
+    ["Démarrage souhaité", aff(d, d.calendrier, "calendrier")], ["Message", d.message], ["Source", aff(d, d.source, "source")],
   ];
 }
 
@@ -425,7 +445,7 @@ function htmlClient(id: string, d: Demande, deposes: Depose[], echoues: string[]
     p(`Vous pouvez suivre l'avancement de votre dossier, consulter les documents que nous vous transmettrons et déposer des pièces dans votre espace client. Connectez-vous avec cette adresse e-mail (${esc(d.email)})&nbsp;: un lien de connexion vous est envoyé à chaque fois, sans mot de passe.`),
     `<p style="margin:0 0 26px"><a href="${espace}" style="display:inline-block;background:#171512;color:#ffffff;text-decoration:none;font-size:12px;line-height:16px;letter-spacing:2px;text-transform:uppercase;padding:14px 24px">Accéder à mon dossier</a></p>`,
     titreBloc("Votre demande"),
-    tableau([["Type de projet", d.type], ["Documents souhaités", d.docs.join(", ")], ["Commune", d.commune], ["Démarrage souhaité", d.calendrier]]),
+    tableau([["Type de projet", aff(d, d.type, "type")], ["Documents souhaités", d.docs.map((x) => aff(d, x, "documents")).join(", ")], ["Commune", d.commune], ["Démarrage souhaité", aff(d, d.calendrier, "calendrier")]]),
     titreBloc("Pièces jointes reçues", "0 0 6px"),
     listeFichiers(deposes, echoues),
     echoues.length ? p("Vous pourrez déposer à nouveau ces pièces dans votre espace client.") : "",
@@ -437,7 +457,7 @@ function htmlAgence(id: string, d: Demande, deposes: Depose[], echoues: string[]
   const tableUrl = `https://supabase.com/dashboard/project/${ref}/editor`;
   const storageUrl = `https://supabase.com/dashboard/project/${ref}/storage/buckets/dossiers/${id}`;
   return gabarit(`Nouveau projet — dossier ${id}`, [
-    `<h1 style="margin:0 0 18px;font-size:22px;line-height:28px;font-weight:bold">${esc(d.type)} · ${esc(d.commune)} — ${esc(d.prenom)} ${esc(d.nom)}</h1>`,
+    `<h1 style="margin:0 0 18px;font-size:22px;line-height:28px;font-weight:bold">${esc(aff(d, d.type, "type"))} · ${esc(d.commune)} — ${esc(d.prenom)} ${esc(d.nom)}</h1>`,
     compte ? "" : alerte(`Compte client non créé pour ${esc(d.email)} : le client ne peut pas encore se connecter. Voir « Rattraper un dossier sans compte » dans SETUP-ESPACE-CLIENT.md.`),
     tableau(recap(d)),
     titreBloc(`Pièces jointes (${deposes.length})`, "0 0 6px"),

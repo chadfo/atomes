@@ -1,4 +1,4 @@
-// Page Contact — formulaire de demande en six écrans, envoi vers la fonction « demande »
+// Page Contact — formulaire de demande en huit écrans, envoi vers la fonction « demande »
 // (création du dossier et de l'espace client) avec FormSubmit en secours.
 // Format de l'objet du mail contractuel : `Nouveau projet — <Type> · <1er document> · <Commune> (<Nom>)`.
 (() => {
@@ -9,22 +9,25 @@
   const ENDPOINT_FORM = 'https://formsubmit.co/contact@atomes.studio';
   const MAX_BYTES = 10 * 1024 * 1024;
   const MAX_FICHIERS = 10;
+  const EXT_OK = /\.(jpe?g|png|gif|webp|heic|heif|pdf)$/i;
   const cfg = window.ATOMES_CONFIG || {};
   const API = cfg.apiUrl ? cfg : null;
 
-  const STEPS = ['Vous', 'Votre projet', 'Le lieu', 'Les surfaces', 'Vos besoins', 'Détails'];
+  const STEPS = ['Vous', 'Votre projet', 'Le lieu', 'Les surfaces', 'Vos besoins', 'Détails', 'Comment nous avez-vous connus', 'Récapitulatif'];
   const DERNIERE = STEPS.length - 1;
 
-  // ---- Règles de cohérence : états possibles selon le type de projet ----
+  // ---- Règles de cohérence : états possibles selon le type de projet (« Autre » toujours possible) ----
   const BIENS_PAR_TYPE = {
-    'Construction': ['Terrain nu', 'Terrain déjà bâti'],
-    'Rénovation': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe ou dépendance'],
-    'Extension': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe ou dépendance'],
-    'Démolition': ['Maison', 'Local ou bâtiment pro', 'Annexe ou dépendance'],
-    'Aménagement intérieur': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe ou dépendance'],
-    'Aménagement extérieur': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Terrain nu'],
-    'Autre': ['Terrain nu', 'Terrain déjà bâti', 'Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe ou dépendance']
+    'Construction': ['Terrain nu', 'Terrain bâti', 'Autre'],
+    'Rénovation': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre'],
+    'Extension': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre'],
+    'Démolition': ['Maison', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre'],
+    'Aménagement intérieur': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre'],
+    'Aménagement extérieur': ['Maison', 'Appartement', 'Local ou bâtiment pro', 'Terrain nu', 'Autre'],
+    'Autre': ['Terrain nu', 'Terrain bâti', 'Maison', 'Appartement', 'Local ou bâtiment pro', 'Annexe, dépendance ou garage', 'Autre']
   };
+  // Choix « Autre » → champ de précision (nom de l'input) ; la précision est obligatoire sauf pour la source.
+  const AUTRE = { type: 'typeAutre', bien: 'bienAutre', docs: 'docsAutre', calendrier: 'calendrierAutre', source: 'sourceAutre' };
 
   // Surfaces demandées selon le type et l'état du bien : { cle, libelle, requis }.
   // Obligatoires : la surface qui détermine l'autorisation (créée pour une construction, existante pour une rénovation,
@@ -36,7 +39,7 @@
     switch (type) {
       case 'Construction':
         add('surface', 'Surface créée', true);
-        if (bien === 'Terrain déjà bâti') add('surfaceExistante', 'Surface du bâti existant', false);
+        if (bien === 'Terrain bâti') add('surfaceExistante', 'Surface du bâti existant', false);
         add('emprise', 'Emprise au sol du projet', false);
         add('surfaceTerrain', 'Surface du terrain', false);
         break;
@@ -68,10 +71,10 @@
     return L;
   };
   const SURFACES = ['surface', 'surfaceExistante', 'emprise', 'surfaceTerrain'];
-  const EXT_OK = /\.(jpe?g|png|gif|webp|heic|heif|pdf)$/i;
 
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+  const crea = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt !== undefined) n.textContent = txt; return n; };
 
   const el = {
     progress: $('.progress', form),
@@ -83,9 +86,7 @@
     blocBien: $('[data-bloc-bien]', form),
     docHint: $('[data-doc-hint]', form),
     message: form.elements.message,
-    recap1: $('[data-recap-1]', form),
-    recap2: $('[data-recap-2]', form),
-    recap3: $('[data-recap-3]', form),
+    recapFinal: $('[data-recap-final]', form),
     dropzone: $('.dropzone', form),
     fileInput: $('input[type="file"]', form),
     filesLabel: $('[data-files-label]', form),
@@ -95,6 +96,9 @@
     next: $('[data-next]', form),
     submit: $('[data-submit]', form),
     sendErr: $('[data-send-err]', form),
+    liveStatus: $('[data-live-status]', form),
+    liveAlert: $('[data-live-alert]', form),
+    apiNote: $('[data-api-note]'),
     sent: $('[data-sent]'),
     sentDossier: $('[data-sent-dossier]'),
     sentNum: $('[data-sent-num]'),
@@ -103,9 +107,6 @@
     sentCompteKo: $('[data-sent-compte-ko]'),
     sentFichiers: $('[data-sent-fichiers]'),
     sentFichiersListe: $('[data-sent-fichiers-liste]'),
-    apiNote: $('[data-api-note]'),
-    liveStatus: $('[data-live-status]', form),
-    liveAlert: $('[data-live-alert]', form),
     reset: $('[data-reset]')
   };
 
@@ -118,10 +119,14 @@
 
   const val = (name) => (form.elements[name] ? form.elements[name].value : '');
   const surfacesActives = () => surfacesPour(s.type, s.bien);
+  const estAutre = (g) => (g === 'docs' ? s.docs.includes('Autre') : s[g] === 'Autre');
+  // Valeur affichée : « Autre : précision » quand le choix est « Autre »
+  const aff = (v, g) => (v === 'Autre' && val(AUTRE[g]).trim() ? 'Autre : ' + val(AUTRE[g]).trim() : v);
 
   // ---- Validation, un écran à la fois ----
   const validate = (step) => {
     const e = {};
+    const precision = (g) => { if (estAutre(g) && val(AUTRE[g]).trim().length < 2) e[AUTRE[g]] = 'Précisez votre choix'; };
     if (step === 0) {
       if (s.profil === 'Professionnel' && !val('societe').trim()) e.societe = 'Champ requis';
       if (!val('prenom').trim()) e.prenom = 'Champ requis';
@@ -131,7 +136,7 @@
     }
     if (step === 1) {
       if (!s.type) e.type = 'Choisissez un type de projet';
-      else if (!s.bien) e.bien = 'Précisez l’état actuel du bien';
+      else { precision('type'); if (!s.bien) e.bien = 'Précisez l’état actuel du bien'; else precision('bien'); }
     }
     if (step === 2) {
       if (!val('adresse').trim()) e.adresse = 'Champ requis';
@@ -147,9 +152,11 @@
     }
     if (step === 4) {
       if (!s.docs.length) e.docs = 'Choisissez au moins un document';
+      else precision('docs');
     }
     if (step === 5) {
       if (!s.calendrier) e.calendrier = 'Indiquez le démarrage souhaité';
+      else precision('calendrier');
       if (val('message').trim().length < 10) e.message = 'Décrivez votre projet en quelques mots (10 caractères min.)';
       else if (val('message').length > 5000) e.message = '5 000 caractères maximum.';
       if (s.fichiers.reduce((a, f) => a + f.size, 0) > MAX_BYTES) e.fichiers = 'Pièces jointes trop lourdes — 10 Mo max au total.';
@@ -165,12 +172,13 @@
     add('Profil', s.profil);
     if (s.profil === 'Professionnel') { add('Société', val('societe')); add('Activité', val('activite')); }
     add('Prénom', val('prenom')); add('Nom', val('nom')); add('email', val('email')); add('Téléphone', val('telephone'));
-    add('Type de projet', s.type); add('État actuel du bien', s.bien); add('Documents souhaités', s.docs.join(', '));
+    add('Type de projet', aff(s.type, 'type')); add('État actuel du bien', aff(s.bien, 'bien'));
+    add('Documents souhaités', s.docs.map((d) => aff(d, 'docs')).join(', '));
     add('Adresse du projet', val('adresse')); add('Commune', val('commune')); add('Code postal', val('codePostal')); add('Référence cadastrale', val('cadastre'));
     surfacesActives().forEach((sf) => add(sf.libelle + ' (m²)', val(sf.cle)));
-    add('Démarrage souhaité', s.calendrier);
-    add('Message', val('message')); add('Source', s.source);
-    add('_subject', 'Nouveau projet — ' + s.type + ' · ' + (s.docs[0] || 'à définir') + ' · ' + val('commune') + ' (' + val('nom') + ')');
+    add('Démarrage souhaité', aff(s.calendrier, 'calendrier'));
+    add('Message', val('message')); add('Source', aff(s.source, 'source'));
+    add('_subject', 'Nouveau projet — ' + aff(s.type, 'type') + ' · ' + (s.docs[0] ? aff(s.docs[0], 'docs') : 'à définir') + ' · ' + val('commune') + ' (' + val('nom') + ')');
     add('_template', 'table'); add('_captcha', 'false');
     if (val('_honey')) add('_honey', val('_honey'));
     return out;
@@ -191,7 +199,7 @@
 
   // ---- Rendu ----
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  // Un bloc qui apparaît (société, état du bien) se révèle en douceur et entre dans la vue si besoin.
+  // Un bloc qui apparaît (société, état du bien, précision « Autre ») se révèle en douceur et entre dans la vue si besoin.
   const montrerBloc = (bloc, visible) => {
     if (!bloc || bloc.hidden === !visible) return;
     bloc.hidden = !visible;
@@ -205,6 +213,42 @@
     $$('[data-err="' + key + '"]', form).forEach((n) => { n.textContent = msg || ''; n.hidden = !msg; });
     const inp = form.elements[key];
     if (inp && inp.setAttribute) { if (msg) inp.setAttribute('aria-invalid', 'true'); else inp.removeAttribute('aria-invalid'); }
+  };
+
+  // Récapitulatif final : une section par écran, avec un bouton « Modifier »
+  const rendreRecapFinal = () => {
+    const cont = el.recapFinal;
+    if (!cont) return;
+    cont.textContent = '';
+    const pro = s.profil === 'Professionnel';
+    const sections = [
+      ['Vous', 0, [
+        ['Profil', [s.profil, pro ? val('societe') : '', pro ? val('activite') : ''].filter((x) => x && x.trim()).join(' · ')],
+        ['Nom', (val('prenom') + ' ' + val('nom')).trim()], ['Email', val('email')], ['Téléphone', val('telephone')]]],
+      ['Votre projet', 1, [['Type de projet', aff(s.type, 'type')], ['État actuel du bien', aff(s.bien, 'bien')]]],
+      ['Le lieu', 2, [['Adresse', val('adresse')], ['Commune', [val('codePostal'), val('commune')].filter((x) => x.trim()).join(' ')], ['Référence cadastrale', val('cadastre')]]],
+      ['Les surfaces', 3, surfacesActives().map((sf) => [sf.libelle, val(sf.cle).trim() ? val(sf.cle).trim() + ' m²' : ''])],
+      ['Vos besoins', 4, [['Documents souhaités', s.docs.map((d) => aff(d, 'docs')).join(', ')]]],
+      ['Détails', 5, [['Démarrage souhaité', aff(s.calendrier, 'calendrier')], ['Votre projet', val('message')], ['Pièces jointes', s.fichiers.map((f) => f.name).join(', ')]]],
+      ['Comment nous avez-vous connus', 6, [['Source', aff(s.source, 'source')]]]
+    ];
+    sections.forEach(([titre, index, lignes]) => {
+      const sec = crea('div', 'recap-sec');
+      const head = crea('div', 'recap-sec-head');
+      head.appendChild(crea('span', 'lbl', titre));
+      const btn = crea('button', 'link-more', 'Modifier');
+      btn.type = 'button'; btn.disabled = s.envoi; btn.setAttribute('aria-label', 'Modifier : ' + titre);
+      btn.addEventListener('click', () => allerA(index));
+      head.appendChild(btn);
+      sec.appendChild(head);
+      const pleines = lignes.filter((l) => l[1] && String(l[1]).trim());
+      if (pleines.length) {
+        const dl = crea('dl', 'recap-liste');
+        pleines.forEach(([k, v]) => { dl.appendChild(crea('dt', '', k)); dl.appendChild(crea('dd', '', v)); });
+        sec.appendChild(dl);
+      } else sec.appendChild(crea('p', 'recap-vide', 'Non renseigné'));
+      cont.appendChild(sec);
+    });
   };
 
   const render = () => {
@@ -242,8 +286,14 @@
     montrerBloc(el.pro, s.profil === 'Professionnel');
     if (form.elements.societe) form.elements.societe.toggleAttribute('aria-required', s.profil === 'Professionnel');
     montrerBloc(el.blocBien, !!s.type);
+    Object.keys(AUTRE).forEach((g) => {
+      const visible = estAutre(g) && (g !== 'bien' || !!s.type);
+      montrerBloc($('[data-bloc-autre="' + g + '"]', form), visible);
+      const inp = form.elements[AUTRE[g]];
+      if (inp) inp.toggleAttribute('aria-required', visible && g !== 'source');
+    });
 
-    // Surfaces : seules celles du projet, libellés adaptés, mention « facultatif »
+    // Surfaces : seules celles du projet, dans l'ordre logique, libellés adaptés, mention « facultatif »
     const actives = surfacesActives();
     SURFACES.forEach((cle) => {
       const bloc = $('[data-surface="' + cle + '"]', form);
@@ -257,6 +307,7 @@
       if (form.elements[cle]) form.elements[cle].toggleAttribute('aria-required', !!(sf && sf.requis));
     });
 
+    // Aide contextuelle sur les autorisations (surfaces actives seulement, seuils selon le type)
     const vActive = (cle) => (actives.some((x) => x.cle === cle) ? Number(val(cle)) || 0 : 0);
     const creee = vActive('surface'), empriseSol = vActive('emprise'), existante = vActive('surfaceExistante');
     const seuil = s.type === 'Construction' ? 20 : 40;
@@ -276,11 +327,6 @@
     const hasAuto = s.docs.some((d) => /Permis|Déclaration/.test(d));
     if (el.message) el.message.placeholder = hasAuto ? 'Programme souhaité (pièces, usages), contraintes connues, état de l’existant, échéances…' : 'Ce que vous imaginez, vos références, vos contraintes…';
 
-    if (el.recap1) el.recap1.textContent = s.profil + ' · ' + val('prenom') + ' ' + val('nom') + ' · ' + val('email');
-    if (el.recap2) el.recap2.textContent = [s.type, s.bien, val('commune')].filter(Boolean).join(' · ');
-    const sfTxt = actives.filter((sf) => val(sf.cle)).map((sf) => val(sf.cle) + ' m² ' + sf.libelle.toLowerCase().replace(/^surface /, '').replace(/ \(.*\)$/, '').replace(/, le cas échéant$/, '')).join(', ');
-    if (el.recap3) el.recap3.textContent = [s.docs.join(', ') || 'document à définir', s.calendrier, sfTxt].filter(Boolean).join(' · ');
-
     if (el.dropzone) el.dropzone.classList.toggle('is-over', s.survol);
     const nf = s.fichiers.length;
     if (el.filesLabel) el.filesLabel.textContent = nf ? nf + ' fichier' + (nf > 1 ? 's' : '') + ' sélectionné' + (nf > 1 ? 's' : '') : 'Aucun fichier sélectionné';
@@ -288,11 +334,10 @@
       el.files.hidden = !nf;
       el.files.textContent = '';
       s.fichiers.forEach((f, i) => {
-        const chip = document.createElement('span');
-        chip.className = 'file-chip';
-        const nomF = document.createElement('span'); nomF.textContent = f.name; chip.appendChild(nomF);
-        const btn = document.createElement('button');
-        btn.type = 'button'; btn.textContent = '×'; btn.setAttribute('aria-label', 'Retirer ' + f.name);
+        const chip = crea('span', 'file-chip');
+        chip.appendChild(crea('span', '', f.name));
+        const btn = crea('button', '', '×');
+        btn.type = 'button'; btn.setAttribute('aria-label', 'Retirer ' + f.name);
         btn.addEventListener('click', () => { s.fichiers = s.fichiers.filter((_, j) => j !== i); s.fichiersRefuses = ''; render(); });
         chip.appendChild(btn);
         el.files.appendChild(chip);
@@ -302,11 +347,13 @@
     const alerte = [s.fichiersRefuses, s.erreurEnvoi].filter(Boolean).join(' ');
     if (el.liveAlert && el.liveAlert.textContent !== alerte) el.liveAlert.textContent = alerte;
 
-    ['societe', 'prenom', 'nom', 'email', 'telephone', 'type', 'bien', 'adresse', 'commune', 'codePostal',
-      'surface', 'surfaceExistante', 'emprise', 'surfaceTerrain', 'docs', 'calendrier', 'message', 'fichiers']
+    if (s.step === DERNIERE) rendreRecapFinal();
+
+    ['societe', 'prenom', 'nom', 'email', 'telephone', 'type', 'typeAutre', 'bien', 'bienAutre', 'adresse', 'commune', 'codePostal',
+      'surface', 'surfaceExistante', 'emprise', 'surfaceTerrain', 'docs', 'docsAutre', 'calendrier', 'calendrierAutre', 'message', 'fichiers']
       .forEach((k) => setErr(k, errs[k]));
 
-    if (el.back) el.back.hidden = s.step === 0;
+    if (el.back) { el.back.hidden = s.step === 0; el.back.disabled = s.envoi; }
     if (el.next) el.next.hidden = s.step === DERNIERE;
     if (el.submit) {
       el.submit.hidden = s.step !== DERNIERE;
@@ -317,21 +364,22 @@
   };
 
   // ---- Navigation entre écrans ----
-  const cibleDe = (cle) => form.elements[cle] && form.elements[cle].focus ? form.elements[cle] : $('.chip[data-group="' + cle + '"]:not([hidden])', form);
+  const cibleDe = (cle) => (form.elements[cle] && form.elements[cle].focus ? form.elements[cle] : $('.chip[data-group="' + cle + '"]:not([hidden])', form));
   const allerA = (step) => {
     s.step = step; s.tried = false; render();
     if (el.progress && el.progress.getBoundingClientRect().top < 0) el.progress.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
-    const premier = window.innerWidth > 640 ? $('.step:not([hidden]) .input, .step:not([hidden]) .chip:not([hidden])', form) : null;
+    const premier = window.innerWidth > 640 ? $$('.step:not([hidden]) .input, .step:not([hidden]) .chip:not([hidden])', form).find((n) => n.getClientRects().length) : null;
     (premier || el.progress).focus({ preventScroll: true });
+  };
+  // Signale les erreurs de l'écran courant : messages, annonce vocale, focus sur la première.
+  const signaler = (erreurs) => {
+    s.tried = true; render();
+    if (el.liveAlert) el.liveAlert.textContent = erreurs.length + (erreurs.length > 1 ? ' champs à corriger' : ' champ à corriger');
+    const cible = cibleDe(erreurs[0]); if (cible) cible.focus();
   };
   const next = () => {
     const erreurs = Object.keys(validate(s.step));
-    if (erreurs.length) {
-      s.tried = true; render();
-      if (el.liveAlert) el.liveAlert.textContent = erreurs.length + (erreurs.length > 1 ? ' champs à corriger' : ' champ à corriger');
-      const cible = cibleDe(erreurs[0]); if (cible) cible.focus();
-      return;
-    }
+    if (erreurs.length) { signaler(erreurs); return; }
     allerA(s.step + 1);
   };
   const back = () => allerA(s.step - 1);
@@ -339,12 +387,12 @@
   // ---- Envoi ----
   const submit = (e) => {
     e.preventDefault();
-    // Entrée dans un champ d'un écran intermédiaire : pas d'envoi (le bouton « Envoyer » n'est actif qu'au dernier).
+    // Entrée dans un champ d'un écran intermédiaire : écran suivant (l'envoi n'est possible qu'au récapitulatif).
     if (s.step !== DERNIERE) { next(); return; }
     if (s.envoi) return;
     // Sécurité : tous les écrans doivent être valides ; sinon retour au premier en défaut.
     const enDefaut = STEPS.map((_, i) => i).find((st) => Object.keys(validate(st)).length);
-    if (enDefaut !== undefined) { s.step = enDefaut; s.tried = true; render(); return; }
+    if (enDefaut !== undefined) { allerA(enDefaut); signaler(Object.keys(validate(enDefaut))); return; }
     s.envoi = true; s.erreurEnvoi = ''; s.tried = false; render();
     if (API) { envoyerApi().then(traiterReponseApi, () => envoyerFormSubmit()); return; }
     envoyerFormSubmit();
@@ -364,6 +412,7 @@
     fd.append('profil', s.profil); fd.append('type', s.type); fd.append('bien', s.bien);
     fd.append('calendrier', s.calendrier); fd.append('source', s.source);
     s.docs.forEach((d) => fd.append('docs', d));
+    Object.keys(AUTRE).forEach((g) => fd.append(AUTRE[g], estAutre(g) ? val(AUTRE[g]) : ''));
     s.fichiers.forEach((f) => fd.append('fichiers', f, f.name));
     const headers = API.supabaseAnonKey ? { apikey: API.supabaseAnonKey, Authorization: 'Bearer ' + API.supabaseAnonKey } : {};
     return fetch(API.apiUrl, { method: 'POST', headers, body: fd }).then((r) => {
@@ -432,7 +481,8 @@
       });
   };
 
-  const reset = () => { s = initial(); form.reset(); render(); };
+  // « Nouvelle demande » : état et champs vidés, retour au premier écran (avec son focus).
+  const reset = () => { s = initial(); form.reset(); allerA(0); };
 
   // ---- Écouteurs ----
   const ORDRE_DOCS = $$('.chip[data-group="docs"]', form).map((c) => c.dataset.value);

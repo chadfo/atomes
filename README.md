@@ -11,7 +11,7 @@ site/                      ← racine publiée (tout ce dossier va à la racine 
   index.html               Accueil
   projets.html             Projets (accordéon, galerie par projet)
   a-propos.html            À propos
-  contact.html             Formulaire de demande en 3 étapes
+  contact.html             Formulaire de demande en huit écrans
   assets/css/site.css      Feuille de style commune : jetons de la charte + composants + pages
   assets/js/atom-logo.js   Logo animé <atom-logo> (à conserver tel quel)
   assets/js/projets.js     Accordéon et galeries de la page Projets
@@ -59,7 +59,7 @@ Il n'y a rien à installer ni à compiler : on édite les fichiers de `site/` et
 | index.html | Hero plein écran, 4 blocs « philosophie » (image à gauche, 300 px min), CTA | hero, philo-01…04 |
 | projets.html | 7 projets en accordéon (un seul ouvert : 35vw, 78vh sous 640 px ; fermé : 400 px), flèches + compteur | proj-0N (+ -a…-d) |
 | a-propos.html | Portrait + texte, formation, signature | portrait, signature |
-| contact.html | Formulaire 3 étapes | contact-photo |
+| contact.html | Formulaire en huit écrans | contact-photo |
 
 Toutes les pages partagent : nav sticky (logo animé + 4 liens, lien actif `aria-current="page"` en blanc),
 pied de page 2 colonnes en IBM Plex Mono (à droite : adresse postale, mail, Instagram, chacun précédé d'une
@@ -89,35 +89,44 @@ icône), fond `#171512`.
 
 ## Formulaire de contact (contact.html + assets/js/contact.js)
 
-Six écrans, un sujet par écran, barre de progression (6 segments 2 px), étiquette « 0N — Titre » et
-« 0N / 06 », validation par écran, boutons Retour / Continuer → / Envoyer la demande.
+Huit écrans, un sujet par écran, barre de progression (8 segments 2 px), étiquette « 0N — Titre » et
+« 0N / 08 », validation par écran, boutons Retour / Continuer → ; l'envoi n'est possible qu'au récapitulatif.
+La touche Entrée passe à l'écran suivant.
 
 1. **Vous** — Particulier | Professionnel (si pro : Société *obligatoire*, Activité) · Prénom* · Nom* · Email* ·
    Téléphone (facultatif, ≥ 10 chiffres si rempli).
 2. **Votre projet** — Type de projet* (Construction, Rénovation, Extension, Démolition, Aménagement intérieur,
-   Aménagement extérieur, Autre), puis État actuel du bien* limité aux cas cohérents : Construction → terrain nu
-   ou terrain déjà bâti ; Rénovation, Extension, Aménagement intérieur → maison, appartement, local pro, annexe ;
-   Aménagement extérieur → maison, appartement, local pro, terrain nu ; Démolition → maison, local pro, annexe ;
-   Autre → tout.
+   Aménagement extérieur, Autre), puis État actuel du bien* limité aux cas cohérents : Construction → terrain nu,
+   terrain bâti ; Rénovation, Extension, Aménagement intérieur → maison, appartement, local pro, annexe /
+   dépendance / garage ; Aménagement extérieur → maison, appartement, local pro, terrain nu ; Démolition →
+   maison, local pro, annexe ; type « Autre » → tous les états. L'état « Autre » est toujours proposé, avec un
+   champ de précision obligatoire (de même pour le type).
 3. **Le lieu** — Adresse* · Commune* · Code postal* (5 chiffres) · Référence cadastrale.
-4. **Les surfaces** — seules celles du projet, libellés adaptés (ex. « Surface à démolir », « Surface du bâti
-   existant »), jamais de surface du terrain pour un appartement. Obligatoires : surface créée (Construction),
-   surface existante (Rénovation, Aménagement intérieur, Démolition), les deux pour une Extension (règle des
-   150 m² après travaux). Les autres sont facultatives (rénovation de façade : rien à saisir en surface créée).
-   Aides contextuelles sur les seuils : 20 m² (construction neuve), 40 m² (extension en zone urbaine), 150 m²
-   de surface totale après travaux (permis de construire et architecte obligatoires).
+4. **Les surfaces** — seules celles du projet, dans l'ordre logique, libellés adaptés (ex. « Surface à démolir »,
+   « Surface du bâti existant »), jamais de surface du terrain pour un appartement. Obligatoires : surface créée
+   (Construction), surface existante (Rénovation, Aménagement intérieur, Démolition), les deux pour une
+   Extension (règle des 150 m² après travaux). Les autres sont facultatives (rénovation de façade : rien à
+   saisir en surface créée).
 5. **Vos besoins** — Documents souhaités (choix multiple, ≥ 1*, tous visibles) : Permis de construire,
    Déclaration préalable, Permis d'aménager, Permis de démolir, Dossier de consultation des entreprises,
-   Perspective, Réalisation de plans, Avis d'architecte / étude simple, Autre, Je ne sais pas encore, toujours
-   renvoyés dans cet ordre (le premier donne l'objet du mail). « Je ne sais pas encore » → message rassurant ;
-   Perspective, plans ou étude simple seuls → « pas de dossier administratif ».
-6. **Détails** — Démarrage souhaité* (Dès que possible / 3–6 mois / 6–12 mois / Plus tard / Pas encore défini) ·
-   Description* (10 à 5 000 caractères) · Pièces jointes (JPG, PNG, GIF, WEBP, HEIC, PDF ; 10 fichiers et 10 Mo max) · Comment nous
-   avez-vous connus (facultatif) · Récapitulatif 3 lignes. Pas de question sur le budget.
+   Perspective, Réalisation de plans, Avis d'architecte / étude simple, Autre (précision obligatoire), Je ne
+   sais pas encore ; toujours renvoyés dans cet ordre (le premier donne l'objet du mail). Aides contextuelles aux
+   seuils : 20 m² (construction neuve), 40 m² (extension en zone urbaine), 150 m² de surface totale après
+   travaux ; « Je ne sais pas encore » → message rassurant ; Perspective, plans ou étude simple seuls → « pas de
+   dossier administratif ».
+6. **Détails** — Démarrage souhaité* (Dès que possible / 3–6 mois / 6–12 mois / Plus tard / Pas encore défini /
+   Autre avec précision) · Description* (10 à 5 000 caractères) · Pièces jointes (JPG, PNG, GIF, WEBP, HEIC,
+   PDF ; 10 fichiers et 10 Mo max).
+7. **Comment nous avez-vous connus** — facultatif (Instagram, Recherche Google, Bouche-à-oreille, Un projet vu
+   sur place, Autre avec précision facultative).
+8. **Récapitulatif** — toutes les réponses, une section par écran avec un bouton « Modifier », puis « Envoyer la
+   demande ». Pas de question sur le budget.
 
-Les règles de cohérence (`BIENS_PAR_TYPE`, `surfacesPour`) vivent dans `contact.js` et sont dupliquées dans la
-fonction `demande` (validation et libellés de l'e-mail) et dans `dossier.js` (récapitulatif) : modifier les trois.
-La touche Entrée passe à l'écran suivant ; l'envoi n'est possible qu'au dernier écran.
+Les précisions des choix « Autre » sont enregistrées dans `projets.precisions` (jsonb : type, bien, documents,
+calendrier, source), affichées « Autre : … » dans les e-mails, l'objet du mail et l'espace client.
+Les règles de cohérence vivent dans `contact.js` : `BIENS_PAR_TYPE` est dupliqué dans la fonction `demande`
+(validation), `surfacesPour` dans la fonction (libellés de l'e-mail) et dans `dossier.js` (récapitulatif) : modifier
+les trois ensemble.
 
 **Envoi** : si `config.js` est rempli, la fonction `demande` (dossier + espace client + e-mails), FormSubmit en
 secours ; sinon FormSubmit seul (`POST https://formsubmit.co/ajax/contact@atomes.studio`, ou formulaire
