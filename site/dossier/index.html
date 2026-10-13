@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Espace client — Atomes studio</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Espace client Atomes studio : suivi de votre dossier, documents et pièces à déposer.">
+<meta name="theme-color" content="#171512">
+<link rel="icon" type="image/png" href="../favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" defer></script>
+<script src="../assets/js/config.js" defer></script>
+<script src="../assets/js/atom-logo.js" defer></script>
+<script src="../assets/js/dossier.js" defer></script>
+</head>
+<body>
+<div class="page">
+
+  <nav class="nav" aria-label="Navigation principale">
+    <a class="brand" href="../index.html"><atom-logo></atom-logo><span>atomes<span class="brand-tld">.studio</span></span></a>
+    <input type="checkbox" id="nav-toggle" class="nav-tgl" aria-label="Menu" aria-controls="nav-links">
+    <label for="nav-toggle" class="nav-btn"><span></span><span></span><span></span></label>
+    <div class="nav-links" id="nav-links">
+      <a href="../index.html">Accueil</a>
+      <a href="../projets.html">Projets</a>
+      <a href="../a-propos.html">À propos</a>
+      <a href="../contact.html">Contact</a>
+    </div>
+  </nav>
+
+  <main class="main">
+    <section class="espace">
+      <div class="lbl">Espace client</div>
+
+      <!-- Chargement -->
+      <div data-vue="chargement">
+        <p class="espace-intro">Chargement…</p>
+      </div>
+
+      <!-- Espace non activé (config.js vide) -->
+      <div data-vue="config" hidden>
+        <h1>Espace client</h1>
+        <p class="espace-intro" data-config-msg>L'espace client n'est pas encore activé. Pour tout suivi de dossier, écrivez-nous à <a href="mailto:contact@atomes.studio">contact@atomes.studio</a>.</p>
+      </div>
+
+      <!-- Connexion sans mot de passe -->
+      <div data-vue="connexion" hidden>
+        <h1>Suivre votre dossier</h1>
+        <p class="espace-intro">Entrez l'adresse e-mail utilisée pour votre demande&nbsp;: vous recevrez un lien de connexion, sans mot de passe.</p>
+        <form class="form espace-form" data-form-connexion novalidate>
+          <div class="field">
+            <label class="lbl" for="e-email">Email</label>
+            <input class="input" type="email" id="e-email" name="email" placeholder="vous@exemple.fr" autocomplete="email" aria-describedby="e-err">
+            <div class="f-err" id="e-err" role="alert" hidden></div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn" data-btn-connexion>Recevoir mon lien de connexion</button>
+          </div>
+        </form>
+        <div class="notice" data-lien-envoye role="status" aria-live="polite"></div>
+      </div>
+
+      <!-- Plusieurs dossiers -->
+      <div data-vue="liste" hidden>
+        <h1>Vos dossiers</h1>
+        <div class="dossiers" data-dossiers></div>
+      </div>
+
+      <!-- Un dossier -->
+      <div data-vue="dossier" hidden>
+        <a href="#" class="link-more" data-retour hidden><span aria-hidden="true">←</span> Vos dossiers</a>
+        <div class="dossier-head">
+          <div class="num" data-d-num></div>
+          <h1 data-d-titre></h1>
+          <p class="espace-intro" data-d-sous></p>
+        </div>
+
+        <section class="bloc" aria-labelledby="lbl-avancement">
+          <div class="lbl bloc-lbl" id="lbl-avancement">Avancement</div>
+          <ol class="timeline" role="list" data-timeline></ol>
+        </section>
+
+        <section class="bloc" aria-labelledby="lbl-docs-agence">
+          <div class="lbl bloc-lbl" id="lbl-docs-agence">Documents de l'agence</div>
+          <ul class="docs" role="list" data-docs-agence></ul>
+          <p class="docs-vide" data-vide-agence hidden>Aucun document pour le moment. Votre devis et vos documents apparaîtront ici.</p>
+        </section>
+
+        <section class="bloc" aria-labelledby="lbl-docs-client">
+          <div class="lbl bloc-lbl" id="lbl-docs-client">Vos documents</div>
+          <ul class="docs" role="list" data-docs-client></ul>
+          <p class="docs-vide" data-vide-client hidden>Aucune pièce déposée pour le moment.</p>
+          <label class="dropzone">
+            <span class="dropzone-cta">+ Ajouter des fichiers</span>
+            <input type="file" class="sr-only" multiple accept="image/*,.pdf" data-depot aria-describedby="depot-err">
+            <span class="dropzone-info" data-depot-info>Images et PDF, 50 Mo max par fichier</span>
+          </label>
+          <div class="f-err" id="depot-err" data-depot-err role="alert" hidden></div>
+        </section>
+
+        <section class="bloc" aria-labelledby="lbl-demande">
+          <div class="lbl bloc-lbl" id="lbl-demande">Votre demande</div>
+          <dl class="recap-liste" data-recap></dl>
+        </section>
+      </div>
+
+      <div class="espace-pied" data-compte hidden>
+        <span class="doc-meta" data-compte-email></span>
+        <button type="button" class="btn btn--ghost" data-deconnexion>Se déconnecter</button>
+      </div>
+      <div class="f-err" data-erreur role="alert" hidden></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div>ATOMES.STUDIO — ARCHITECTURE DU DÉTAIL<br>SIMON CHARLES — ARCHITECTE HMONP · INGÉNIEUR GÉNIE CIVIL ET URBANISME<br><a href="./">ESPACE CLIENT <span aria-hidden="true">→</span></a></div>
+    <div class="footer-contact">
+      <span class="footer-line"><i class="ico ico-house" aria-hidden="true"></i><span class="sr-only">Adresse — </span>31 RUE CHEVALIER PAUL, 83000 TOULON</span>
+      <a class="footer-line" href="mailto:contact@atomes.studio"><i class="ico ico-mail" aria-hidden="true"></i><span class="sr-only">Mail — </span>CONTACT@ATOMES.STUDIO</a>
+      <a class="footer-line" href="https://www.instagram.com/atomes.studio" target="_blank" rel="noopener"><i class="ico ico-instagram" aria-hidden="true"></i><span class="sr-only">Instagram — </span>@ATOMES.STUDIO</a>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

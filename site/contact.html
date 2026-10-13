@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact — Atomes studio</title>
+<meta name="description" content="Contactez Atomes studio : construction, rénovation, extension, aménagement, permis de construire ou déclaration préalable — à Toulon, Hyères, dans le Var et partout en France.">
+<link rel="canonical" href="https://atomes.studio/contact.html">
+<meta property="og:site_name" content="Atomes studio">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://atomes.studio/contact.html">
+<meta property="og:title" content="Contact — Atomes studio">
+<meta property="og:description" content="Parlez-nous de votre projet : construction, rénovation, extension, aménagement, permis de construire ou déclaration préalable — à Toulon, Hyères, dans le Var et partout en France.">
+<meta property="og:image" content="https://atomes.studio/a5ce3393-fd84-4dc1-b13c-f8d500c9d5f4-mr3ef561.png">
+<meta property="og:locale" content="fr_FR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#171512">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/site.css">
+<script src="assets/js/atom-logo.js" defer></script>
+<script src="assets/js/config.js" defer></script>
+<script src="assets/js/contact.js" defer></script>
+</head>
+<body>
+<div class="page">
+
+  <nav class="nav" aria-label="Navigation principale">
+    <a class="brand" href="index.html"><atom-logo></atom-logo><span>atomes<span class="brand-tld">.studio</span></span></a>
+    <input type="checkbox" id="nav-toggle" class="nav-tgl" aria-label="Menu" aria-controls="nav-links">
+    <label for="nav-toggle" class="nav-btn"><span></span><span></span><span></span></label>
+    <div class="nav-links" id="nav-links">
+      <a href="index.html">Accueil</a>
+      <a href="projets.html">Projets</a>
+      <a href="a-propos.html">À propos</a>
+      <a href="contact.html" aria-current="page">Contact</a>
+    </div>
+  </nav>
+
+  <main class="main">
+    <h1 class="sr-only">Contact</h1>
+
+    <section class="m-sec contact-sec">
+      <div class="m-img"><img src="images/contact-photo.webp" alt="Séjour lumineux ouvert sur un jardin d'oliviers, voilage blanc et poutres en bois" width="1200" height="675"></div>
+      <div class="m-grad"></div>
+      <div class="m-txt m-txt--wide">
+        <p class="intro">Construction, rénovation, extension, démolition, aménagement…<br>Confiez-nous votre projet.</p>
+
+        <form id="demande" class="form" novalidate>
+          <input type="text" name="_honey" class="sr-only" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+          <div class="progress">
+            <div class="progress-bars" aria-hidden="true"><span class="is-on"></span><span></span><span></span></div>
+            <div class="progress-lbl" role="status"><span><span data-step-num>01</span> — <span data-step-title>Vous</span></span><span><span data-step-num>01</span> / 03</span></div>
+          </div>
+
+          <!-- ÉTAPE 1 — VOUS -->
+          <div class="step">
+            <div class="field">
+              <span class="lbl" id="lbl-profil">Vous êtes</span>
+              <div class="grid-profil" role="group" aria-labelledby="lbl-profil">
+                <button type="button" class="chip is-on" data-group="profil" data-value="Particulier" aria-pressed="true">Particulier</button>
+                <button type="button" class="chip" data-group="profil" data-value="Professionnel" aria-pressed="false">Professionnel</button>
+              </div>
+            </div>
+            <div class="grid-2" data-pro hidden>
+              <div class="field">
+                <label class="lbl" for="f-societe">Société</label>
+                <input class="input" id="f-societe" name="societe" aria-describedby="err-societe" placeholder="Raison sociale" autocomplete="organization">
+                <div class="f-err" id="err-societe" data-err="societe" hidden></div>
+              </div>
+              <div class="field">
+                <label class="lbl" for="f-activite">Activité <span class="lbl-opt">(facultatif)</span></label>
+                <input class="input" id="f-activite" name="activite" placeholder="Promoteur, commerce, SCI…">
+              </div>
+            </div>
+            <div class="grid-2">
+              <div class="field">
+                <label class="lbl" for="f-prenom">Prénom</label>
+                <input class="input" id="f-prenom" name="prenom" aria-describedby="err-prenom" placeholder="Votre prénom" autocomplete="given-name">
+                <div class="f-err" id="err-prenom" data-err="prenom" hidden></div>
+              </div>
+              <div class="field">
+                <label class="lbl" for="f-nom">Nom</label>
+                <input class="input" id="f-nom" name="nom" aria-describedby="err-nom" placeholder="Votre nom" autocomplete="family-name">
+                <div class="f-err" id="err-nom" data-err="nom" hidden></div>
+              </div>
+            </div>
+            <div class="grid-2">
+              <div class="field">
+                <label class="lbl" for="f-email">Email</label>
+                <input class="input" type="email" id="f-email" name="email" aria-describedby="err-email" placeholder="vous@exemple.fr" autocomplete="email">
+                <div class="f-err" id="err-email" data-err="email" hidden></div>
+              </div>
+              <div class="field">
+                <label class="lbl" for="f-telephone">Téléphone <span class="lbl-opt">(facultatif)</span></label>
+                <input class="input" type="tel" id="f-telephone" name="telephone" aria-describedby="err-telephone" placeholder="06 12 34 56 78" autocomplete="tel">
+                <div class="f-err" id="err-telephone" data-err="telephone" hidden></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ÉTAPE 2 — LE PROJET -->
+          <div class="step" hidden>
+            <div class="field">
+              <label class="lbl" for="f-adresse">Adresse du projet</label>
+              <input class="input" id="f-adresse" name="adresse" aria-describedby="err-adresse" placeholder="N° et rue" autocomplete="address-line1">
+              <div class="f-err" id="err-adresse" data-err="adresse" hidden></div>
+            </div>
+            <div class="grid-commune">
+              <div class="field">
+                <label class="lbl" for="f-commune">Commune du projet</label>
+                <input class="input" id="f-commune" name="commune" aria-describedby="err-commune" placeholder="Hyères, Toulon…" autocomplete="address-level2">
+                <div class="f-err" id="err-commune" data-err="commune" hidden></div>
+              </div>
+              <div class="field">
+                <label class="lbl" for="f-codePostal">Code postal</label>
+                <input class="input" id="f-codePostal" name="codePostal" aria-describedby="err-codePostal" inputmode="numeric" placeholder="83400" autocomplete="postal-code">
+                <div class="f-err" id="err-codePostal" data-err="codePostal" hidden></div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="lbl" for="f-cadastre">Référence cadastrale <span class="lbl-opt">(facultatif)</span></label>
+              <input class="input" id="f-cadastre" name="cadastre" placeholder="Section et n° de parcelle, ex. AB 123">
+            </div>
+            <div class="field">
+              <span class="lbl" id="lbl-type">Type de projet</span>
+              <div class="chips" role="group" aria-labelledby="lbl-type">
+                <button type="button" class="chip is-on" data-group="type" data-value="Construction" aria-pressed="true">Construction</button>
+                <button type="button" class="chip" data-group="type" data-value="Rénovation" aria-pressed="false">Rénovation</button>
+                <button type="button" class="chip" data-group="type" data-value="Extension" aria-pressed="false">Extension</button>
+                <button type="button" class="chip" data-group="type" data-value="Démolition" aria-pressed="false">Démolition</button>
+                <button type="button" class="chip" data-group="type" data-value="Aménagement intérieur" aria-pressed="false">Aménagement intérieur</button>
+                <button type="button" class="chip" data-group="type" data-value="Aménagement extérieur" aria-pressed="false">Aménagement extérieur</button>
+                <button type="button" class="chip" data-group="type" data-value="Autre" aria-pressed="false">Autre</button>
+              </div>
+            </div>
+            <div class="field">
+              <span class="lbl" id="lbl-docs">Documents souhaités <span class="lbl-opt">(plusieurs choix possibles)</span></span>
+              <div class="chips" role="group" aria-labelledby="lbl-docs" aria-describedby="err-docs hint-docs">
+                <button type="button" class="chip" data-group="docs" data-value="Permis de construire" aria-pressed="false">Permis de construire</button>
+                <button type="button" class="chip" data-group="docs" data-value="Déclaration préalable" aria-pressed="false">Déclaration préalable</button>
+                <button type="button" class="chip" data-group="docs" data-value="Permis d'aménager" aria-pressed="false">Permis d'aménager</button>
+                <button type="button" class="chip" data-group="docs" data-value="Permis de démolir" aria-pressed="false">Permis de démolir</button>
+                <button type="button" class="chip" data-group="docs" data-value="Dossier de consultation des entreprises" aria-pressed="false">Dossier de consultation des entreprises</button>
+                <button type="button" class="chip" data-group="docs" data-value="Perspective" aria-pressed="false">Perspective</button>
+                <button type="button" class="chip" data-group="docs" data-value="Autre" aria-pressed="false">Autre</button>
+                <button type="button" class="chip" data-group="docs" data-value="Je ne sais pas encore" aria-pressed="false">Je ne sais pas encore</button>
+              </div>
+              <div class="f-err" id="err-docs" data-err="docs" hidden></div>
+              <div class="f-hint" id="hint-docs" data-doc-hint role="status" hidden></div>
+            </div>
+            <div class="field">
+              <span class="lbl" id="lbl-bien">État actuel du projet</span>
+              <div class="chips" role="group" aria-labelledby="lbl-bien">
+                <button type="button" class="chip is-on" data-group="bien" data-value="Terrain nu" aria-pressed="true">Terrain nu</button>
+                <button type="button" class="chip" data-group="bien" data-value="Maison existante" aria-pressed="false">Maison existante</button>
+                <button type="button" class="chip" data-group="bien" data-value="Appartement existant" aria-pressed="false">Appartement existant</button>
+                <button type="button" class="chip" data-group="bien" data-value="Local ou bâtiment pro" aria-pressed="false">Local ou bâtiment pro</button>
+              </div>
+            </div>
+            <div class="field">
+              <span class="lbl" id="lbl-surfaces">Surfaces <span class="lbl-opt">(remplissez celles qui concernent votre projet)</span></span>
+              <div class="grid-surfaces" role="group" aria-labelledby="lbl-surfaces">
+                <div class="field">
+                  <label class="lbl" for="f-surface">Surface habitable créée</label>
+                  <div class="unit-wrap">
+                    <input class="input" type="number" min="0" inputmode="numeric" id="f-surface" name="surface" aria-describedby="err-surface" placeholder="40">
+                    <span class="unit">m²</span>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="lbl" for="f-surfaceExistante">Surface habitable existante</label>
+                  <div class="unit-wrap">
+                    <input class="input" type="number" min="0" inputmode="numeric" id="f-surfaceExistante" name="surfaceExistante" aria-describedby="err-surface" placeholder="120">
+                    <span class="unit">m²</span>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="lbl" for="f-emprise">Emprise du projet</label>
+                  <div class="unit-wrap">
+                    <input class="input" type="number" min="0" inputmode="numeric" id="f-emprise" name="emprise" aria-describedby="err-surface" placeholder="60">
+                    <span class="unit">m²</span>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="lbl" for="f-surfaceTerrain">Surface du terrain</label>
+                  <div class="unit-wrap">
+                    <input class="input" type="number" min="0" inputmode="numeric" id="f-surfaceTerrain" name="surfaceTerrain" aria-describedby="err-surface" placeholder="800">
+                    <span class="unit">m²</span>
+                  </div>
+                </div>
+              </div>
+              <div class="f-err" id="err-surface" data-err="surface" hidden></div>
+            </div>
+          </div>
+
+          <!-- ÉTAPE 3 — DÉTAILS -->
+          <div class="step" hidden>
+            <div class="grid-2">
+              <div class="field">
+                <label class="lbl" for="f-budget">Budget travaux envisagé</label>
+                <select class="input" id="f-budget" name="budget">
+                  <option>Non défini</option>
+                  <option>Moins de 50 000 €</option>
+                  <option>50 000 – 100 000 €</option>
+                  <option>100 000 – 200 000 €</option>
+                  <option>200 000 – 400 000 €</option>
+                  <option>Plus de 400 000 €</option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="lbl" for="f-calendrier">Démarrage souhaité</label>
+                <select class="input" id="f-calendrier" name="calendrier">
+                  <option>Dès que possible</option>
+                  <option>Dans 3 à 6 mois</option>
+                  <option>Dans 6 à 12 mois</option>
+                  <option>Plus tard</option>
+                  <option>Pas encore défini</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label class="lbl" for="f-message">Votre projet</label>
+              <textarea class="input" id="f-message" name="message" aria-describedby="err-message" rows="6" placeholder="Ce que vous imaginez, vos références, vos contraintes…"></textarea>
+              <div class="f-err" id="err-message" data-err="message" hidden></div>
+            </div>
+            <div class="field">
+              <span class="lbl">Pièces jointes <span class="lbl-opt">(facultatif — plans, photos, PDF)</span></span>
+              <label class="dropzone">
+                <span class="dropzone-cta">+ Ajouter des fichiers</span>
+                <input type="file" name="fichiers" class="sr-only" multiple accept="image/*,.pdf" aria-describedby="err-fichiers files-refused">
+                <span class="dropzone-info" data-files-label>Aucun fichier sélectionné</span>
+              </label>
+              <div class="files" data-files hidden></div>
+              <div class="f-err" id="files-refused" data-files-refused role="alert" hidden></div>
+              <div class="f-err" id="err-fichiers" data-err="fichiers" hidden></div>
+            </div>
+            <div class="field">
+              <label class="lbl" for="f-source">Comment nous avez-vous connus ? <span class="lbl-opt">(facultatif)</span></label>
+              <select class="input" id="f-source" name="source">
+                <option>—</option>
+                <option>Instagram</option>
+                <option>Recherche Google</option>
+                <option>Bouche-à-oreille</option>
+                <option>Un projet vu sur place</option>
+                <option>Autre</option>
+              </select>
+            </div>
+            <div class="recap">
+              <div class="recap-lbl">Récapitulatif</div>
+              <div data-recap-1></div>
+              <div data-recap-2></div>
+            </div>
+            <p class="f-hint" data-api-note hidden>En envoyant votre demande, un espace client est créé pour votre adresse e-mail&nbsp;: vous y retrouverez votre demande, vos pièces et nos documents (connexion par lien e-mail, sans mot de passe).</p>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn--ghost" data-back hidden><span aria-hidden="true">←</span> Retour</button>
+            <button type="button" class="btn" data-next>Continuer <span aria-hidden="true">→</span></button>
+            <button type="submit" class="btn" data-submit hidden>Envoyer la demande</button>
+          </div>
+          <div class="send-err" data-send-err role="alert" hidden></div>
+        </form>
+
+        <div class="sent" data-sent tabindex="-1" hidden>
+          <div class="sent-lbl">DEMANDE ENVOYÉE</div>
+          <p>Merci. Nous étudions votre demande et revenons vers vous sous 48 h ouvrées.</p>
+          <p class="sent-dossier" data-sent-dossier hidden>Votre dossier porte le n°&nbsp;<strong data-sent-num></strong>. <span data-sent-mail-ok>Un e-mail de confirmation vous a été envoyé&nbsp;: vous pourrez suivre l'avancement et déposer des pièces dans votre <a href="dossier/">espace client</a>.</span><span data-sent-mail-ko hidden>Notez ce numéro&nbsp;: vous pourrez suivre l'avancement et déposer des pièces dans votre <a href="dossier/">espace client</a>, en vous connectant avec l'adresse e-mail indiquée.</span></p>
+          <p class="sent-dossier" data-sent-fichiers hidden>Certaines pièces n'ont pas pu être enregistrées&nbsp;: <span data-sent-fichiers-liste></span>. Vous pourrez les déposer dans votre espace client.</p>
+          <button type="button" class="btn btn--ghost" data-reset>Nouvelle demande</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div>ATOMES.STUDIO — ARCHITECTURE DU DÉTAIL<br>SIMON CHARLES — ARCHITECTE HMONP · INGÉNIEUR GÉNIE CIVIL ET URBANISME<br><a href="dossier/">ESPACE CLIENT <span aria-hidden="true">→</span></a></div>
+    <div class="footer-contact">
+      <span class="footer-line"><i class="ico ico-house" aria-hidden="true"></i><span class="sr-only">Adresse — </span>31 RUE CHEVALIER PAUL, 83000 TOULON</span>
+      <a class="footer-line" href="mailto:contact@atomes.studio"><i class="ico ico-mail" aria-hidden="true"></i><span class="sr-only">Mail — </span>CONTACT@ATOMES.STUDIO</a>
+      <a class="footer-line" href="https://www.instagram.com/atomes.studio" target="_blank" rel="noopener"><i class="ico ico-instagram" aria-hidden="true"></i><span class="sr-only">Instagram — </span>@ATOMES.STUDIO</a>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics="">
+<link rel="icon" type="image/png" href="./favicon.png">
+<meta name="description" content="Contactez Atomes studio : construction, rénovation, extension, aménagement, permis de construire ou déclaration préalable — à Toulon, Hyères, dans le Var et partout en France.">
+<link rel="canonical" href="https://atomes.studio/contact.html">
+<meta property="og:site_name" content="Atomes studio">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://atomes.studio/contact.html">
+<meta property="og:title" content="Contact — Atomes studio">
+<meta property="og:description" content="Parlez-nous de votre projet : construction, rénovation, extension, aménagement, permis de construire ou déclaration préalable — à Toulon, Hyères, dans le Var et partout en France.">
+<meta property="og:image" content="https://atomes.studio/a5ce3393-fd84-4dc1-b13c-f8d500c9d5f4-mr3ef561.png">
+<meta property="og:locale" content="fr_FR">
+<meta name="twitter:card" content="summary_large_image">
+<script src="./atom-logo.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#171512}
+image-slot{display:block;width:100%;height:100%}
+input::placeholder,textarea::placeholder{color:rgba(236,231,222,.35)}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield}
+/* Rendu responsive : sous 980px (dès que le texte empiète sur l'image), l'image passe au-dessus du texte et le dégradé devient vertical, ratio conservé */
+@media (max-width:980px){
+  .m-sec{flex-direction:column !important;align-items:stretch !important;min-height:0 !important}
+  .m-img{position:relative !important;top:auto !important;left:auto !important;right:auto !important;bottom:auto !important;width:100% !important;height:auto !important;aspect-ratio:3/2}
+  .m-grad{top:0 !important;left:0 !important;right:0 !important;bottom:auto !important;width:100% !important;height:66.7vw !important;background:linear-gradient(180deg,transparent 45%,rgba(23,21,18,.55) 78%,#171512 100%) !important}
+  .m-txt{width:100% !important;max-width:100% !important;box-sizing:border-box;margin:0 !important}
+}
+/* Logo animé : boîte fixe dès le premier rendu, le canvas n'influence jamais la mise en page */
+atom-logo{display:block;width:30px;height:30px;flex:0 0 auto;position:relative;contain:strict;overflow:hidden}
+atom-logo canvas{position:absolute;inset:0}
+/* Menu mobile : hamburger sous 640px (case à cocher masquée) */
+.nav-btn{flex-direction:column;gap:5px;cursor:pointer;padding:8px 0}
+@media (max-width:640px){
+  .nav-btn{display:flex !important}
+  .nav-links{display:none !important}
+  .nav-tgl:checked ~ .nav-links{display:flex !important;flex-direction:column;width:100%;gap:20px;padding:12px 0 4px}
+}
+::selection{background:#ece7de;color:#171512}
+</style>
+</helmet>
+
+<div data-screen-label="Contact" style="min-height:100vh;background:#171512;color:#ece7de;font-family:'Archivo',sans-serif;display:flex;flex-direction:column">
+
+  <nav style="position:sticky;top:0;z-index:50;background:rgba(23,21,18,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:24px clamp(20px,5vw,48px);border-bottom:1px solid rgba(236,231,222,.14)">
+    <a href="Accueil.dc.html" style="display:flex;align-items:center;gap:10px;font:500 19px 'Archivo',sans-serif;letter-spacing:-0.02em;color:#ece7de;text-decoration:none"><atom-logo style="width:30px;height:30px;display:block"></atom-logo><span>atomes<span style="opacity:.4">.studio</span></span></a>
+    <input type="checkbox" id="nav-toggle" class="nav-tgl" style="display:none">
+    <label for="nav-toggle" class="nav-btn" aria-label="Menu" style="display:none">
+      <span style="display:block;width:22px;height:2px;background:#ece7de"></span>
+      <span style="display:block;width:22px;height:2px;background:#ece7de"></span>
+      <span style="display:block;width:22px;height:2px;background:#ece7de"></span>
+    </label>
+    <div class="nav-links" style="display:flex;gap:clamp(18px,3vw,36px);font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap">
+      <a href="Accueil.dc.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">Accueil</a>
+      <a href="Projets.dc.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">Projets</a>
+      <a href="A propos.dc.html" style="color:#ece7de;text-decoration:none;opacity:.55" style-hover="opacity:1">À propos</a>
+      <a href="Contact.dc.html" style="color:#ffffff;text-decoration:none">Contact</a>
+    </div>
+  </nav>
+
+  <section class="m-sec" style="position:relative;overflow:hidden;display:flex;align-items:flex-start;flex:1">
+    <div class="m-img" style="position:absolute;top:0;left:0;bottom:0;width:50%;overflow:hidden">
+      <x-import component-from-global-scope="image-slot" from="./image-slot.js" id="contact-photo" shape="rect" placeholder="Photo — atelier ou projet" style="width:100%;height:100%;display:block" hint-size="100%,520px"></x-import>
+    </div>
+    <div class="m-grad" style="position:absolute;top:0;left:0;bottom:0;width:50%;background:linear-gradient(270deg,#171512 0%,rgba(23,21,18,.55) 30%,rgba(23,21,18,0) 65%);pointer-events:none"></div>
+    <div class="m-txt" style="position:relative;margin-left:auto;width:min(680px,58%);padding:clamp(40px,6vw,72px) clamp(20px,5vw,48px)">
+      <p style="margin:0 0 36px;font:500 clamp(20px,2.2vw,26px)/1.5 'Archivo',sans-serif;letter-spacing:-0.01em;max-width:560px;text-wrap:pretty">Construction, rénovation, extension, démolition, aménagement…<br>Confiez-nous votre projet.</p>
+
+      <sc-if value="{{ notSent }}" hint-placeholder-val="{{ true }}">
+        <form onSubmit="{{ submit }}" noValidate="{{ true }}" style="display:flex;flex-direction:column;gap:26px;max-width:560px">
+
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;gap:4px">
+              <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3"><span style="flex:1;height:2px;background:{{ s.bar }}"></span></sc-for>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:12px;font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase"><span>{{ stepNum }} — {{ stepTitle }}</span><span style="color:rgba(236,231,222,.4)">{{ stepNum }} / 03</span></div>
+          </div>
+
+          <!-- ÉTAPE 1 — VOUS -->
+          <sc-if value="{{ isStep1 }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:22px">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Vous êtes</label>
+                <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+                  <sc-for list="{{ profilOptions }}" as="o" hint-placeholder-count="2">
+                    <button type="button" onClick="{{ o.select }}" style="background:{{ o.bg }};color:{{ o.fg }};border:1px solid {{ o.border }};padding:13px 14px;font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;text-align:left;transition:background .15s,border-color .15s" style-hover="border-color:rgba(236,231,222,.75)">{{ o.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+              <sc-if value="{{ isPro }}" hint-placeholder-val="{{ false }}">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:22px">
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Société</label>
+                    <input value="{{ societe }}" onChange="{{ setSociete }}" placeholder="Raison sociale" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                    <sc-if value="{{ hasErrSociete }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errSociete }}</div></sc-if>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Activité <span style="text-transform:none;color:rgba(236,231,222,.35)">(facultatif)</span></label>
+                    <input value="{{ activite }}" onChange="{{ setActivite }}" placeholder="Promoteur, commerce, SCI…" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                  </div>
+                </div>
+              </sc-if>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:22px">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Prénom</label>
+                  <input value="{{ prenom }}" onChange="{{ setPrenom }}" placeholder="Votre prénom" autoComplete="given-name" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                  <sc-if value="{{ hasErrPrenom }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errPrenom }}</div></sc-if>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Nom</label>
+                  <input value="{{ nom }}" onChange="{{ setNom }}" placeholder="Votre nom" autoComplete="family-name" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                  <sc-if value="{{ hasErrNom }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errNom }}</div></sc-if>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:22px">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Email</label>
+                  <input type="email" value="{{ email }}" onChange="{{ setEmail }}" placeholder="vous@exemple.fr" autoComplete="email" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                  <sc-if value="{{ hasErrEmail }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errEmail }}</div></sc-if>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Téléphone <span style="text-transform:none;color:rgba(236,231,222,.35)">(facultatif)</span></label>
+                  <input type="tel" value="{{ telephone }}" onChange="{{ setTelephone }}" placeholder="06 12 34 56 78" autoComplete="tel" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                  <sc-if value="{{ hasErrTelephone }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errTelephone }}</div></sc-if>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ÉTAPE 2 — LE PROJET -->
+          <sc-if value="{{ isStep2 }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:22px">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Adresse du projet</label>
+                <input value="{{ adresse }}" onChange="{{ setAdresse }}" placeholder="N° et rue" autoComplete="street-address" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                <sc-if value="{{ hasErrAdresse }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errAdresse }}</div></sc-if>
+              </div>
+              <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:22px">
+                <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+                  <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Commune du projet</label>
+                  <input value="{{ commune }}" onChange="{{ setCommune }}" placeholder="Hyères, Toulon…" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                  <sc-if value="{{ hasErrCommune }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errCommune }}</div></sc-if>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+                  <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Code postal</label>
+                  <input inputMode="numeric" value="{{ codePostal }}" onChange="{{ setCodePostal }}" placeholder="83400" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                  <sc-if value="{{ hasErrCodePostal }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errCodePostal }}</div></sc-if>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Référence cadastrale <span style="text-transform:none;color:rgba(236,231,222,.35)">(facultatif)</span></label>
+                <input value="{{ cadastre }}" onChange="{{ setCadastre }}" placeholder="Section et n° de parcelle, ex. AB 123" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Type de projet</label>
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                  <sc-for list="{{ typeOptions }}" as="o" hint-placeholder-count="6">
+                    <button type="button" onClick="{{ o.select }}" style="background:{{ o.bg }};color:{{ o.fg }};border:1px solid {{ o.border }};padding:11px 14px;font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s,border-color .15s" style-hover="border-color:rgba(236,231,222,.75)">{{ o.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Documents souhaités <span style="text-transform:none;color:rgba(236,231,222,.35)">(plusieurs choix possibles)</span></label>
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                  <sc-for list="{{ docOptions }}" as="o" hint-placeholder-count="6">
+                    <button type="button" onClick="{{ o.select }}" style="background:{{ o.bg }};color:{{ o.fg }};border:1px solid {{ o.border }};padding:11px 14px;font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s,border-color .15s" style-hover="border-color:rgba(236,231,222,.75)">{{ o.label }}</button>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ hasErrDocs }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errDocs }}</div></sc-if>
+                <sc-if value="{{ hasDocHint }}" hint-placeholder-val="{{ false }}"><div style="font:400 13px/1.55 'Archivo',sans-serif;color:rgba(236,231,222,.55);text-wrap:pretty">{{ docHint }}</div></sc-if>
+              </div>
+              
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">État actuel du projet</label>
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                  <sc-for list="{{ bienOptions }}" as="o" hint-placeholder-count="4">
+                    <button type="button" onClick="{{ o.select }}" style="background:{{ o.bg }};color:{{ o.fg }};border:1px solid {{ o.border }};padding:11px 14px;font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s,border-color .15s" style-hover="border-color:rgba(236,231,222,.75)">{{ o.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Surfaces <span style="text-transform:none;color:rgba(236,231,222,.35)">(remplissez celles qui concernent votre projet)</span></label>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:16px 22px">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Surface habitable créée</label>
+                  <div style="position:relative">
+                    <input type="number" min="0" inputMode="numeric" value="{{ surface }}" onChange="{{ setSurface }}" placeholder="40" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 48px 13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                    <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.45);pointer-events:none">m²</span>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Surface habitable existante</label>
+                  <div style="position:relative">
+                    <input type="number" min="0" inputMode="numeric" value="{{ surfaceExistante }}" onChange="{{ setSurfaceExistante }}" placeholder="120" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 48px 13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                    <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.45);pointer-events:none">m²</span>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Emprise du projet</label>
+                  <div style="position:relative">
+                    <input type="number" min="0" inputMode="numeric" value="{{ emprise }}" onChange="{{ setEmprise }}" placeholder="60" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 48px 13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                    <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.45);pointer-events:none">m²</span>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Surface du terrain</label>
+                  <div style="position:relative">
+                    <input type="number" min="0" inputMode="numeric" value="{{ surfaceTerrain }}" onChange="{{ setSurfaceTerrain }}" placeholder="800" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 48px 13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                    <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);font:400 12px 'IBM Plex Mono',monospace;color:rgba(236,231,222,.45);pointer-events:none">m²</span>
+                  </div>
+                </div>
+                </div>
+                <sc-if value="{{ hasErrSurface }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errSurface }}</div></sc-if>
+              </div>
+            
+            </div>
+          </sc-if>
+
+          <!-- ÉTAPE 3 — DÉTAILS -->
+          <sc-if value="{{ isStep3 }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:22px">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:22px">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Budget travaux envisagé</label>
+                  <select value="{{ budget }}" onChange="{{ setBudget }}" style="background:transparent;color-scheme:dark;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                    <option>Non défini</option>
+                    <option>Moins de 50 000 €</option>
+                    <option>50 000 – 100 000 €</option>
+                    <option>100 000 – 200 000 €</option>
+                    <option>200 000 – 400 000 €</option>
+                    <option>Plus de 400 000 €</option>
+                  </select>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Démarrage souhaité</label>
+                  <select value="{{ calendrier }}" onChange="{{ setCalendrier }}" style="background:transparent;color-scheme:dark;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                    <option>Dès que possible</option>
+                    <option>Dans 3 à 6 mois</option>
+                    <option>Dans 6 à 12 mois</option>
+                    <option>Plus tard</option>
+                    <option>Pas encore défini</option>
+                  </select>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Votre projet</label>
+                <textarea value="{{ message }}" onChange="{{ setMessage }}" rows="6" placeholder="{{ messagePlaceholder }}" style="background:transparent;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px/1.6 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none;resize:vertical" style-focus="border-color:rgba(236,231,222,.75)"></textarea>
+                <sc-if value="{{ hasErrMessage }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errMessage }}</div></sc-if>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Pièces jointes <span style="text-transform:none;color:rgba(236,231,222,.35)">(facultatif — plans, photos, PDF)</span></label>
+                <label onDragOver="{{ dragOver }}" onDragLeave="{{ dragLeave }}" onDrop="{{ drop }}" style="{{ dropZoneStyle }}" style-hover="border-color:rgba(236,231,222,.6)">
+                  <span style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:rgba(236,231,222,.6);pointer-events:none">+ Ajouter des fichiers</span>
+                  <input type="file" multiple="" accept="image/*,.pdf" onChange="{{ setFichiers }}" style="display:none">
+                  <span style="font:400 13px 'Archivo',sans-serif;color:rgba(236,231,222,.5);pointer-events:none">{{ fichiersLabel }}</span>
+                </label>
+                <sc-if value="{{ hasFichiers }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-wrap:wrap;gap:8px">
+                    <sc-for list="{{ fichiersList }}" as="f" hint-placeholder-count="0">
+                      <span style="display:flex;align-items:center;gap:10px;border:1px solid rgba(236,231,222,.25);padding:7px 10px 7px 12px;font:400 12.5px 'Archivo',sans-serif;color:rgba(236,231,222,.85)">{{ f.nom }}<button type="button" onClick="{{ f.retirer }}" aria-label="Retirer ce fichier" style="background:transparent;border:none;color:rgba(236,231,222,.5);font:400 15px/1 'Archivo',sans-serif;cursor:pointer;padding:0" style-hover="color:#ece7de">×</button></span>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ hasFichiersRefuses }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ fichiersRefuses }}</div></sc-if>
+                <sc-if value="{{ hasErrFichiers }}" hint-placeholder-val="{{ false }}"><div style="font:400 11.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ errFichiers }}</div></sc-if>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <label style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.5)">Comment nous avez-vous connus ? <span style="text-transform:none;color:rgba(236,231,222,.35)">(facultatif)</span></label>
+                <select value="{{ source }}" onChange="{{ setSource }}" style="background:transparent;color-scheme:dark;border:1px solid rgba(236,231,222,.25);color:#ece7de;padding:13px 14px;font:400 15px 'Archivo',sans-serif;border-radius:0;width:100%;box-sizing:border-box;outline:none" style-focus="border-color:rgba(236,231,222,.75)">
+                  <option>—</option>
+                  <option>Instagram</option>
+                  <option>Recherche Google</option>
+                  <option>Bouche-à-oreille</option>
+                  <option>Un projet vu sur place</option>
+                  <option>Autre</option>
+                </select>
+              </div>
+              <div style="border:1px solid rgba(236,231,222,.14);padding:16px 18px;display:flex;flex-direction:column;gap:6px;font:400 13px/1.6 'Archivo',sans-serif;color:rgba(236,231,222,.6)">
+                <div style="font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(236,231,222,.45)">Récapitulatif</div>
+                <div>{{ recapLigne1 }}</div>
+                <div>{{ recapLigne2 }}</div>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-top:4px">
+            <sc-if value="{{ canBack }}" hint-placeholder-val="{{ false }}">
+              <button type="button" onClick="{{ back }}" style="font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#ece7de;background:transparent;border:1px solid rgba(236,231,222,.35);padding:15px 20px;cursor:pointer" style-hover="border-color:rgba(236,231,222,.8)">← Retour</button>
+            </sc-if>
+            <sc-if value="{{ isLast }}" hint-placeholder-val="{{ false }}">
+              <button type="submit" disabled="{{ envoi }}" style="font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#171512;background:#ece7de;padding:16px 28px;border:none;cursor:pointer;margin-left:auto" style-hover="background:#ffffff">{{ btnEnvoyer }}</button>
+            </sc-if>
+            <sc-if value="{{ notLast }}" hint-placeholder-val="{{ true }}">
+              <button type="button" onClick="{{ next }}" style="font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#171512;background:#ece7de;padding:16px 28px;border:none;cursor:pointer;margin-left:auto" style-hover="background:#ffffff">Continuer →</button>
+            </sc-if>
+          </div>
+          <sc-if value="{{ hasErreurEnvoi }}" hint-placeholder-val="{{ false }}"><div style="font:400 12.5px 'IBM Plex Mono',monospace;color:#d8896b">{{ erreurEnvoi }}</div></sc-if>
+        </form>
+      </sc-if>
+
+      <sc-if value="{{ sent }}" hint-placeholder-val="{{ false }}">
+        <div style="border:1px solid rgba(236,231,222,.25);padding:40px;max-width:560px;box-sizing:border-box">
+          <div style="font:500 11.5px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(236,231,222,.5);margin-bottom:16px">DEMANDE ENVOYÉE</div>
+          <p style="margin:0;font:500 20px/1.5 'Archivo',sans-serif;text-wrap:pretty">Merci. Nous étudions votre demande et revenons vers vous sous 48 h ouvrées.</p>
+          <button onClick="{{ reset }}" style="margin-top:28px;font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:#ece7de;background:transparent;border:1px solid rgba(236,231,222,.35);padding:12px 20px;cursor:pointer" style-hover="border-color:rgba(236,231,222,.8)">Nouvelle demande</button>
+        </div>
+      </sc-if>
+    </div>
+  </section>
+
+  <footer style="border-top:1px solid rgba(236,231,222,.14);padding:36px clamp(20px,5vw,48px);display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;font:400 11.5px/1.9 'IBM Plex Mono',monospace;color:rgba(236,231,222,.45)">
+    <div>ATOMES.STUDIO — ARCHITECTURE DU DÉTAIL<br>SIMON CHARLES — ARCHITECTE HMONP · INGÉNIEUR GÉNIE CIVIL ET URBANISME</div>
+    <div><a href="mailto:contact@atomes.studio" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">MAIL — CONTACT@ATOMES.STUDIO</a><br><a href="https://www.instagram.com/atomes.studio" target="_blank" rel="noopener" style="color:rgba(236,231,222,.6);text-decoration:none" style-hover="color:#ece7de">INSTAGRAM — @ATOMES.STUDIO</a></div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  TYPES = ['Construction', 'Rénovation', 'Extension', 'Démolition', 'Aménagement intérieur', 'Aménagement extérieur', 'Autre'];
+  DOCS = ['Permis de construire', 'Déclaration préalable', "Permis d'aménager", 'Permis de démolir', 'Dossier de consultation des entreprises', 'Perspective', 'Autre', 'Je ne sais pas encore'];
+  BIENS = ['Terrain nu', 'Maison existante', 'Appartement existant', 'Local ou bâtiment pro'];
+  STEPS = ['Vous', 'Le projet', 'Détails'];
+
+  initial() {
+    return {
+      step: 0, profil: 'Particulier', societe: '', activite: '', prenom: '', nom: '', email: '', telephone: '',
+      type: 'Construction', docs: [], commune: '', codePostal: '', adresse: '', cadastre: '', bien: 'Terrain nu', surface: '', surfaceExistante: '', emprise: '', surfaceTerrain: '',
+      budget: 'Non défini', calendrier: 'Dès que possible', message: '', source: '—',
+      fichiers: [], fichiersRefuses: '', survol: false, tried: false, sent: false, envoi: false, erreurEnvoi: ''
+    };
+  }
+  state = this.initial();
+
+  accepte(f) { return f.type.indexOf('image/') === 0 || f.type === 'application/pdf' || /\.pdf$/i.test(f.name); }
+
+  ajouterFichiers(nouveaux) {
+    const acceptes = [], refuses = [];
+    [...nouveaux].forEach(f => (this.accepte(f) ? acceptes : refuses).push(f));
+    const existants = this.state.fichiers;
+    const cles = new Set(existants.map(f => f.name + '|' + f.size));
+    const ajout = acceptes.filter(f => !cles.has(f.name + '|' + f.size));
+    this.setState({ fichiers: existants.concat(ajout), fichiersRefuses: refuses.length ? 'Format non pris en charge (images et PDF uniquement) : ' + refuses.map(f => f.name).join(', ') : '', survol: false });
+  }
+
+  componentDidMount() {
+    if (new URLSearchParams(location.search).get('envoye') === '1') {
+      this.setState({ sent: true });
+      history.replaceState(null, '', location.pathname);
+    }
+  }
+
+  validate(step) {
+    const s = this.state, e = {};
+    if (step === 0) {
+      if (s.profil === 'Professionnel' && !s.societe.trim()) e.societe = 'Champ requis';
+      if (!s.prenom.trim()) e.prenom = 'Champ requis';
+      if (!s.nom.trim()) e.nom = 'Champ requis';
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.email)) e.email = 'Adresse email invalide';
+      if (s.telephone.trim() && s.telephone.replace(/\D/g, '').length < 10) e.telephone = 'Numéro invalide';
+    }
+    if (step === 1) {
+      if (!s.docs.length) e.docs = 'Choisissez au moins un document';
+      if (!s.commune.trim()) e.commune = 'Champ requis';
+      if (!s.adresse.trim()) e.adresse = 'Champ requis';
+      if (!/^\d{5}$/.test(s.codePostal.trim())) e.codePostal = '5 chiffres';
+      if (![s.surface, s.surfaceExistante, s.emprise, s.surfaceTerrain].some(v => Number(v) > 0)) e.surface = 'Indiquez au moins une surface approximative';
+    }
+    if (step === 2) {
+      if (s.message.trim().length < 10) e.message = 'Décrivez votre projet en quelques mots (10 caractères min.)';
+      if (s.fichiers.reduce((a, f) => a + f.size, 0) > 10 * 1024 * 1024) e.fichiers = 'Pièces jointes trop lourdes — 10 Mo max au total.';
+    }
+    return e;
+  }
+
+  champs() {
+    const s = this.state, out = [];
+    const add = (k, v) => { if (v !== undefined && v !== null && String(v).trim() !== '' && v !== '—') out.push([k, String(v)]); };
+    add('Profil', s.profil);
+    if (s.profil === 'Professionnel') { add('Société', s.societe); add('Activité', s.activite); }
+    add('Prénom', s.prenom); add('Nom', s.nom); add('email', s.email); add('Téléphone', s.telephone);
+    add('Type de projet', s.type); add('Documents souhaités', s.docs.join(', '));
+    add('Adresse du projet', s.adresse); add('Commune', s.commune); add('Code postal', s.codePostal); add('Référence cadastrale', s.cadastre);
+    add('État actuel du projet', s.bien);
+    add('Surface habitable créée (m²)', s.surface); add('Surface habitable existante (m²)', s.surfaceExistante); add('Emprise du projet (m²)', s.emprise); add('Surface du terrain (m²)', s.surfaceTerrain);
+    add('Budget travaux', s.budget); add('Démarrage souhaité', s.calendrier);
+    add('Message', s.message); add('Source', s.source);
+    add('_subject', 'Nouveau projet — ' + s.type + ' · ' + (s.docs[0] || 'à définir') + ' · ' + s.commune + ' (' + s.nom + ')');
+    add('_template', 'table'); add('_captcha', 'false');
+    return out;
+  }
+
+  renderVals() {
+    const s = this.state;
+    const set = k => e => this.setState({ [k]: e.target.value });
+    const errs = s.tried ? this.validate(s.step) : {};
+    const chip = (label, on, fn) => ({ label, bg: on ? '#ece7de' : 'transparent', fg: on ? '#171512' : 'rgba(236,231,222,.75)', border: on ? '#ece7de' : 'rgba(236,231,222,.25)', select: fn });
+    const hasAuto = s.docs.some(d => /Permis|Déclaration/.test(d));
+    const docHint = s.docs.includes('Je ne sais pas encore') ? "Pas d'inquiétude : nous déterminons ensemble l'autorisation nécessaire selon la surface créée et la zone du PLU."
+      : s.docs.includes('Déclaration préalable') && Number(s.surface) > 40 ? 'Au-delà de 40 m² créés (20 m² hors zone urbaine), un permis de construire est généralement requis. Nous vérifierons avec vous.'
+      : s.docs.includes('Perspective') && s.docs.length === 1 ? 'Une perspective seule (image 3D de votre projet) ne nécessite pas de dossier administratif.' : '';
+    const n = s.step + 1;
+    return {
+      steps: this.STEPS.map((t, i) => ({ bar: i <= s.step ? '#ece7de' : 'rgba(236,231,222,.18)' })),
+      stepNum: '0' + n, stepTitle: this.STEPS[s.step],
+      isStep1: s.step === 0, isStep2: s.step === 1, isStep3: s.step === 2,
+      canBack: s.step > 0, isLast: s.step === 2, notLast: s.step < 2,
+      next: () => { if (Object.keys(this.validate(s.step)).length) { this.setState({ tried: true }); return; } this.setState({ step: s.step + 1, tried: false }); },
+      back: () => this.setState({ step: s.step - 1, tried: false }),
+
+      profilOptions: ['Particulier', 'Professionnel'].map(p => chip(p, s.profil === p, () => this.setState({ profil: p }))),
+      isPro: s.profil === 'Professionnel',
+      societe: s.societe, setSociete: set('societe'), activite: s.activite, setActivite: set('activite'),
+      prenom: s.prenom, nom: s.nom, email: s.email, telephone: s.telephone,
+      setPrenom: set('prenom'), setNom: set('nom'), setEmail: set('email'), setTelephone: set('telephone'),
+
+      typeOptions: this.TYPES.map(t => chip(t, s.type === t, () => this.setState({ type: t }))),
+      docOptions: this.DOCS.map(d => chip(d, s.docs.includes(d), () => this.setState({ docs: s.docs.includes(d) ? s.docs.filter(x => x !== d) : s.docs.concat(d) }))),
+      hasDocHint: !!docHint, docHint,
+      commune: s.commune, setCommune: set('commune'), codePostal: s.codePostal, setCodePostal: set('codePostal'), adresse: s.adresse, setAdresse: set('adresse'), cadastre: s.cadastre, setCadastre: set('cadastre'),
+      bienOptions: this.BIENS.map(b => chip(b, s.bien === b, () => this.setState({ bien: b }))),
+      surface: s.surface, setSurface: set('surface'), emprise: s.emprise, setEmprise: set('emprise'),
+      surfaceExistante: s.surfaceExistante, setSurfaceExistante: set('surfaceExistante'), surfaceTerrain: s.surfaceTerrain, setSurfaceTerrain: set('surfaceTerrain'),
+
+      budget: s.budget, setBudget: set('budget'), calendrier: s.calendrier, setCalendrier: set('calendrier'),
+      message: s.message, setMessage: set('message'),
+      messagePlaceholder: hasAuto ? 'Programme souhaité (pièces, usages), contraintes connues, état de l’existant, échéances…' : 'Ce que vous imaginez, vos références, vos contraintes…',
+      source: s.source, setSource: set('source'),
+      recapLigne1: s.profil + ' · ' + s.prenom + ' ' + s.nom + ' · ' + s.email,
+      recapLigne2: s.type + ' · ' + (s.docs.join(', ') || 'document à définir') + ' · ' + s.commune + (s.surface ? ' · ' + s.surface + ' m² créés' : s.emprise ? ' · ' + s.emprise + ' m² d’emprise' : ''),
+
+      setFichiers: e => { this.ajouterFichiers(e.target.files); e.target.value = ''; },
+      dragOver: e => { e.preventDefault(); if (!s.survol) this.setState({ survol: true }); },
+      dragLeave: () => this.setState({ survol: false }),
+      drop: e => { e.preventDefault(); this.ajouterFichiers(e.dataTransfer.files); },
+      dropZoneStyle: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', cursor: 'pointer', border: '1px dashed ' + (s.survol ? '#ece7de' : 'rgba(236,231,222,.3)'), background: s.survol ? 'rgba(236,231,222,.08)' : 'transparent', transition: 'border-color .2s ease, background .2s ease' },
+      fichiersLabel: s.fichiers.length ? s.fichiers.length + ' fichier' + (s.fichiers.length > 1 ? 's' : '') + ' sélectionné' + (s.fichiers.length > 1 ? 's' : '') : 'Aucun fichier sélectionné',
+      hasFichiers: s.fichiers.length > 0,
+      fichiersList: s.fichiers.map((f, i) => ({ nom: f.name, retirer: () => this.setState({ fichiers: s.fichiers.filter((_, j) => j !== i), fichiersRefuses: '' }) })),
+      hasFichiersRefuses: !!s.fichiersRefuses, fichiersRefuses: s.fichiersRefuses,
+
+      hasErrSociete: !!errs.societe, errSociete: errs.societe || '',
+      hasErrPrenom: !!errs.prenom, errPrenom: errs.prenom || '',
+      hasErrNom: !!errs.nom, errNom: errs.nom || '',
+      hasErrEmail: !!errs.email, errEmail: errs.email || '',
+      hasErrTelephone: !!errs.telephone, errTelephone: errs.telephone || '',
+      hasErrDocs: !!errs.docs, errDocs: errs.docs || '',
+      hasErrCommune: !!errs.commune, errCommune: errs.commune || '',
+      hasErrAdresse: !!errs.adresse, errAdresse: errs.adresse || '',
+      hasErrCodePostal: !!errs.codePostal, errCodePostal: errs.codePostal || '',
+      hasErrSurface: !!errs.surface, errSurface: errs.surface || '',
+      hasErrMessage: !!errs.message, errMessage: errs.message || '',
+      hasErrFichiers: !!errs.fichiers, errFichiers: errs.fichiers || '',
+
+      sent: s.sent, notSent: !s.sent, envoi: s.envoi,
+      btnEnvoyer: s.envoi ? 'Envoi en cours…' : 'Envoyer la demande',
+      hasErreurEnvoi: !!s.erreurEnvoi, erreurEnvoi: s.erreurEnvoi,
+      submit: e => {
+        e.preventDefault();
+        if (s.envoi) return;
+        if (Object.keys(this.validate(2)).length) { this.setState({ tried: true }); return; }
+        this.setState({ envoi: true, erreurEnvoi: '', tried: false });
+        const champs = this.champs();
+        if (s.fichiers.length) {
+          // L'endpoint AJAX de FormSubmit ignore les fichiers : envoi natif multipart avec retour sur la page.
+          const form = document.createElement('form');
+          form.method = 'POST'; form.action = 'https://formsubmit.co/contact@atomes.studio'; form.enctype = 'multipart/form-data'; form.style.display = 'none';
+          champs.concat([['_next', location.origin + location.pathname + '?envoye=1']]).forEach(([k, v]) => { const inp = document.createElement('input'); inp.type = 'hidden'; inp.name = k; inp.value = v; form.appendChild(inp); });
+          s.fichiers.forEach((f, i) => { const inp = document.createElement('input'); inp.type = 'file'; inp.name = 'attachment' + (i || ''); const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; form.appendChild(inp); });
+          document.body.appendChild(form); form.submit();
+          return;
+        }
+        const fd = new FormData();
+        champs.filter(([k]) => k !== '_captcha').forEach(([k, v]) => fd.append(k, v));
+        fetch('https://formsubmit.co/ajax/contact@atomes.studio', { method: 'POST', headers: { 'Accept': 'application/json' }, body: fd })
+          .then(r => r.json()).then(res => {
+            if (res.success === 'true' || res.success === true) this.setState({ envoi: false, sent: true });
+            else this.setState({ envoi: false, erreurEnvoi: 'L\u2019envoi a échoué. Réessayez ou écrivez-nous directement à contact@atomes.studio.' });
+          }).catch(() => this.setState({ envoi: false, erreurEnvoi: 'L\u2019envoi a échoué (connexion). Réessayez ou écrivez-nous directement à contact@atomes.studio.' }));
+      },
+      reset: () => this.setState(this.initial())
+    };
+  }
+}
+</script>
+</body>
+</html>
