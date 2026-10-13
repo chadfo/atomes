@@ -221,9 +221,11 @@ Mise en place détaillée dans **SETUP-ESPACE-CLIENT.md**. Résumé :
   http://localhost:3000/dossier/?demo ; avec `npx serve`, l'adresse `dossier/index.html` est redirigée et perd
   le paramètre).
 - `site/admin/` + `assets/js/admin.js` : espace agence (compte inscrit dans `admins`). Liste filtrable (en
-  cours, à traiter, clos), fiche : étapes (« Passer ici »), option de suivi, note pour le client, questions,
-  envoi du devis (PDF déposé dans `<id>/agence/devis-<id>.pdf`, montant, libellé), état de la signature et du
-  paiement, « Marquer comme payé », documents, demande de validation, modifications demandées.
+  cours, à traiter, clos), fiche : étapes (« Passer ici »), option de suivi, note pour le client, questions (et
+  retrait d'une question sans réponse), envoi du devis (un fichier par version, `<id>/agence/devis-<id>-<AAMMJJHHMMSS>.pdf`,
+  jamais écrasé ; montant, libellé), état de la signature et du paiement, « Marquer comme payé », documents,
+  demande de validation, modifications demandées. Chaque opération reste attachée au dossier ouvert au moment
+  du clic, même si une autre fiche est ouverte pendant l'envoi.
   **Mode démo : `admin/?demo`**.
 - Un champ caché anti-robots (`_honey`) est présent dans les deux formulaires (devis et Contact). La page
   Contact ne charge pas config.js : elle envoie par FormSubmit dans tous les cas.
@@ -233,6 +235,5 @@ Mise en place détaillée dans **SETUP-ESPACE-CLIENT.md**. Résumé :
 
 ## Suite prévue
 
-1. **Espace admin** (`site/admin/`) : liste des demandes, changement d'étape, dépôt des documents de
-   l'agence, notes internes, sans passer par le tableau de bord Supabase.
-2. Anti-spam (Cloudflare Turnstile) si nécessaire ; notifications au client à chaque changement d'étape.
+1. Avis clients (quand la fiche Google existera).
+2. Anti-spam (Cloudflare Turnstile) si nécessaire.

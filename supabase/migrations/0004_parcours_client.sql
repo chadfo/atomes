@@ -3,7 +3,8 @@
 -- 11 étapes (dont 3 optionnelles : suivi administratif), actions du client à certaines étapes
 -- (répondre aux questions, signer le devis, payer par carte, valider les documents ou demander une
 -- modification), questions de l'agence, demandes de modification, devis signé, paiement Stripe.
--- À exécuter dans Supabase → SQL Editor (après 0003), avant de déployer la fonction « espace ».
+-- À exécuter dans Supabase → SQL Editor (après 0003), dans la même séance que le déploiement de la
+-- fonction « espace » et la publication du site (voir SETUP-ESPACE-CLIENT.md, « Mises à jour à appliquer »).
 -- Rejouable sans danger.
 -- =============================================================================
 
@@ -34,6 +35,7 @@ alter table public.projets
   add column if not exists signe_empreinte text,
   add column if not exists paye_le timestamptz,               -- paiement par carte (Stripe)
   add column if not exists paiement_ref text,
+  add column if not exists paiement_session text,             -- dernière session Stripe Checkout (cs_…), réutilisée ou expirée
   add column if not exists documents_valides_le timestamptz;
 
 -- Questions de l'agence (réponses du client via la fonction « espace »)
@@ -69,10 +71,10 @@ begin
       ('demande',      1, 'Demande reçue',                          'Votre demande nous est bien parvenue.', false, true, null),
       ('traitement',   2, 'Traitement de votre demande',            'Nous étudions votre projet et pouvons vous poser quelques questions pour affiner votre demande.', false, false, 'questions'),
       ('devis',        3, 'Production de votre devis',              'Nous préparons votre devis.', false, false, null),
-      ('signature',    4, 'Validation de votre devis',              'Votre devis est prêt : lisez-le, puis signez-le en ligne.', false, false, 'signer'),
+      ('signature',    4, 'Validation de votre devis',              'Votre devis est prêt : lisez-le, puis signez-le en ligne.', false, false, 'signer'),
       ('paiement',     5, 'Paiement',                               'Réglez par carte bancaire le montant indiqué pour lancer la production de vos documents.', false, false, 'payer'),
       ('production',   6, 'Production de vos documents',            'Nous réalisons vos documents.', false, false, null),
-      ('validation',   7, 'Validation de vos documents',            'Vos documents sont prêts : vérifiez-les, puis validez-les ou demandez une modification.', false, false, 'valider'),
+      ('validation',   7, 'Validation de vos documents',            'Vos documents sont prêts : vérifiez-les, puis validez-les ou demandez une modification.', false, false, 'valider'),
       ('depot',        8, 'Dépôt de votre démarche administrative', 'Nous déposons votre dossier auprès du service instructeur.', true, false, null),
       ('instruction',  9, 'Suivi de votre démarche administrative', 'Nous suivons l''instruction de votre dossier et répondons aux éventuelles demandes du service instructeur.', true, false, null),
       ('accordee',    10, 'Démarche administrative validée',        'Votre démarche administrative est validée.', true, true, null),
@@ -93,7 +95,8 @@ $$;
 
 -- Statuts de la timeline d'après projets.etape (étape atteinte) et l'option de suivi administratif :
 -- étapes passées « fait » (datées), étape atteinte « en cours » (ou « fait » si instantanée),
--- suivantes « à venir ». Sans l'option, les étapes optionnelles restent « à venir » (masquées).
+-- suivantes « à venir ». Sans l'option, les étapes optionnelles restent « à venir » (masquées) ; leurs dates
+-- sont conservées et réapparaissent si l'option est réactivée.
 create or replace function public.recalculer_etapes(p_id text) returns void
 language plpgsql security definer set search_path = public as $$
 declare
@@ -112,7 +115,7 @@ begin
          fait_le = coalesce(fait_le, case when ordre = 1 then cree else now() end),
          debut_le = coalesce(debut_le, fait_le, case when ordre = 1 then cree else now() end)
    where projet_id = p_id and ordre < o and (not optionnelle or suivi);
-  update public.etapes set statut = 'a_venir', fait_le = null, debut_le = null
+  update public.etapes set statut = 'a_venir'
    where projet_id = p_id and ordre < o and optionnelle and not suivi;
   update public.etapes set
          debut_le = case when statut = 'en_cours' then coalesce(debut_le, now()) else now() end,
@@ -137,6 +140,14 @@ end $$;
 create or replace function public.maj_etapes() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
+  -- Option activée sur un dossier qui a dépassé le dépôt sans y passer (ex. dossier clos) : ces étapes
+  -- s'afficheraient faites à tort ; il faut repasser le dossier à « Dépôt » dans la même modification.
+  if new.suivi_administratif and not old.suivi_administratif and new.etape = old.etape and exists (
+       select 1 from public.etapes e
+        where e.projet_id = new.id and e.optionnelle and e.fait_le is null
+          and e.ordre < (select ordre from public.etapes where projet_id = new.id and cle = new.etape)) then
+    raise exception 'Le suivi administratif ne peut être activé sur ce dossier qu''en le repassant à l''étape « Dépôt »';
+  end if;
   perform public.recalculer_etapes(new.id);
   return new;
 end $$;
@@ -150,18 +161,34 @@ create trigger trg_maj_etapes after update of etape, suivi_administratif on publ
   execute function public.maj_etapes();
 
 -- ---------- Dossiers existants : passage au nouveau modèle ------------------
--- Correspondance des anciennes étapes, timeline reconstruite ; dates conservées pour la demande,
--- le traitement et le paiement (les autres étapes ont changé de sens).
+-- Correspondance des anciennes étapes ; timeline reconstruite avec les dates et les notes reprises
+-- (demande, traitement, devis, validation → signature, paiement, etude → production, livraison → validation
+-- et clos). Les anciennes lignes sont archivées dans etapes_v1 (illisible par les clients).
+
+create table if not exists public.etapes_v1 (
+  projet_id   text not null references public.projets (id) on delete cascade,
+  cle         text not null,
+  ordre       int not null,
+  libelle     text,
+  statut      text,
+  fait_le     timestamptz,
+  note        text,
+  archive_le  timestamptz not null default now(),
+  primary key (projet_id, cle)
+);
+alter table public.etapes_v1 enable row level security;   -- aucune politique : réservé à l'agence (tableau de bord)
+revoke all on public.etapes_v1 from anon, authenticated;
 
 do $$
 declare
-  p record; nouvelle text; d_traitement timestamptz; d_paiement timestamptz;
+  p record; nouvelle text; debut timestamptz; note_courante text;
 begin
   alter table public.projets disable trigger trg_maj_etapes;
-  for p in select pr.id, pr.etape from public.projets pr
+  for p in select pr.id, pr.etape, pr.cree_le from public.projets pr
            where not exists (select 1 from public.etapes e where e.projet_id = pr.id and e.cle = 'signature') loop
-    select fait_le into d_traitement from public.etapes where projet_id = p.id and cle = 'traitement';
-    select fait_le into d_paiement from public.etapes where projet_id = p.id and cle = 'paiement';
+    insert into public.etapes_v1 (projet_id, cle, ordre, libelle, statut, fait_le, note)
+      select projet_id, cle, ordre, libelle, statut, fait_le, note from public.etapes where projet_id = p.id
+      on conflict do nothing;
     nouvelle := case p.etape
       when 'devis' then 'devis' when 'validation' then 'devis' when 'paiement' then 'paiement'
       when 'pieces' then 'production' when 'etude' then 'production' when 'livraison' then 'validation'
@@ -169,8 +196,21 @@ begin
     delete from public.etapes where projet_id = p.id;
     update public.projets set etape = nouvelle where id = p.id;
     perform public.copier_modele(p.id);
-    update public.etapes set fait_le = d_traitement where projet_id = p.id and cle = 'traitement' and d_traitement is not null;
-    update public.etapes set fait_le = d_paiement where projet_id = p.id and cle = 'paiement' and d_paiement is not null;
+    -- dates (et notes des étapes passées) reprises par correspondance
+    update public.etapes e set fait_le = a.fait_le,
+           note = case when e.cle = nouvelle or e.cle = 'clos' or a.statut = 'en_cours' then null else a.note end
+      from (values ('demande', 'demande'), ('traitement', 'traitement'), ('devis', 'devis'), ('validation', 'signature'),
+                   ('paiement', 'paiement'), ('etude', 'production'), ('livraison', 'validation'), ('livraison', 'clos')) m(ancienne, cible)
+      join public.etapes_v1 a on a.cle = m.ancienne
+     where a.projet_id = p.id and e.projet_id = p.id and e.cle = m.cible;
+    -- étape en cours : sa note (visible par le client) et son début (fin de la dernière étape faite)
+    note_courante := null;
+    select note into note_courante from public.etapes_v1 where projet_id = p.id and statut = 'en_cours';
+    select coalesce(max(a.fait_le), p.cree_le) into debut from public.etapes_v1 a
+     where a.projet_id = p.id and a.statut = 'fait'
+       and a.ordre < coalesce((select ordre from public.etapes_v1 where projet_id = p.id and statut = 'en_cours'), 1000);
+    update public.etapes set statut = 'en_cours', debut_le = debut, note = note_courante
+     where projet_id = p.id and cle = nouvelle;
     perform public.recalculer_etapes(p.id);
   end loop;
   alter table public.projets enable trigger trg_maj_etapes;
@@ -179,6 +219,14 @@ end $$;
 -- ---------- Sécurité (RLS) --------------------------------------------------
 -- Le client lit les questions et demandes de modification de ses dossiers ; il y répond (ou en crée)
 -- par la fonction « espace » (rôle service). L'agence gère tout.
+
+drop policy if exists "client lit ses etapes" on public.etapes;
+create policy "client lit ses etapes" on public.etapes
+  for select to authenticated
+  using (exists (select 1 from public.projets p
+                 where p.id = projet_id
+                   and ((p.client_id = auth.uid() and (not etapes.optionnelle or p.suivi_administratif))
+                        or public.est_admin())));
 
 alter table public.questions     enable row level security;
 alter table public.modifications enable row level security;

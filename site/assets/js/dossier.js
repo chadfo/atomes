@@ -54,7 +54,7 @@
           });
         } catch (ex) { throw new Error('Connexion impossible : vérifiez votre accès à Internet, puis réessayez.'); }
         const j = await r.json().catch(() => ({}));
-        if (!r.ok || !j.ok) throw new Error(j.erreur || ECHEC);
+        if (!r.ok || !j.ok) { const e = new Error(j.erreur || ECHEC); e.statut = r.status; throw e; }
         return j;
       }
     };
@@ -65,21 +65,23 @@
     ['demande', 'Demande reçue', 'Votre demande nous est bien parvenue.', false, true, null],
     ['traitement', 'Traitement de votre demande', 'Nous étudions votre projet et pouvons vous poser quelques questions pour affiner votre demande.', false, false, 'questions'],
     ['devis', 'Production de votre devis', 'Nous préparons votre devis.', false, false, null],
-    ['signature', 'Validation de votre devis', 'Votre devis est prêt : lisez-le, puis signez-le en ligne.', false, false, 'signer'],
+    ['signature', 'Validation de votre devis', 'Votre devis est prêt\u00a0: lisez-le, puis signez-le en ligne.', false, false, 'signer'],
     ['paiement', 'Paiement', 'Réglez par carte bancaire le montant indiqué pour lancer la production de vos documents.', false, false, 'payer'],
     ['production', 'Production de vos documents', 'Nous réalisons vos documents.', false, false, null],
-    ['validation', 'Validation de vos documents', 'Vos documents sont prêts : vérifiez-les, puis validez-les ou demandez une modification.', false, false, 'valider'],
+    ['validation', 'Validation de vos documents', 'Vos documents sont prêts\u00a0: vérifiez-les, puis validez-les ou demandez une modification.', false, false, 'valider'],
     ['depot', 'Dépôt de votre démarche administrative', 'Nous déposons votre dossier auprès du service instructeur.', true, false, null],
     ['instruction', 'Suivi de votre démarche administrative', 'Nous suivons l’instruction de votre dossier et répondons aux éventuelles demandes du service instructeur.', true, false, null],
     ['accordee', 'Démarche administrative validée', 'Votre démarche administrative est validée.', true, true, null],
     ['clos', 'Dossier clos', 'Votre dossier est terminé. Merci de votre confiance.', false, true, null]
   ];
-  // Même règle que recalculer_etapes() en SQL : passées faites (datées), atteinte en cours (ou faite si instantanée).
+  // Même règle que recalculer_etapes() en SQL : passées faites (datées), atteinte en cours (ou faite si instantanée) ;
+  // sans l'option, les étapes optionnelles passées restent masquées et gardent leurs dates.
   const recalculer = (p, maintenant) => {
     const o = p.etapes.find((e) => e.cle === p.etape).ordre;
     p.etapes.forEach((e) => {
       const visible = !e.optionnelle || p.suivi_administratif;
       if (e.ordre < o && visible) { e.statut = 'fait'; e.fait_le = e.fait_le || maintenant; e.debut_le = e.debut_le || e.fait_le; }
+      else if (e.ordre < o) e.statut = 'a_venir';
       else if (e.ordre === o) { if (e.statut !== 'en_cours') e.debut_le = maintenant; e.statut = e.instantanee ? 'fait' : 'en_cours'; e.fait_le = e.instantanee ? (e.fait_le || maintenant) : null; }
       else { e.statut = 'a_venir'; e.fait_le = null; e.debut_le = null; }
     });
@@ -182,8 +184,27 @@
   const erreurLien = paramsHash.get('error_description') || paramsHash.get('error') || params.get('error_description') || params.get('error');
   if (erreurLien) history.replaceState(null, '', location.pathname);
   // Retour de Stripe : ?paiement=ok&session=cs_… ou ?paiement=annule (traité une fois le dossier ouvert).
+  // Paiement « en cours de confirmation » mémorisé 10 minutes pour cet onglet (sessionStorage, ou mémoire si le
+  // stockage est indisponible) : le bouton « Payer » ne revient pas pendant ce temps, même après un rechargement,
+  // et la vérification reprend au rechargement.
+  const CLE_PAIEMENT = 'atomes-paiement';
+  let paiementMemo = null;
+  const lirePaiement = () => {
+    let v = paiementMemo;
+    try { v = JSON.parse(sessionStorage.getItem(CLE_PAIEMENT) || 'null') || paiementMemo; } catch (ex) { /* stockage indisponible : mémoire seule */ }
+    return v && v.jusqua > Date.now() ? v : null;
+  };
+  const noterPaiement = (v) => {
+    paiementMemo = v;
+    try { if (v) sessionStorage.setItem(CLE_PAIEMENT, JSON.stringify(v)); else sessionStorage.removeItem(CLE_PAIEMENT); } catch (ex) { /* idem */ }
+  };
+  const paiementAttendu = (d) => { const v = lirePaiement(); return !!(v && v.id === d.id && !d.paye_le); };
   let retourPaiement = params.get('paiement');
   const sessionStripe = params.get('session') || '';
+  const idRetour = location.hash.replace('#', '');
+  if (retourPaiement === 'ok' && /^cs_[A-Za-z0-9_]+$/.test(sessionStripe) && /^[0-9]{12}$/.test(idRetour)) {
+    noterPaiement({ id: idRetour, session: sessionStripe, jusqua: Date.now() + 600000 });
+  }
   if (retourPaiement) history.replaceState(null, '', location.pathname + (demo ? '?demo=' + (params.get('demo') || '') : '') + location.hash);
 
   // ---------- Connexion ----------
@@ -217,11 +238,23 @@
     }).finally(() => { btn.disabled = false; btn.textContent = 'Recevoir mon lien de connexion'; });
   });
 
-  $('[data-deconnexion]').addEventListener('click', () => { api.deconnexion().then(() => { location.hash = ''; }); });
+  // Déconnexion : l'écran de connexion est affiché par l'événement de fin de session (branche sans session plus bas),
+  // y compris pour une déconnexion faite dans un autre onglet.
+  $('[data-deconnexion]').addEventListener('click', () => {
+    api.deconnexion().then(() => { history.replaceState(null, '', location.pathname + location.search); });
+  });
 
   // ---------- Dossiers ----------
   let dossiers = [];
   let courant = null;
+  let utilisateurCharge = null;   // compte connecté (identifiant ; e-mail en démo)
+  // Oubli des données affichées (déconnexion)
+  const oublier = () => {
+    dossiers = []; courant = null;
+    ['[data-dossiers]', '[data-timeline]', '[data-echanges]', '[data-recap]', '[data-docs-agence]', '[data-docs-client]', '[data-d-num]', '[data-d-titre]', '[data-d-sous]']
+      .forEach((sel) => { const n = $(sel); if (n) n.textContent = ''; });
+    annoncer(''); erreur('');
+  };
 
   const etapeCourante = (d) => (d.etapes || []).find((e) => e.cle === d.etape);
   const enAttente = (d) => (d.questions || []).filter((q) => !q.repondue_le).sort((a, b) => new Date(a.posee_le) - new Date(b.posee_le));
@@ -230,10 +263,11 @@
     const e = etapeCourante(d);
     if (enAttente(d).length) return true;
     if (!e || e.statut !== 'en_cours') return false;
-    return (e.action === 'signer' && d.devis_chemin && !d.signe_le) || (e.action === 'payer' && d.montant_cents && !d.paye_le) || e.action === 'valider';
+    return (e.action === 'signer' && d.devis_chemin && !d.signe_le) || (e.action === 'payer' && d.montant_cents && !d.paye_le && !paiementAttendu(d)) || e.action === 'valider';
   };
 
   const charger = () => api.dossiers().then((liste) => {
+    if (!utilisateurCharge) return;   // déconnecté pendant la lecture
     dossiers = liste || [];
     erreur('');
     const voulu = location.hash.replace('#', '');
@@ -241,11 +275,12 @@
     if (cible) ouvrir(cible);
     else if (dossiers.length) rendreListe();
     else { montrer('liste'); $('[data-dossiers]').textContent = ''; $('[data-dossiers]').appendChild(el('p', 'docs-vide', 'Aucun dossier n’est associé à ce compte pour le moment.')); }
-    if (retourPaiement && courant) traiterRetourPaiement();
-  }).catch(() => { montrer('liste'); erreur('Impossible de charger vos dossiers. Réessayez dans quelques minutes.'); });
+    if (courant && (retourPaiement || lirePaiement())) traiterRetourPaiement();
+  }).catch(() => { if (!utilisateurCharge) return; montrer('liste'); erreur('Impossible de charger vos dossiers. Réessayez dans quelques minutes.'); });
 
   // Après une action : données relues, même dossier rouvert, message annoncé.
   const recharger = (id, message) => api.dossiers().then((liste) => {
+    if (!utilisateurCharge) return;
     dossiers = liste || [];
     const d = dossiers.find((x) => x.id === id);
     if (d) ouvrir(d, true);
@@ -296,6 +331,7 @@
 
   $('[data-retour]').addEventListener('click', (e) => { e.preventDefault(); history.pushState(null, '', location.pathname + location.search); rendreListe(); });
   window.addEventListener('hashchange', () => {
+    if (!utilisateurCharge) return;
     const d = dossiers.find((x) => x.id === location.hash.replace('#', ''));
     if (d) ouvrir(d); else if (dossiers.length > 1) rendreListe();
   });
@@ -320,10 +356,14 @@
       let actions = null;   // panneau d'action : sous l'étape, sur toute la largeur (colonnes titre et date)
       if (courante) {
         if (e.note || e.description) corps.appendChild(el('p', 'tl-desc', e.note || e.description));
-        if (e.statut === 'en_cours') {
-          actions = panneauxActions(d, e);
-          if (!actions) corps.appendChild(el('span', 'tl-statut', 'En cours'));
+        // Étape atteinte instantanée (« faite » : démarche validée, dossier clos) : seulement les questions en attente
+        actions = panneauxActions(d, e.statut === 'en_cours' ? e : { action: null });
+        // Compte agence ouvert sur l'espace client (même navigateur) : les actions appartiennent au client
+        if (actions && !demo && d.client_id !== utilisateurCharge) {
+          actions = el('div', 'tl-action');
+          actions.appendChild(el('p', 'tl-action-intro', 'Compte agence\u00a0: les actions sont réservées au client du dossier.'));
         }
+        if (!actions && e.statut === 'en_cours') corps.appendChild(el('span', 'tl-statut', 'En cours'));
       } else if (e.statut === 'fait' && resume) corps.appendChild(el('p', 'tl-desc', resume));
       li.appendChild(corps);
       li.appendChild(el('span', 'tl-date', e.statut === 'fait' ? fmtDate(e.fait_le) : e.statut === 'en_cours' ? (e.debut_le ? 'Depuis le ' + fmtDate(e.debut_le) : 'En cours') : ''));
@@ -356,16 +396,19 @@
   const boutons = (...liste) => { const n = el('div', 'form-actions'); liste.forEach((b) => n.appendChild(b)); return n; };
   const bouton = (texte, cls, type) => { const b = el('button', cls || 'btn', texte); b.type = type || 'button'; return b; };
 
-  // Envoie une action ; succès : message et dossier relu ; échec : message d'erreur sous le panneau.
+  // Envoie une action ; succès : dossier relu et message annoncé ; échec : message sous le panneau et focus rendu
+  // au bouton ; dossier modifié entre-temps (409 : devis renvoyé, étape changée) : dossier relu, message en tête.
   const agir = (btn, err, nom, d, corps, merci) => {
     const texte = btn.textContent;
+    const echec = (msg) => { err.textContent = msg || ECHEC; err.hidden = false; btn.disabled = false; btn.textContent = texte; btn.focus(); };
     btn.disabled = true; btn.textContent = 'Envoi…'; err.hidden = true;
     return api.action(nom, d.id, corps).then((j) => {
       if (j.url) { btn.textContent = 'Redirection…'; location.assign(j.url); return; }
-      return recharger(d.id, merci);
-    }).catch((ex) => {
-      err.textContent = (ex && ex.message) || ECHEC; err.hidden = false;
-      btn.disabled = false; btn.textContent = texte;
+      return recharger(d.id, merci).catch(() => { btn.textContent = texte; annoncer(merci + ' Actualisez la page pour voir votre dossier à jour.'); });
+    }, (ex) => {
+      const msg = ex && ex.message;
+      if (ex && ex.statut === 409) return recharger(d.id, msg).catch(() => echec(msg));
+      echec(msg);
     });
   };
 
@@ -401,6 +444,12 @@
     f.appendChild(boutons(envoyer));
     f.addEventListener('submit', (ev) => {
       ev.preventDefault();
+      const orpheline = liste.find((q) => q.choix && q.choix.length && !f.querySelector('input[name="q-' + q.id + '"]:checked') && f.elements['c-' + q.id].value.trim());
+      if (orpheline) {
+        err.textContent = 'Choisissez une réponse pour accompagner votre précision.'; err.hidden = false;
+        f.querySelector('input[name="q-' + orpheline.id + '"]').focus();
+        return;
+      }
       const reponses = liste.map((q) => {
         if (q.choix && q.choix.length) {
           const coche = f.querySelector('input[name="q-' + q.id + '"]:checked');
@@ -449,7 +498,7 @@
     const inom = el('input', 'input'); inom.id = nomId; inom.autocomplete = 'name'; inom.maxLength = 120; inom.placeholder = (d.prenom + ' ' + d.nom).trim();
     champ.appendChild(lnom); champ.appendChild(inom);
     f.appendChild(champ);
-    f.appendChild(el('p', 'f-hint', 'Votre signature électronique est enregistrée avec la date, l’heure et l’empreinte du devis. Vous recevez une confirmation par e-mail.'));
+    f.appendChild(el('p', 'f-hint', 'Votre signature électronique est enregistrée avec la date, l’heure, votre adresse IP, votre navigateur et l’empreinte du devis. Vous recevez une confirmation par e-mail.'));
     const err = champErreur(); inom.setAttribute('aria-describedby', err.id);
     const signer = bouton('Signer le devis', 'btn', 'submit');
     f.appendChild(err); f.appendChild(boutons(signer));
@@ -457,7 +506,7 @@
       ev.preventDefault();
       if (!cb.checked) { err.textContent = 'Cochez « bon pour accord » pour signer le devis.'; err.hidden = false; cb.focus(); return; }
       if (inom.value.trim().length < 3) { err.textContent = 'Saisissez votre nom et votre prénom.'; err.hidden = false; inom.focus(); return; }
-      agir(signer, err, 'signer', d, { accepte: true, nom: inom.value.trim() }, 'Merci, votre devis est signé. Vous pouvez maintenant régler le paiement.');
+      agir(signer, err, 'signer', d, { accepte: true, nom: inom.value.trim(), empreinte: d.devis_empreinte, montant: d.montant_cents }, 'Merci, votre devis est signé. Vous pouvez maintenant régler le paiement.');
     });
     box.appendChild(f);
     return box;
@@ -468,6 +517,10 @@
     if (d.paye_le) { box.appendChild(el('p', 'tl-action-intro', 'Paiement reçu le ' + fmtDate(d.paye_le) + '. Merci.')); return box; }
     if (!d.montant_cents) { box.appendChild(el('p', 'tl-action-intro', 'Le montant à régler vous sera communiqué prochainement.')); return box; }
     box.appendChild(ligneMontant('À régler', d));
+    if (paiementAttendu(d)) {
+      box.appendChild(el('p', 'tl-action-intro', 'Paiement en cours de confirmation. Vous recevrez un e-mail dès qu’il sera enregistré.'));
+      return box;
+    }
     const err = champErreur();
     const payer = bouton('Payer par carte');
     payer.addEventListener('click', () => agir(payer, err, 'payer', d, {}, 'Paiement reçu, merci. Nous lançons la production de vos documents.'));
@@ -523,19 +576,24 @@
     return box;
   };
 
-  // Retour de Stripe : confirmation du paiement (le webhook l'enregistre aussi de son côté).
+  // Retour de Stripe, ou rechargement pendant la confirmation : vérification du paiement (le webhook l'enregistre
+  // aussi de son côté). Paiement qui ne correspond plus au devis en cours : l'agence est prévenue et revient vers le client.
   const traiterRetourPaiement = () => {
     const etat = retourPaiement;
     retourPaiement = null;
-    if (etat === 'annule') { annoncer('Paiement annulé : vous pouvez le régler quand vous le souhaitez.'); return; }
-    if (etat !== 'ok' || !courant) return;
-    const id = courant.id;
+    if (etat === 'annule') { noterPaiement(null); annoncer('Paiement annulé : vous pouvez le régler quand vous le souhaitez.'); return; }
+    const attente = lirePaiement();
+    if (!attente || !courant || courant.id !== attente.id) return;
+    if (courant.paye_le) { noterPaiement(null); return; }
+    const id = attente.id;
+    const plusTard = 'Votre paiement est en cours de confirmation. Rechargez la page dans quelques minutes ; vous recevrez aussi un e-mail.';
     let essais = 0;
-    const verifier = () => api.action('paiement', id, { session: sessionStripe }).then((j) => {
-      if (j.paye) return recharger(id, 'Paiement reçu, merci. Nous lançons la production de vos documents.');
+    const verifier = () => api.action('paiement', id, { session: attente.session }).then((j) => {
+      if (j.paye) { noterPaiement(null); return recharger(id, 'Paiement reçu, merci. Nous lançons la production de vos documents.'); }
+      if (j.verification) { noterPaiement(null); return recharger(id, 'Votre paiement est bien reçu, mais il ne correspond plus au devis en cours : nous revenons vers vous.'); }
       if (++essais < 4) { annoncer('Votre paiement est en cours de confirmation…'); setTimeout(verifier, 3000); }
-      else annoncer('Votre paiement est en cours de confirmation. Rechargez la page dans quelques minutes ; vous recevrez aussi un e-mail.');
-    }).catch(() => annoncer('Votre paiement est en cours de confirmation. Rechargez la page dans quelques minutes ; vous recevrez aussi un e-mail.'));
+      else annoncer(plusTard);
+    }).catch(() => annoncer(plusTard));
     verifier();
   };
 
@@ -641,7 +699,6 @@
   });
 
   // ---------- Session ----------
-  let utilisateurCharge = null;
   api.surChangement((session, evt) => {
     if (evt === 'TOKEN_REFRESHED' || evt === 'USER_UPDATED') return;
     if (session && session.user) {
@@ -650,8 +707,8 @@
       if (utilisateurCharge !== (session.user.id || session.user.email)) { utilisateurCharge = session.user.id || session.user.email; charger(); }
     } else {
       utilisateurCharge = null;
+      oublier();
       compte.hidden = true;
-      courant = null;
       montrer('connexion');
       if (erreurLien) { const err = $('#e-err'); err.textContent = 'Ce lien a expiré ou a déjà été utilisé. Demandez un nouveau lien ci-dessous.'; err.hidden = false; }
     }

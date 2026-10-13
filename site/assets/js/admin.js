@@ -2,7 +2,8 @@
 // avancement (étapes, option de suivi administratif, note pour le client), questions au client, envoi du devis signable,
 // suivi de la signature et du paiement, documents de l'agence, pièces du client, modifications demandées.
 // Les actions qui préviennent le client passent par la fonction « espace » ; dépôts et notes passent directement par
-// Supabase (règles RLS de l'agence). Mode démo pour travailler le design sans backend : admin/?demo
+// Supabase (règles RLS de l'agence). Chaque opération est attachée au dossier ouvert au moment du clic : changer de
+// fiche pendant un envoi ne la détourne pas vers un autre dossier. Mode démo sans backend : admin/?demo
 (() => {
   const cfg = window.ATOMES_CONFIG || {};
   const demo = new URLSearchParams(location.search).has('demo');
@@ -42,6 +43,10 @@
           .map((o) => ({ nom: o.name, chemin: id + '/' + dossier + '/' + o.name, taille: (o.metadata && o.metadata.size) || 0, date: o.created_at }))),
       lien: (chemin, nom, lire) => sb.storage.from('dossiers').createSignedUrl(chemin, 600, lire ? undefined : { download: nom }).then(ok).then((d) => d.signedUrl),
       deposer: (chemin, fichier, remplacer) => sb.storage.from('dossiers').upload(chemin, fichier, { upsert: !!remplacer, contentType: fichier.type || undefined }).then(ok),
+      supprimer: (chemin) => sb.storage.from('dossiers').remove([chemin]).then(ok),
+      relire: (id) => sb.from('projets').select('*, etapes(*), questions(*), modifications(*)').eq('id', id).maybeSingle().then(ok),
+      // Question sans réponse retirée ; faux si le client vient d'y répondre (elle est alors conservée)
+      retirerQuestion: (id) => sb.from('questions').delete().eq('id', id).is('repondue_le', null).select('id').then(ok).then((l) => (l || []).length > 0),
       note: (id, cle, note) => sb.from('etapes').update({ note: note || null }).eq('projet_id', id).eq('cle', cle).then(ok),
       action: async (nom, projet, corps) => {
         const { data } = await sb.auth.getSession();
@@ -54,7 +59,7 @@
           });
         } catch (ex) { throw new Error('Connexion impossible : vérifiez votre accès à Internet, puis réessayez.'); }
         const j = await r.json().catch(() => ({}));
-        if (!r.ok || !j.ok) throw new Error(j.erreur || ECHEC);
+        if (!r.ok || !j.ok) { const e = new Error(j.erreur || ECHEC); e.statut = r.status; throw e; }
         return j;
       }
     };
@@ -65,20 +70,22 @@
     ['demande', 'Demande reçue', 'Votre demande nous est bien parvenue.', false, true, null],
     ['traitement', 'Traitement de votre demande', 'Nous étudions votre projet et pouvons vous poser quelques questions pour affiner votre demande.', false, false, 'questions'],
     ['devis', 'Production de votre devis', 'Nous préparons votre devis.', false, false, null],
-    ['signature', 'Validation de votre devis', 'Votre devis est prêt : lisez-le, puis signez-le en ligne.', false, false, 'signer'],
+    ['signature', 'Validation de votre devis', 'Votre devis est prêt\u00a0: lisez-le, puis signez-le en ligne.', false, false, 'signer'],
     ['paiement', 'Paiement', 'Réglez par carte bancaire le montant indiqué pour lancer la production de vos documents.', false, false, 'payer'],
     ['production', 'Production de vos documents', 'Nous réalisons vos documents.', false, false, null],
-    ['validation', 'Validation de vos documents', 'Vos documents sont prêts : vérifiez-les, puis validez-les ou demandez une modification.', false, false, 'valider'],
+    ['validation', 'Validation de vos documents', 'Vos documents sont prêts\u00a0: vérifiez-les, puis validez-les ou demandez une modification.', false, false, 'valider'],
     ['depot', 'Dépôt de votre démarche administrative', 'Nous déposons votre dossier auprès du service instructeur.', true, false, null],
     ['instruction', 'Suivi de votre démarche administrative', 'Nous suivons l’instruction de votre dossier et répondons aux éventuelles demandes du service instructeur.', true, false, null],
     ['accordee', 'Démarche administrative validée', 'Votre démarche administrative est validée.', true, true, null],
     ['clos', 'Dossier clos', 'Votre dossier est terminé. Merci de votre confiance.', false, true, null]
   ];
+  // Même règle que recalculer_etapes() en SQL (sans l'option, les étapes optionnelles passées gardent leurs dates).
   const recalculer = (p, maintenant) => {
     const o = p.etapes.find((e) => e.cle === p.etape).ordre;
     p.etapes.forEach((e) => {
       const visible = !e.optionnelle || p.suivi_administratif;
       if (e.ordre < o && visible) { e.statut = 'fait'; e.fait_le = e.fait_le || maintenant; e.debut_le = e.debut_le || e.fait_le; }
+      else if (e.ordre < o) e.statut = 'a_venir';
       else if (e.ordre === o) { if (e.statut !== 'en_cours') e.debut_le = maintenant; e.statut = e.instantanee ? 'fait' : 'en_cours'; e.fait_le = e.instantanee ? (e.fait_le || maintenant) : null; }
       else { e.statut = 'a_venir'; e.fait_le = null; e.debut_le = null; }
     });
@@ -111,12 +118,21 @@
     dossiers.forEach((d) => { docs[d.id] = { agence: d.devis_chemin ? [{ nom: d.devis_chemin.split('/').pop(), chemin: d.devis_chemin, taille: 184320, date: d.devis_envoye_le || d.cree_le }] : [], client: [{ nom: '01-photos.jpg', chemin: 'demo', taille: 2411520, date: d.cree_le }] }; });
     let session = { user: { id: 'admin', email: 'contact@atomes.studio' } }, ecouteur = null;
     const trouver = (id) => dossiers.find((d) => d.id === id);
+    const refus = (message, statut) => { const e = new Error(message); e.statut = statut || 400; return e; };
     const actions = {
       questions: (p, c) => { (c.questions || []).forEach((q) => p.questions.push({ id: Date.now() + Math.random(), question: q.question, choix: q.choix && q.choix.length ? q.choix : null, reponse: null, commentaire: null, posee_le: new Date().toISOString(), repondue_le: null })); return { posees: c.questions.length }; },
-      devis: (p, c) => { if (p.paye_le) throw new Error('Ce dossier est déjà payé : le devis ne peut plus être remplacé'); Object.assign(p, { devis_chemin: c.chemin, devis_empreinte: 'demo', devis_envoye_le: new Date().toISOString(), montant_cents: centimes(c.montant), montant_libelle: c.libelle || 'Montant du devis', signe_le: null, signe_nom: null }); p.etape = 'signature'; recalculer(p, new Date().toISOString()); return {}; },
+      devis: (p, c) => { if (p.paye_le) throw refus('Ce dossier est déjà payé : le devis ne peut plus être remplacé', 409); Object.assign(p, { devis_chemin: c.chemin, devis_empreinte: 'demo', devis_envoye_le: new Date().toISOString(), montant_cents: centimes(c.montant), montant_libelle: c.libelle || 'Montant du devis', signe_le: null, signe_nom: null }); p.etape = 'signature'; recalculer(p, new Date().toISOString()); return {}; },
       etape: (p, c) => { const e = p.etapes.find((x) => x.cle === c.cle); if (e.optionnelle && !p.suivi_administratif) throw new Error('Activez d’abord le suivi administratif'); p.etape = c.cle; recalculer(p, new Date().toISOString()); return { mail: ETAPES_MAIL.includes(c.cle) }; },
-      option: (p, c) => { const e = p.etapes.find((x) => x.cle === p.etape); if (!c.suivi && e.optionnelle) throw new Error('L’étape « ' + p.etape + ' » fait partie du suivi administratif, qui n’est pas activé pour ce dossier'); p.suivi_administratif = c.suivi; recalculer(p, new Date().toISOString()); return {}; },
-      paye: (p) => { p.paye_le = new Date().toISOString(); p.paiement_ref = 'manuel'; if (p.etape === 'paiement') { p.etape = 'production'; recalculer(p, p.paye_le); } return { paye: true }; }
+      option: (p, c) => {
+        const e = p.etapes.find((x) => x.cle === p.etape);
+        if (!c.suivi && e.optionnelle) throw refus('L’étape « ' + p.etape + ' » fait partie du suivi administratif, qui n’est pas activé pour ce dossier', 409);
+        const rouvrir = c.suivi && !p.suivi_administratif && p.etapes.some((x) => x.optionnelle && x.ordre < e.ordre && !x.fait_le);
+        p.suivi_administratif = c.suivi;
+        if (rouvrir) p.etape = 'depot';
+        recalculer(p, new Date().toISOString());
+        return { suivi: c.suivi, etape: p.etape };
+      },
+      paye: (p) => { if (p.paye_le) return { deja: true }; p.paye_le = new Date().toISOString(); p.paiement_ref = 'manuel'; if (p.etape === 'paiement') { p.etape = 'production'; recalculer(p, p.paye_le); } return { paye: true, carte: false }; }
     };
     return {
       surChangement: (fn) => { ecouteur = fn; setTimeout(() => fn(session), 0); },
@@ -134,6 +150,21 @@
         if (i >= 0) liste.splice(i, 1);
         liste.unshift({ nom, chemin, taille: fichier.size, date: new Date().toISOString() });
         return Promise.resolve();
+      },
+      supprimer: (chemin) => {
+        const [id, dossier, nom] = chemin.split('/');
+        const liste = (docs[id] && docs[id][dossier]) || [];
+        const i = liste.findIndex((f) => f.nom === nom);
+        if (i >= 0) liste.splice(i, 1);
+        return Promise.resolve();
+      },
+      relire: (id) => Promise.resolve(trouver(id) ? JSON.parse(JSON.stringify(trouver(id))) : null),
+      retirerQuestion: (qid) => {
+        for (const d of dossiers) {
+          const i = d.questions.findIndex((q) => q.id === qid && !q.repondue_le);
+          if (i >= 0) { d.questions.splice(i, 1); return Promise.resolve(true); }
+        }
+        return Promise.resolve(false);
       },
       note: (id, cle, note) => { trouver(id).etapes.find((e) => e.cle === cle).note = note || null; return Promise.resolve(); },
       action: (nom, id, corps) => new Promise((res, rej) => setTimeout(() => { try { res(Object.assign({ ok: true }, actions[nom](trouver(id), corps || {}))); } catch (ex) { rej(ex); } }, 200))
@@ -165,21 +196,30 @@
       err.hidden = false;
     }).finally(() => { btn.disabled = false; btn.textContent = 'Recevoir mon lien de connexion'; });
   });
-  $('[data-deconnexion]').addEventListener('click', () => { api.deconnexion().then(() => { location.hash = ''; }); });
+  $('[data-deconnexion]').addEventListener('click', () => {
+    api.deconnexion().then(() => { history.replaceState(null, '', location.pathname + location.search); });
+  });
 
   // ---------- État ----------
   let dossiers = [];
   let courant = null;
   let filtre = 'encours';
+  let charge = null;        // compte connecté
+  let autorise = false;     // compte inscrit dans la table admins
 
   const etapeDe = (d) => (d.etapes || []).find((e) => e.cle === d.etape) || {};
   const visibles = (d) => (d.etapes || []).filter((e) => !e.optionnelle || d.suivi_administratif).sort((a, b) => a.ordre - b.ordre);
   const enAttente = (d) => (d.questions || []).filter((q) => !q.repondue_le);
   const derniereModif = (d) => (d.modifications || []).slice().sort((a, b) => new Date(b.demandee_le) - new Date(a.demandee_le))[0];
-  // Qui a la main : [libellé, 'agence' | 'client' | 'clos']
+  // Qui a la main : [libellé, 'agence' | 'client' | 'clos']. Une question sans réponse ne met le dossier « côté
+  // client » qu'à l'étape « traitement » ; ailleurs, c'est l'étape qui décide (le nombre est affiché dans la liste).
   const situation = (d) => {
     if (d.etape === 'clos') return ['Clos', 'clos'];
-    if (enAttente(d).length) return [enAttente(d).length > 1 ? enAttente(d).length + ' questions en attente' : 'Question en attente', 'client'];
+    const n = enAttente(d).length;
+    if (n && d.etape === 'traitement') return [n > 1 ? n + ' questions en attente' : 'Question en attente', 'client'];
+    return parEtape(d);
+  };
+  const parEtape = (d) => {
     const e = etapeDe(d);
     const modif = derniereModif(d);
     switch (d.etape) {
@@ -197,18 +237,34 @@
   };
 
   const charger = () => api.dossiers().then((liste) => {
+    if (!charge || !autorise) return;   // déconnexion pendant la lecture
     dossiers = liste || [];
     erreur('');
     const d = dossiers.find((x) => x.id === location.hash.replace('#', ''));
     if (d) ouvrir(d); else rendreListe();
-  }).catch(() => { montrer('liste'); erreur('Impossible de charger les dossiers. Réessayez dans quelques minutes.'); });
+  }).catch(() => { if (!charge || !autorise) return; montrer('liste'); erreur('Impossible de charger les dossiers. Réessayez dans quelques minutes.'); });
 
-  const recharger = (message) => api.dossiers().then((liste) => {
+  // Après une opération sur le dossier `id` : données relues ; sa fiche est redessinée seulement si elle est encore
+  // affichée (une autre fiche ouverte entre-temps n'est pas touchée, sa saisie en cours serait perdue).
+  const recharger = (message, id) => api.dossiers().then((liste) => {
+    if (!charge || !autorise) return;
     dossiers = liste || [];
-    const d = dossiers.find((x) => courant && x.id === courant.id);
-    if (d) ouvrir(d, true);
-    if (message) annoncer(message);
+    if (courant && (!id || courant.id === id)) {
+      const d = dossiers.find((x) => x.id === courant.id);
+      if (d) ouvrir(d, true);
+      if (message) annoncer(message);
+    } else if (!courant && !vues.liste.hidden) rendreListe();
   });
+  const remplacer = (d) => { dossiers = dossiers.map((x) => (x.id === d.id ? d : x)); };
+  // Changement de fiche ou retour à la liste : affichage immédiat (données en mémoire), puis données relues en
+  // arrière-plan pour montrer l'état réel (paiement, signature…). Un échec n'efface rien : message seulement.
+  const actualiser = () => api.dossiers().then((liste) => {
+    if (!charge || !autorise) return;
+    dossiers = liste || [];
+    const d = dossiers.find((x) => x.id === location.hash.replace('#', ''));
+    if (d && (!courant || courant.id === d.id)) ouvrir(d, true);
+    else if (!courant && !vues.liste.hidden) rendreListe();
+  }).catch(() => { if (charge && autorise) erreur('Les dossiers n’ont pas pu être actualisés : rechargez la page.'); });
 
   const annoncer = (message) => {
     const n = $('[data-notice]');
@@ -243,7 +299,9 @@
       a.appendChild(c1);
       a.appendChild(el('span', 'admin-type', d.type + ' · ' + d.commune));
       const vis = visibles(d), e = etapeDe(d);
-      a.appendChild(el('span', 'admin-etape', String(vis.indexOf(vis.find((x) => x.cle === d.etape)) + 1).padStart(2, '0') + '/' + String(vis.length).padStart(2, '0') + ' · ' + (e.libelle || '')));
+      const sansReponse = d.etape === 'traitement' || d.etape === 'clos' ? 0 : enAttente(d).length;
+      a.appendChild(el('span', 'admin-etape', String(vis.indexOf(vis.find((x) => x.cle === d.etape)) + 1).padStart(2, '0') + '/' + String(vis.length).padStart(2, '0') + ' · ' + (e.libelle || '')
+        + (sansReponse ? ' · ' + sansReponse + (sansReponse > 1 ? ' questions sans réponse' : ' question sans réponse') : '')));
       const [texte, qui] = situation(d);
       a.appendChild(el('span', 'badge badge--' + qui, texte));
       cont.appendChild(a);
@@ -251,10 +309,17 @@
     montrer('liste');
   };
 
-  $('[data-retour]').addEventListener('click', (e) => { e.preventDefault(); history.pushState(null, '', location.pathname + location.search); rendreListe(); });
+  $('[data-retour]').addEventListener('click', (e) => {
+    e.preventDefault();
+    history.pushState(null, '', location.pathname + location.search);
+    rendreListe();
+    actualiser();
+  });
   window.addEventListener('hashchange', () => {
+    if (!charge || !autorise) return;
     const d = dossiers.find((x) => x.id === location.hash.replace('#', ''));
     if (d) ouvrir(d); else rendreListe();
+    actualiser();
   });
 
   // ---------- Fiche d'un dossier ----------
@@ -267,6 +332,12 @@
       dernierOuvert = d.id;
       $('[data-nouvelles]').textContent = '';
       ['[data-err-questions]', '[data-depot-err]', '[data-err-devis]'].forEach((sel) => { $(sel).hidden = true; });
+      $('[data-depot-info]').textContent = 'Visibles par le client dans son espace';
+      ['[data-btn-questions]', '[data-btn-devis]', '[data-btn-paye]', '[data-btn-pret]'].forEach((sel) => {
+        const b = $(sel);
+        if (b.dataset.texteOrigine) { b.disabled = false; b.textContent = b.dataset.texteOrigine; }
+      });
+      $('[data-suivi]').disabled = false;
     }
     $('[data-d-num]').textContent = 'DOSSIER N° ' + d.id;
     $('[data-d-titre]').textContent = (d.prenom + ' ' + d.nom).trim() + (d.societe ? ' · ' + d.societe : '');
@@ -285,17 +356,32 @@
     rafraichirDocs();
   };
 
-  // Action envoyée à la fonction : bouton occupé, message en cas de succès, dossier relu
-  // (libellé d'origine du bouton mémorisé dans data-texte-origine : il est rétabli après l'action, réussie ou non)
-  const agir = (btn, err, nom, corps, merci) => {
+  // Action envoyée à la fonction pour le dossier `id` (par défaut celui affiché au moment de l'appel). Succès : message
+  // annoncé dès la réponse, `apres(j)` exécuté (brouillons à vider), dossier relu ; le bouton reste occupé jusqu'à la fin
+  // de la relecture, et une relecture ratée n'est pas présentée comme un échec. Échec : message sous le bloc (ou en tête)
+  // et focus rendu au bouton ; si une autre fiche est ouverte entre-temps, message en tête avec le numéro du dossier.
+  // (libellé d'origine du bouton mémorisé dans data-texte-origine)
+  const agir = (btn, err, nom, corps, merci, apres, id) => {
+    const pid = id || courant.id;
+    const meme = () => !!courant && courant.id === pid;
     if (btn && !btn.dataset.texteOrigine) btn.dataset.texteOrigine = btn.textContent;
-    const retablir = () => { if (btn) { btn.disabled = false; btn.textContent = btn.dataset.texteOrigine; } };
+    const retablir = () => { if (btn && meme()) { btn.disabled = false; btn.textContent = btn.dataset.texteOrigine; } };
     if (btn) { btn.disabled = true; btn.textContent = 'Envoi…'; }
     if (err) err.hidden = true;
-    return api.action(nom, courant.id, corps).then((j) => { retablir(); return recharger(typeof merci === 'function' ? merci(j) : merci).then(() => j); }).catch((ex) => {
-      const msg = (ex && ex.message) || ECHEC;
-      if (err) { err.textContent = msg; err.hidden = false; } else annoncer(msg);
+    return api.action(nom, pid, corps).then((j) => {
+      const m = typeof merci === 'function' ? merci(j) : merci;
+      if (apres) apres(j);
+      if (meme()) annoncer(m);
+      return recharger(null, pid)
+        .catch(() => { if (meme()) annoncer(m + ' Actualisez la page pour voir le dossier à jour.'); })
+        .then(() => { retablir(); return j; });
+    }, (ex) => {
       retablir();
+      const msg = (ex && ex.message) || ECHEC;
+      if (meme()) {
+        if (err) { err.textContent = msg; err.hidden = false; } else annoncer(msg);
+        if (btn && btn.isConnected && !btn.disabled) btn.focus();
+      } else erreur('Dossier N° ' + pid + ' : ' + msg);
       throw ex;
     });
   };
@@ -321,7 +407,7 @@
       if (courante && e.note) corps.appendChild(el('p', 'tl-desc', 'Note : ' + e.note));
       if (masquee) corps.appendChild(el('p', 'tl-desc', 'Option non retenue pour ce dossier'));
       li.appendChild(corps);
-      li.appendChild(el('span', 'tl-date', e.statut === 'fait' ? fmtCourt(e.fait_le) : e.statut === 'en_cours' ? 'Depuis le ' + fmtCourt(e.debut_le) : ''));
+      li.appendChild(el('span', 'tl-date', e.statut === 'fait' ? fmtCourt(e.fait_le) : e.statut === 'en_cours' ? (e.debut_le ? 'Depuis le ' + fmtCourt(e.debut_le) : 'En cours') : ''));
       if (courante) li.appendChild(el('span', 'tl-statut', 'Étape actuelle'));
       else {
         const b = el('button', 'link-more', 'Passer ici'); b.type = 'button';
@@ -332,7 +418,7 @@
           const avance = e.ordre > ordreCourant;
           const mail = avance && ETAPES_MAIL.includes(e.cle);
           if (!window.confirm('Passer le dossier à l’étape « ' + e.libelle + ' » ?' + (mail ? '\nLe client recevra un e-mail.' : avance ? '' : '\nC’est un retour en arrière : les étapes suivantes repassent à venir.'))) return;
-          agir(b, null, 'etape', { cle: e.cle }, (j) => 'Dossier passé à l’étape « ' + e.libelle + ' »' + (j.mail ? ' : le client a reçu un e-mail.' : '.')).catch(() => {});
+          agir(b, null, 'etape', { cle: e.cle }, (j) => 'Dossier passé à l’étape « ' + e.libelle + ' »' + (j.mail ? ' : le client a reçu un e-mail.' : '.'), null, d.id).catch(() => {});
         });
         li.appendChild(b);
       }
@@ -345,17 +431,37 @@
   };
 
   $('[data-suivi]').addEventListener('change', (ev) => {
-    const suivi = ev.target.checked;
-    agir(null, null, 'option', { suivi }, suivi ? 'Suivi administratif activé : les étapes 8 à 10 apparaissent pour le client.' : 'Suivi administratif désactivé.').catch(() => { ev.target.checked = !suivi; });
+    const cb = ev.target;
+    const suivi = cb.checked;
+    const d = courant;
+    if (!d) return;
+    const id = d.id, e = etapeDe(d);
+    // Même règle que la fonction : un dossier qui a dépassé le dépôt sans y passer est rouvert au dépôt
+    const rouvrir = suivi && (d.etapes || []).some((x) => x.optionnelle && x.ordre < (e.ordre || 0) && !x.fait_le);
+    if (rouvrir && !window.confirm('Ce dossier a dépassé l’étape « Dépôt » sans y passer : activer le suivi administratif le rouvre à l’étape « Dépôt de votre démarche administrative ». Continuer ?')) { cb.checked = false; return; }
+    if (!suivi && !e.optionnelle && (d.etapes || []).some((x) => x.optionnelle && x.statut === 'fait')
+      && !window.confirm('Ce dossier est passé par le suivi administratif : le désactiver masque les étapes 8 à 10 dans l’espace du client. Continuer ?')) { cb.checked = true; return; }
+    cb.disabled = true;
+    agir(null, null, 'option', { suivi }, (j) => (!suivi ? 'Suivi administratif désactivé.'
+      : j.etape === 'depot' && e.cle !== 'depot' ? 'Suivi administratif activé : le dossier repasse à l’étape « Dépôt ».'
+        : 'Suivi administratif activé : les étapes 8 à 10 apparaissent pour le client.'), null, id)
+      .catch(() => { if (courant && courant.id === id) cb.checked = !suivi; })
+      .finally(() => { cb.disabled = false; });
   });
 
   $('[data-form-note]').addEventListener('submit', (ev) => {
     ev.preventDefault();
     if (!courant) return;
+    const id = courant.id;
+    const meme = () => !!courant && courant.id === id;
     const btn = $('[data-btn-note]');
+    const m = 'Note enregistrée : le client la voit sous l’étape en cours.';
     btn.disabled = true;
-    api.note(courant.id, courant.etape, $('[data-note]').value.trim()).then(() => recharger('Note enregistrée : le client la voit sous l’étape en cours.'))
-      .catch(() => annoncer('La note n’a pas pu être enregistrée.')).finally(() => { btn.disabled = false; });
+    api.note(id, courant.etape, $('[data-note]').value.trim()).then(() => {
+      if (meme()) annoncer(m);
+      return recharger(null, id).catch(() => { if (meme()) annoncer(m + ' Actualisez la page pour voir le dossier à jour.'); });
+    }, () => { if (meme()) annoncer('La note n’a pas pu être enregistrée.'); else erreur('Dossier N° ' + id + ' : la note n’a pas pu être enregistrée.'); })
+      .finally(() => { btn.disabled = false; });
   });
 
   // ---------- Questions ----------
@@ -370,6 +476,18 @@
       li.appendChild(el('p', 'echange-q', q.question));
       if (q.choix && q.choix.length) li.appendChild(el('span', 'doc-meta', 'Propositions : ' + q.choix.join(' · ')));
       li.appendChild(el('p', 'echange-r', q.repondue_le ? q.reponse + (q.commentaire ? '\n' + q.commentaire : '') : 'En attente de réponse'));
+      if (!q.repondue_le) {
+        const b = el('button', 'link-more', 'Retirer la question'); b.type = 'button';
+        b.addEventListener('click', () => {
+          if (!window.confirm('Retirer cette question ? Le client ne la verra plus.')) return;
+          const id = d.id;
+          b.disabled = true;
+          api.retirerQuestion(q.id)
+            .then((retiree) => recharger(retiree ? 'Question retirée.' : 'Le client vient de répondre à cette question : elle est conservée.', id))
+            .catch(() => { b.disabled = false; if (courant && courant.id === id) annoncer('La question n’a pas pu être retirée.'); });
+        });
+        li.appendChild(b);
+      }
       ul.appendChild(li);
     });
     const zone = $('[data-nouvelles]');
@@ -409,8 +527,9 @@
     })).filter((q) => q.question.length >= 2);
     if (!questions.length) { err.textContent = 'Saisissez au moins une question.'; err.hidden = false; return; }
     if (questions.some((q) => q.choix.length === 1)) { err.textContent = 'Proposez au moins deux réponses, ou aucune pour une réponse libre.'; err.hidden = false; return; }
-    agir($('[data-btn-questions]'), err, 'questions', { questions }, questions.length > 1 ? questions.length + ' questions envoyées : le client a reçu un e-mail.' : 'Question envoyée : le client a reçu un e-mail.')
-      .then(() => { $('[data-nouvelles]').textContent = ''; ajouterQuestion(); }).catch(() => {});
+    const idq = courant.id;
+    agir($('[data-btn-questions]'), err, 'questions', { questions }, questions.length > 1 ? questions.length + ' questions envoyées : le client a reçu un e-mail.' : 'Question envoyée : le client a reçu un e-mail.',
+      () => { if (courant && courant.id === idq) { $('[data-nouvelles]').textContent = ''; ajouterQuestion(); } }, idq).catch(() => {});
   });
 
   // ---------- Devis, signature, paiement ----------
@@ -440,8 +559,17 @@
     $('[data-devis-info]').textContent = f ? f.name + ' · ' + fmtTaille(f.size) : 'Aucun fichier choisi';
   });
 
+  // Horodatage AAMMJJHHMMSS à l'heure de Paris (format des numéros de dossier) : nom de fichier propre à chaque version
+  const horodatage = () => {
+    const p = {};
+    new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date()).forEach((x) => { p[x.type] = x.value; });
+    return p.year + p.month + p.day + p.hour + p.minute + p.second;
+  };
+
   $('[data-form-devis]').addEventListener('submit', (ev) => {
     ev.preventDefault();
+    if (!courant) return;
     const err = $('[data-err-devis]');
     const f = $('[data-devis-fichier]').files && $('[data-devis-fichier]').files[0];
     const montant = $('[data-montant]').value;
@@ -451,20 +579,47 @@
     if (!/\.pdf$/i.test(f.name)) return dire('Le devis doit être un fichier PDF.');
     if (f.size > 50 * 1024 * 1024) return dire('Fichier trop lourd (50 Mo max).');
     if (!centimes(montant)) return dire('Montant invalide : par exemple 720 ou 720,50.');
-    if (courant.signe_le && !window.confirm('Ce devis est déjà signé. Envoyer un nouveau devis annule la signature : le client devra signer à nouveau. Continuer ?')) return;
+    const id = courant.id;
+    const meme = () => !!courant && courant.id === id;
     const btn = $('[data-btn-devis]');
-    const chemin = courant.id + '/agence/devis-' + courant.id + '.pdf';
     if (!btn.dataset.texteOrigine) btn.dataset.texteOrigine = btn.textContent;
+    const liberer = () => { if (meme()) { btn.disabled = false; btn.textContent = btn.dataset.texteOrigine; } };
     btn.disabled = true; btn.textContent = 'Envoi…'; err.hidden = true;
-    api.deposer(chemin, f, true)
-      .then(() => agir(btn, err, 'devis', { chemin, montant, libelle }, 'Devis envoyé : le client a reçu un e-mail pour le lire et le signer.'))
-      .then(rafraichirDocs)
-      .catch((ex) => { if (err.hidden) dire((ex && ex.message) || ECHEC); btn.disabled = false; btn.textContent = btn.dataset.texteOrigine; });
+    let chemin = null;
+    // État réel du dossier juste avant le dépôt : payé → refus ; signé → confirmation
+    api.relire(id).then((frais) => {
+      if (!frais) throw new Error('Dossier introuvable : actualisez la page.');
+      if (frais.paye_le) {
+        if (meme()) { remplacer(frais); ouvrir(frais, true); dire('Ce dossier est déjà payé : le devis ne peut plus être remplacé.'); }
+        return false;
+      }
+      if (frais.signe_le && !window.confirm('Ce devis est déjà signé. Envoyer un nouveau devis annule la signature : le client devra signer à nouveau. Continuer ?')) { liberer(); return false; }
+      // Chaque version sous un nom propre : un devis signé n'est jamais écrasé
+      chemin = id + '/agence/devis-' + id + '-' + horodatage() + '.pdf';
+      return api.deposer(chemin, f, false).then(() => true);
+    }).then((depose) => {
+      if (!depose) return;
+      return agir(btn, err, 'devis', { chemin, montant, libelle }, 'Devis envoyé : le client a reçu un e-mail pour le lire et le signer.',
+        () => { if (meme()) { $('[data-devis-fichier]').value = ''; $('[data-devis-info]').textContent = 'Aucun fichier choisi'; } }, id)
+        .catch((ex) => {
+          // Refus explicite (4xx) : le fichier déposé n'a pas servi et est supprimé, sauf s'il est devenu le devis du
+          // dossier. Erreur réseau ou serveur : la fonction a pu enregistrer le devis, le fichier est gardé.
+          if (!(ex && ex.statut >= 400 && ex.statut < 500)) return;
+          return api.relire(id).then((d2) => (d2 && d2.devis_chemin === chemin ? null : api.supprimer(chemin))).catch(() => {});
+        })
+        .then(() => { if (meme()) rafraichirDocs(); });
+    }).catch((ex) => {
+      const msg = (ex && ex.message) || ECHEC;
+      if (meme()) { dire(/exists|duplicate/i.test(msg) ? 'Un fichier du même nom vient d’être déposé : réessayez.' : msg); liberer(); if (!btn.disabled) btn.focus(); }
+      else erreur('Dossier N° ' + id + ' : devis non envoyé (' + msg + ').');
+    });
   });
 
   $('[data-btn-paye]').addEventListener('click', () => {
     if (!window.confirm('Marquer ce dossier comme payé (paiement reçu hors du site) ? Le client recevra un e-mail et le dossier passera à la production.')) return;
-    agir($('[data-btn-paye]'), $('[data-err-devis]'), 'paye', {}, 'Paiement enregistré : le dossier passe à la production des documents.').catch(() => {});
+    agir($('[data-btn-paye]'), $('[data-err-devis]'), 'paye', {}, (j) => (j.deja ? 'Ce dossier était déjà payé.'
+      : j.carte ? 'Le client venait de payer par carte : son paiement est enregistré et le dossier passe à la production.'
+        : 'Paiement enregistré : le dossier passe à la production des documents.'), null, courant.id).catch(() => {});
   });
 
   // ---------- Documents ----------
@@ -487,8 +642,9 @@
   const rafraichirDocs = () => {
     if (!courant) return;
     const id = courant.id;
-    api.lister(id, 'agence').then((l) => rendreDocs($('[data-docs-agence]'), $('[data-vide-agence]'), l)).catch(() => annoncer('Documents de l’agence indisponibles.'));
-    api.lister(id, 'client').then((l) => rendreDocs($('[data-docs-client]'), $('[data-vide-client]'), l)).catch(() => annoncer('Pièces du client indisponibles.'));
+    const meme = () => !!courant && courant.id === id;
+    api.lister(id, 'agence').then((l) => { if (meme()) rendreDocs($('[data-docs-agence]'), $('[data-vide-agence]'), l); }).catch(() => { if (meme()) annoncer('Documents de l’agence indisponibles.'); });
+    api.lister(id, 'client').then((l) => { if (meme()) rendreDocs($('[data-docs-client]'), $('[data-vide-client]'), l); }).catch(() => { if (meme()) annoncer('Pièces du client indisponibles.'); });
   };
 
   const depot = $('[data-depot]');
@@ -496,23 +652,26 @@
     const fichiers = Array.from(depot.files || []);
     depot.value = '';
     if (!courant || !fichiers.length) return;
+    const id = courant.id;   // tous les fichiers vont dans ce dossier, même si une autre fiche est ouverte pendant l'envoi
+    const meme = () => !!courant && courant.id === id;
     const err = $('[data-depot-err]'), info = $('[data-depot-info]');
     const lourds = fichiers.filter((f) => f.size > 50 * 1024 * 1024);
     if (lourds.length) { err.textContent = 'Fichier trop lourd (50 Mo max) : ' + lourds.map((f) => f.name).join(', '); err.hidden = false; return; }
     err.hidden = true; info.textContent = 'Envoi en cours…';
     const ko = [];
-    fichiers.reduce((p, f) => p.then(() => api.deposer(courant.id + '/agence/' + nomSur(f.name), f, false).catch((ex) => { ko.push(f.name + (/exists|duplicate/i.test(String(ex && ex.message)) ? ' (un fichier du même nom existe déjà)' : '')); })), Promise.resolve())
+    fichiers.reduce((p, f) => p.then(() => api.deposer(id + '/agence/' + nomSur(f.name), f, false).catch((ex) => { ko.push(f.name + (/exists|duplicate/i.test(String(ex && ex.message)) ? ' (un fichier du même nom existe déjà)' : '')); })), Promise.resolve())
       .then(() => {
+        if (!meme()) { if (ko.length) erreur('Dossier N° ' + id + ' — non déposé : ' + ko.join(', ')); return; }
         info.textContent = 'Visibles par le client dans son espace';
         if (ko.length) { err.textContent = 'Non déposé : ' + ko.join(', '); err.hidden = false; }
         else annoncer(fichiers.length > 1 ? fichiers.length + ' documents déposés : le client les voit dans son espace.' : 'Document déposé : le client le voit dans son espace.');
       })
-      .finally(rafraichirDocs);
+      .finally(() => { if (meme()) rafraichirDocs(); });
   });
 
   $('[data-btn-pret]').addEventListener('click', () => {
     if (!window.confirm('Demander au client de valider ses documents ? Il recevra un e-mail.')) return;
-    agir($('[data-btn-pret]'), null, 'etape', { cle: 'validation' }, 'Le client a reçu un e-mail pour valider ses documents.').catch(() => {});
+    agir($('[data-btn-pret]'), null, 'etape', { cle: 'validation' }, 'Le client a reçu un e-mail pour valider ses documents.', null, courant.id).catch(() => {});
   });
 
   // ---------- Modifications, demande ----------
@@ -547,18 +706,27 @@
   };
 
   // ---------- Session ----------
-  let charge = null;
+  // Déconnexion (ici ou dans un autre onglet) : plus aucune donnée client en mémoire ni dans la page
+  const oublier = () => {
+    dossiers = []; courant = null; dernierOuvert = null;
+    ['[data-liste]', '[data-compte-liste]', '[data-d-num]', '[data-d-titre]', '[data-d-sous]', '[data-d-liens]', '[data-etapes]', '[data-questions]', '[data-nouvelles]',
+      '[data-devis-etat]', '[data-docs-agence]', '[data-docs-client]', '[data-modifs]', '[data-recap]'].forEach((sel) => { const n = $(sel); if (n) n.textContent = ''; });
+    ['#a-recherche', '[data-note]', '[data-montant]', '[data-libelle]', '[data-devis-fichier]'].forEach((sel) => { const n = $(sel); if (n) n.value = ''; });
+    annoncer(''); erreur('');
+  };
   api.surChangement((session, evt) => {
     if (evt === 'TOKEN_REFRESHED' || evt === 'USER_UPDATED') return;
     if (session && session.user) {
       $('[data-compte]').hidden = false;
       $('[data-compte-email]').textContent = session.user.email || '';
       if (charge === session.user.id) return;
-      charge = session.user.id;
-      api.estAdmin(session.user.id).then((admin) => { if (admin) charger(); else montrer('refus'); })
-        .catch(() => { montrer('refus'); erreur('Vérification du compte impossible pour le moment.'); });
+      const uid = session.user.id;
+      charge = uid; autorise = false;
+      api.estAdmin(uid).then((admin) => { if (charge !== uid) return; autorise = admin; if (admin) charger(); else montrer('refus'); })
+        .catch(() => { if (charge !== uid) return; montrer('refus'); erreur('Vérification du compte impossible pour le moment.'); });
     } else {
-      charge = null;
+      charge = null; autorise = false;
+      oublier();
       $('[data-compte]').hidden = true;
       montrer('connexion');
     }

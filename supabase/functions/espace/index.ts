@@ -4,7 +4,8 @@
 //   Client  : repondre (questions), signer (devis), payer (session Stripe), paiement (retour Stripe),
 //             valider (documents), modifier (demande de modification)
 //   Agence  : questions, devis (envoi du devis signable), etape, option (suivi administratif), paye
-//   Stripe  : webhook checkout.session.completed (requête signée, en-tête stripe-signature)
+//   Stripe  : webhook checkout.session.completed, format « instantané » ou « léger » (requête signée,
+//             en-tête stripe-signature)
 // Appel : POST JSON { action, projet, … } avec l'en-tête Authorization: Bearer <jeton de session Supabase>.
 // « Verify JWT » est désactivé pour cette fonction : le jeton est vérifié ici (Stripe n'en envoie pas).
 // Les transitions d'étapes passent par projets.etape : le déclencheur SQL recalcule la timeline
@@ -20,6 +21,7 @@ const SERVICE_KEY = Deno.env.get("SB_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERV
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
 const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
+const STRIPE_VERSION = "2024-06-20";
 const MAIL_AGENCE = Deno.env.get("MAIL_AGENCE") ?? "contact@atomes.studio";
 const MAIL_FROM = Deno.env.get("MAIL_FROM") ?? "Atomes studio <contact@atomes.studio>";
 const SITE_URL = (Deno.env.get("SITE_URL") ?? "https://atomes.studio").replace(/\/$/, "");
@@ -28,14 +30,18 @@ const ORIGINES = (Deno.env.get("ORIGINES_AUTORISEES") ??
 const ESPACE_CLIENT = `${SITE_URL}/dossier/`;
 const ESPACE_AGENCE = `${SITE_URL}/admin/`;
 
-type Etape = { cle: string; ordre: number; libelle: string; statut: string; optionnelle: boolean; action: string | null };
+type Etape = { cle: string; ordre: number; libelle: string; statut: string; optionnelle: boolean; action: string | null; fait_le: string | null };
 type Question = { id: number; question: string; choix: string[] | null; reponse: string | null; commentaire: string | null; repondue_le: string | null };
 type Projet = {
   id: string; client_id: string | null; prenom: string; nom: string; email: string; type: string; commune: string;
   etape: string; suivi_administratif: boolean;
   devis_chemin: string | null; devis_empreinte: string | null; montant_cents: number | null; montant_libelle: string | null;
-  signe_le: string | null; paye_le: string | null; etapes: Etape[]; questions: Question[];
+  signe_le: string | null; signe_empreinte: string | null;
+  paye_le: string | null; paiement_ref: string | null; paiement_session: string | null;
+  etapes: Etape[]; questions: Question[];
 };
+// deno-lint-ignore no-explicit-any
+type Session = any;   // objet Stripe (Checkout Session) : id, url, status, payment_status, amount_total, metadata, expires_at, payment_intent
 // deno-lint-ignore no-explicit-any
 type Sb = any;
 type Contexte = { sb: Sb; projet: Projet; corps: Record<string, unknown>; req: Request; base: string };
@@ -67,19 +73,21 @@ Deno.serve(async (req) => {
     const { data: auth, error: errAuth } = await sb.auth.getUser(jeton);
     const user = auth?.user;
     if (errAuth || !user) throw new Refus("Session expirée : reconnectez-vous", 401);
+    const estClient = Object.hasOwn(ACTIONS_CLIENT, action), estAgence = Object.hasOwn(ACTIONS_AGENCE, action);
+    if (!estClient && !estAgence) throw new Refus("Action inconnue");
+    if (estAgence && !(await estAdmin(sb, user.id))) throw new Refus("Action réservée à l'agence", 403);
     const projet = await chargerProjet(sb, String(corps.projet ?? ""));
     if (!projet) throw new Refus("Dossier introuvable", 404);
+    if (estClient && projet.client_id !== user.id) {
+      // Compte agence ouvert sur l'espace client (même navigateur) : message explicite. Autre compte : même
+      // réponse que pour un dossier inexistant (l'existence des numéros de dossier n'est pas révélée).
+      if (await estAdmin(sb, user.id)) {
+        throw new Refus("Action réservée au client du dossier : connectez-vous avec son adresse e-mail, dans une fenêtre privée ou sur un autre appareil.", 403);
+      }
+      throw new Refus("Dossier introuvable", 404);
+    }
     const c: Contexte = { sb, projet, corps, req, base: ORIGINES.includes(origine) ? origine : SITE_URL };
-
-    if (Object.hasOwn(ACTIONS_CLIENT, action)) {
-      if (projet.client_id !== user.id) throw new Refus("Dossier introuvable", 404);
-      return json({ ok: true, ...(await ACTIONS_CLIENT[action](c)) }, 200, cors);
-    }
-    if (Object.hasOwn(ACTIONS_AGENCE, action)) {
-      if (!(await estAdmin(sb, user.id))) throw new Refus("Action réservée à l'agence", 403);
-      return json({ ok: true, ...(await ACTIONS_AGENCE[action](c)) }, 200, cors);
-    }
-    throw new Refus("Action inconnue");
+    return json({ ok: true, ...(await (estClient ? ACTIONS_CLIENT : ACTIONS_AGENCE)[action](c)) }, 200, cors);
   } catch (e) {
     if (e instanceof Refus) return json({ ok: false, erreur: e.message }, e.statut, cors);
     console.error("espace", e);
@@ -118,31 +126,46 @@ const ACTIONS_CLIENT: Record<string, Action> = {
   },
 
   // Signature électronique simple : case « Bon pour accord », nom saisi, date, adresse IP, navigateur et
-  // empreinte SHA-256 du PDF signé (recalculée ici : un devis remplacé entre-temps ne peut pas être signé).
+  // empreinte SHA-256 du PDF signé. Elle porte sur la version et le montant affichés au client (corps.empreinte,
+  // corps.montant) : un devis remplacé depuis l'affichage, ou pendant l'envoi, est refusé (409, page relue).
   async signer({ sb, projet, corps, req }) {
+    if (projet.signe_le && String(corps.empreinte ?? "") === projet.signe_empreinte) return { deja: true };   // double envoi
     exigerAction(projet, "signer");
-    if (projet.signe_le) return { deja: true };
     if (!projet.devis_chemin || !projet.devis_empreinte) throw new Refus("Le devis n'est pas encore disponible");
     if (corps.accepte !== true) throw new Refus("Cochez « Bon pour accord » pour signer le devis");
     const nom = propre(String(corps.nom ?? ""), 120);
     if (nom.length < 3) throw new Refus("Saisissez votre nom et votre prénom");
+    if (String(corps.empreinte ?? "") !== projet.devis_empreinte || Number(corps.montant ?? 0) !== Number(projet.montant_cents ?? 0)) {
+      throw new Refus(DEVIS_CHANGE, 409);
+    }
     const empreinte = await empreinteFichier(sb, projet.devis_chemin);
-    if (empreinte !== projet.devis_empreinte) throw new Refus("Le devis a été mis à jour : rechargez la page avant de le signer", 409);
+    if (empreinte !== projet.devis_empreinte) throw new Refus(DEVIS_CHANGE, 409);
     const le = new Date();
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || null;
     const navigateur = propre(req.headers.get("user-agent") ?? "", 300) || null;
     const suivante = etapeSuivante(projet);
+    // Écriture conditionnelle : même étape, même version et même montant qu'à la lecture, pas encore signé.
     const { data, error } = await sb.from("projets").update({
       signe_le: le.toISOString(), signe_nom: nom, signe_ip: ip, signe_agent: navigateur, signe_empreinte: empreinte, etape: suivante,
-    }).eq("id", projet.id).is("signe_le", null).select("id");
+    }).eq("id", projet.id).eq("etape", projet.etape).is("signe_le", null)
+      .eq("devis_empreinte", empreinte).eq("montant_cents", projet.montant_cents).select("id");
     if (error) throw refusSql(error);
-    if (!data?.length) return { deja: true };
+    if (!data?.length) {
+      // Rien d'écrit : double envoi (déjà signé, même version) ou dossier modifié entre-temps par l'agence.
+      const relu = await chargerProjet(sb, projet.id);
+      if (relu?.signe_le && relu.signe_empreinte === empreinte && relu.devis_empreinte === empreinte && relu.montant_cents === projet.montant_cents) {
+        return { deja: true };
+      }
+      const change = !relu || relu.devis_empreinte !== empreinte || relu.montant_cents !== projet.montant_cents;
+      throw new Refus(change ? DEVIS_CHANGE : "Le dossier a changé entre-temps : vérifiez-le avant de signer", 409);
+    }
     const fichier = projet.devis_chemin.split("/").pop() ?? "";
     const preuve: [string, string][] = [["Signé le", dateParis(le)], ["Par", nom], ["Document", fichier], ["Empreinte SHA-256", empreinte]];
     await mailClient(projet, `Devis signé — dossier ${projet.id}`, "Devis signé", [
       `<h1 style="${H1}">Merci ${esc(projet.prenom)}, votre devis est signé.</h1>`,
       tableau(preuve),
-      p(`Prochaine étape&nbsp;: le paiement par carte bancaire de ${esc(montantTexte(projet))}, depuis votre espace client.`),
+      p("Prochaine étape&nbsp;: le paiement par carte bancaire, depuis votre espace client."),
+      tableau([["À régler", montantTexte(projet)]]),
       bouton("Payer en ligne", ESPACE_CLIENT),
     ].join(""));
     await mailAgence(projet, `Devis signé — dossier ${projet.id} (${projet.nom})`, "Devis signé", [
@@ -152,12 +175,30 @@ const ACTIONS_CLIENT: Record<string, Action> = {
     return { etape: suivante };
   },
 
-  // Paiement par carte : session Stripe Checkout, retour sur l'espace client.
-  async payer({ projet, base }) {
-    exigerAction(projet, "payer");
+  // Paiement par carte : une seule session Stripe Checkout ouverte par dossier (valable 1 h), réutilisée si le
+  // client clique de nouveau ; expirée et remplacée si elle ne correspond plus au devis. Retour sur l'espace client.
+  async payer({ sb, projet, base }) {
     if (projet.paye_le) return { deja: true };
+    exigerAction(projet, "payer");
     if (!projet.montant_cents) throw new Refus("Le montant n'est pas encore défini");
+    if (projet.signe_le && projet.signe_empreinte !== projet.devis_empreinte) {
+      throw new Refus("Le devis a été mis à jour : rechargez la page et signez la dernière version", 409);
+    }
     if (!STRIPE_KEY) throw new Refus("Le paiement en ligne n'est pas encore activé : nous revenons vers vous.", 503);
+    if (projet.paiement_session) {
+      const s = await stripe(`checkout/sessions/${projet.paiement_session}`, undefined, "GET", true);
+      if (s?.payment_status === "paid" && s.metadata?.projet === projet.id) {
+        // Déjà payé (retour sur le site manqué, webhook pas encore reçu) : paiement enregistré, aucune nouvelle session.
+        const r = await marquerPaye(sb, projet, String(s.payment_intent ?? s.id), Number(s.amount_total ?? 0), s.metadata?.empreinte ?? null);
+        if (r === "anomalie") throw new Refus("Un paiement a déjà été reçu pour une version précédente du devis : nous revenons vers vous.", 409);
+        return { deja: true };
+      }
+      if (s?.status === "open") {
+        if (s.url && Number(s.amount_total) === projet.montant_cents && s.metadata?.empreinte === projet.devis_empreinte &&
+          Number(s.expires_at ?? 0) - Date.now() / 1000 > 600) return { url: s.url };
+        await stripe(`checkout/sessions/${s.id}/expire`, {});   // échec (payée entre-temps) : refus, pas de 2e session
+      }
+    }
     const session = await stripe("checkout/sessions", {
       "mode": "payment",
       "payment_method_types[0]": "card",
@@ -169,24 +210,28 @@ const ACTIONS_CLIENT: Record<string, Action> = {
       "customer_email": projet.email,
       "client_reference_id": projet.id,
       "metadata[projet]": projet.id,
+      "metadata[empreinte]": projet.devis_empreinte ?? "",
       "payment_intent_data[metadata][projet]": projet.id,
       "payment_intent_data[description]": `Atomes studio — dossier ${projet.id}`,
       "locale": "fr",
+      "expires_at": String(Math.floor(Date.now() / 1000) + 3600),
       "success_url": `${base}/dossier/?paiement=ok&session={CHECKOUT_SESSION_ID}#${projet.id}`,
       "cancel_url": `${base}/dossier/?paiement=annule#${projet.id}`,
     });
+    await majProjet(sb, projet.id, { paiement_session: session.id });
     return { url: session.url };
   },
 
   // Retour de Stripe : vérification de la session (le webhook fait foi, ceci accélère l'affichage).
+  // Paiement qui ne correspond plus au devis en cours : { verification: true } (l'agence est alertée par le webhook).
   async paiement({ sb, projet, corps }) {
     if (projet.paye_le) return { paye: true };
     const id = String(corps.session ?? "");
     if (!/^cs_[A-Za-z0-9_]+$/.test(id) || !STRIPE_KEY) return { paye: false };
-    const s = await stripe(`checkout/sessions/${id}`, undefined, "GET");
-    if (s.metadata?.projet !== projet.id || s.payment_status !== "paid") return { paye: false };
-    await marquerPaye(sb, projet, String(s.payment_intent ?? s.id), Number(s.amount_total ?? 0));
-    return { paye: true };
+    const s = await stripe(`checkout/sessions/${id}`, undefined, "GET", true);
+    if (!s || s.metadata?.projet !== projet.id || s.payment_status !== "paid") return { paye: false };
+    const r = await marquerPaye(sb, projet, String(s.payment_intent ?? s.id), Number(s.amount_total ?? 0), s.metadata?.empreinte ?? null);
+    return r === "anomalie" ? { paye: false, verification: true } : { paye: true };
   },
 
   // Documents validés : étape suivante (dépôt avec l'option de suivi, sinon dossier clos).
@@ -252,9 +297,10 @@ const ACTIONS_AGENCE: Record<string, Action> = {
     return { posees: lignes.length };
   },
 
-  // Envoi du devis : PDF déposé dans <id>/agence/, montant à payer à la signature ; empreinte calculée ici.
+  // Envoi du devis : PDF déposé dans <id>/agence/ (un fichier par version, jamais écrasé), montant à payer à la
+  // signature ; empreinte calculée ici. Refusé une fois le dossier payé, même si le paiement arrive pendant l'envoi.
   async devis({ sb, projet, corps }) {
-    if (projet.paye_le) throw new Refus("Ce dossier est déjà payé : le devis ne peut plus être remplacé", 409);
+    if (projet.paye_le) throw new Refus(DEJA_PAYE, 409);
     const chemin = String(corps.chemin ?? "");
     if (!chemin.startsWith(`${projet.id}/agence/`) || !/\.pdf$/i.test(chemin) || chemin.includes("..") || chemin.split("/").length !== 3) {
       throw new Refus("Le devis doit être un PDF déposé dans les documents de l'agence");
@@ -263,12 +309,19 @@ const ACTIONS_AGENCE: Record<string, Action> = {
     if (!cents) throw new Refus("Montant invalide");
     const libelle = propre(String(corps.libelle ?? ""), 120) || "Montant du devis";
     const empreinte = await empreinteFichier(sb, chemin);
-    await majProjet(sb, projet.id, {
+    // Session de paiement de l'ancien devis expirée. Stripe injoignable : on continue (un paiement tardif de
+    // l'ancien devis ne serait pas enregistré et l'agence serait alertée).
+    let payee: Session = null;
+    try { payee = await fermerSession(projet); } catch (e) { console.error("stripe : session non expirée", projet.id, e); }
+    if (payee) throw new Refus("Le client vient de régler le devis en cours par carte : il ne peut plus être remplacé. Rechargez le dossier.", 409);
+    const { data: fait, error } = await sb.from("projets").update({
       devis_chemin: chemin, devis_empreinte: empreinte, devis_envoye_le: new Date().toISOString(),
-      montant_cents: cents, montant_libelle: libelle,
+      montant_cents: cents, montant_libelle: libelle, paiement_session: null,
       signe_le: null, signe_nom: null, signe_ip: null, signe_agent: null, signe_empreinte: null,
       etape: "signature",
-    });
+    }).eq("id", projet.id).is("paye_le", null).select("id");
+    if (error) throw refusSql(error);
+    if (!fait?.length) throw new Refus(DEJA_PAYE, 409);
     const maj: Projet = { ...projet, montant_cents: cents, montant_libelle: libelle };
     await mailClient(projet, `Votre devis est prêt — dossier ${projet.id}`, "Votre devis", [
       `<h1 style="${H1}">Bonjour ${esc(projet.prenom)}, votre devis est prêt.</h1>`,
@@ -297,26 +350,40 @@ const ACTIONS_AGENCE: Record<string, Action> = {
     return { etape: cle, mail: !!mail };
   },
 
-  // Option de suivi administratif (étapes 8 à 10) ; refusée par la base si le dossier est sur l'une d'elles.
+  // Option de suivi administratif (étapes 8 à 10). Activée sur un dossier qui a dépassé le dépôt sans y passer
+  // (dossier clos, par exemple) : le dossier est rouvert au dépôt. Désactivation refusée par la base si le dossier
+  // est sur l'une de ces étapes ; leurs dates sont conservées si l'option est retirée puis rétablie.
   async option({ sb, projet, corps }) {
     const suivi = corps.suivi === true;
-    await majProjet(sb, projet.id, { suivi_administratif: suivi });
-    return { suivi };
+    const o = ordreCourant(projet);
+    const rouvrir = suivi && !projet.suivi_administratif && projet.etapes.some((e) => e.optionnelle && e.ordre < o && !e.fait_le);
+    const depot = projet.etapes.find((e) => e.optionnelle)?.cle ?? "depot";
+    await majProjet(sb, projet.id, rouvrir ? { suivi_administratif: true, etape: depot } : { suivi_administratif: suivi });
+    return { suivi, etape: rouvrir ? depot : projet.etape };
   },
 
-  // Paiement reçu hors du site (exception) : même effet qu'un paiement par carte.
+  // Paiement reçu hors du site (exception) : même effet qu'un paiement par carte. Si le client vient de régler
+  // le devis en cours par carte (webhook pas encore reçu), c'est ce paiement qui est enregistré ; une session
+  // encore ouverte est expirée.
   async paye({ sb, projet }) {
     if (projet.paye_le) return { deja: true };
     if (!projet.montant_cents) throw new Refus("Montant non défini");
-    await marquerPaye(sb, projet, "manuel", projet.montant_cents);
-    return { paye: true };
+    let carte: Session = null;
+    try { carte = await fermerSession(projet); } catch (e) { console.error("stripe : session non vérifiée", projet.id, e); }
+    const r = carte
+      ? await marquerPaye(sb, projet, String(carte.payment_intent ?? carte.id), Number(carte.amount_total ?? 0), carte.metadata?.empreinte ?? null)
+      : await marquerPaye(sb, projet, "manuel", projet.montant_cents, projet.devis_empreinte);
+    return r === "paye" ? { paye: true, carte: !!carte } : { deja: true };
   },
 };
+
+const DEVIS_CHANGE = "Le devis a été mis à jour : lisez la nouvelle version avant de la signer";
+const DEJA_PAYE = "Ce dossier est déjà payé : le devis ne peut plus être remplacé";
 
 const MAILS_ETAPE: Record<string, { sujet: string; texte: string; bouton: string }> = {
   validation: { sujet: "Vos documents sont prêts", texte: "Vos documents sont disponibles dans votre espace client. Vérifiez-les, puis validez-les ou demandez une modification.", bouton: "Voir mes documents" },
   instruction: { sujet: "Votre dossier est déposé", texte: "Votre démarche administrative est déposée. Nous suivons son instruction et vous tenons informé.", bouton: "Suivre mon dossier" },
-  accordee: { sujet: "Démarche administrative validée", texte: "Bonne nouvelle : votre démarche administrative est validée. Les documents correspondants sont dans votre espace client.", bouton: "Ouvrir mon espace client" },
+  accordee: { sujet: "Démarche administrative validée", texte: "Bonne nouvelle&nbsp;: votre démarche administrative est validée. Les documents correspondants sont dans votre espace client.", bouton: "Ouvrir mon espace client" },
   clos: { sujet: "Dossier clos", texte: "Votre dossier est clos. Vos documents restent disponibles dans votre espace client. Merci de votre confiance.", bouton: "Ouvrir mon espace client" },
 };
 
@@ -329,12 +396,24 @@ async function webhookStripe(sb: Sb, req: Request, entete: string): Promise<Resp
   }
   try {
     const evt = JSON.parse(corps);
-    if (evt.type === "checkout.session.completed" || evt.type === "checkout.session.async_payment_succeeded") {
-      const s = evt.data?.object ?? {};
+    // Deux formats de destination : « instantané » (snapshot : checkout.session.completed, session dans data.object)
+    // et « léger » (thin : v1.checkout.session.completed, session à relire chez Stripe).
+    const type = String(evt.type ?? "").replace(/^v1\./, "");
+    let traite = false;
+    if (type === "checkout.session.completed" || type === "checkout.session.async_payment_succeeded") {
+      let s: Session = evt.data?.object ?? null;
+      const lie = evt.related_object;
+      if (!s && lie?.type === "checkout.session" && /^cs_[A-Za-z0-9_]+$/.test(String(lie.id ?? ""))) {
+        s = await stripe(`checkout/sessions/${lie.id}`, undefined, "GET");   // erreur → 500 : Stripe réessaiera
+      }
+      s = s ?? {};
       const projet = s.payment_status === "paid" && s.metadata?.projet ? await chargerProjet(sb, String(s.metadata.projet)) : null;
-      if (projet) await marquerPaye(sb, projet, String(s.payment_intent ?? s.id), Number(s.amount_total ?? 0));
-    }
-    return new Response(JSON.stringify({ recu: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (projet) {
+        await marquerPaye(sb, projet, String(s.payment_intent ?? s.id), Number(s.amount_total ?? 0), s.metadata?.empreinte ?? null, true);
+        traite = true;
+      }
+    } else console.warn("webhook stripe : événement ignoré", String(evt.type ?? ""));
+    return new Response(JSON.stringify({ recu: true, type: String(evt.type ?? ""), traite }), { status: 200, headers: { "Content-Type": "application/json" } });
   } catch (e) {
     console.error("webhook stripe", e);   // 500 : Stripe renverra l'événement plus tard
     return new Response(JSON.stringify({ erreur: "traitement impossible" }), { status: 500, headers: { "Content-Type": "application/json" } });
@@ -352,37 +431,103 @@ async function signatureStripeValide(corps: string, entete: string): Promise<boo
   return v1.some((v) => egalConstant(v, attendu));
 }
 
-// Idempotent : un seul enregistrement (et un seul jeu d'e-mails) même si Stripe et le retour du client arrivent ensemble.
-async function marquerPaye(sb: Sb, projet: Projet, ref: string, montantPaye: number): Promise<boolean> {
-  const { data, error } = await sb.from("projets").update({ paye_le: new Date().toISOString(), paiement_ref: ref })
-    .eq("id", projet.id).is("paye_le", null).select("id");
-  if (error) throw error;
-  if (!data?.length) return false;
-  if (projet.montant_cents && montantPaye && montantPaye !== projet.montant_cents) {
-    console.warn("montant payé différent du montant du devis", projet.id, montantPaye, projet.montant_cents);
+// Enregistre un paiement : paye_le, paiement_ref et passage en production en une seule écriture (après une erreur,
+// la nouvelle tentative de Stripe rattrape tout). Idempotent : un seul enregistrement et un seul jeu d'e-mails, même
+// si Stripe et le retour du client arrivent ensemble. Rien n'est enregistré pour un paiement par carte qui ne
+// correspond pas au devis en cours (montant ou version), ni pour un second paiement : l'agence est alertée par
+// e-mail quand `alerter` est vrai (webhook seulement, pour un seul envoi par paiement).
+async function marquerPaye(sb: Sb, projet: Projet, ref: string, montantPaye: number, empreintePayee: string | null,
+  alerter = false): Promise<"paye" | "deja" | "anomalie"> {
+  const carte = ref !== "manuel";
+  for (let essai = 0; essai < 3; essai++) {
+    if (projet.paye_le) {
+      if (carte && alerter && projet.paiement_ref !== ref) await alerteDoublon(projet, ref, montantPaye);
+      return "deja";
+    }
+    if (carte && (montantPaye !== projet.montant_cents || (empreintePayee || null) !== (projet.devis_empreinte || null))) {
+      if (alerter) await alerteEcart(projet, ref, montantPaye);
+      return "anomalie";
+    }
+    const valeurs: Record<string, unknown> = { paye_le: new Date().toISOString(), paiement_ref: ref };
+    if (projet.etape === "paiement") valeurs.etape = etapeSuivante(projet);
+    const { data, error } = await sb.from("projets").update(valeurs)
+      .eq("id", projet.id).eq("etape", projet.etape).is("paye_le", null).select("id");
+    if (error) throw refusSql(error);
+    if (data?.length) {
+      const montant = euros(montantPaye);
+      await mailClient(projet, `Paiement reçu — dossier ${projet.id}`, "Paiement reçu", [
+        `<h1 style="${H1}">Merci ${esc(projet.prenom)}, votre paiement est bien reçu.</h1>`,
+        p(`Nous avons reçu votre paiement de ${esc(montant)}. Nous lançons la production de vos documents et vous prévenons dès qu'ils sont prêts.`),
+        bouton("Suivre mon dossier", ESPACE_CLIENT),
+      ].join(""));
+      await mailAgence(projet, `Paiement reçu — dossier ${projet.id} (${projet.nom}) : ${montant}`, "Paiement reçu", [
+        p(`${esc(projet.prenom)} ${esc(projet.nom)} a payé ${esc(montant)}. Le dossier passe à la production des documents.`),
+        tableau([["Montant", montant], ["Référence", ref === "manuel" ? "Paiement reçu hors du site (marqué par l'agence)" : ref]]),
+      ].join(""));
+      return "paye";
+    }
+    // Rien d'écrit : payé entre-temps, ou étape changée par l'agence. Nouvel essai sur l'état relu.
+    const relu = await chargerProjet(sb, projet.id);
+    if (!relu) return "deja";
+    projet = relu;
   }
-  if (projet.etape === "paiement") await majProjet(sb, projet.id, { etape: etapeSuivante(projet) });
-  const montant = euros(montantPaye || projet.montant_cents || 0);
-  await mailClient(projet, `Paiement reçu — dossier ${projet.id}`, "Paiement reçu", [
-    `<h1 style="${H1}">Merci ${esc(projet.prenom)}, votre paiement est bien reçu.</h1>`,
-    p(`Nous avons reçu votre paiement de ${esc(montant)}. Nous lançons la production de vos documents et vous prévenons dès qu'ils sont prêts.`),
-    bouton("Suivre mon dossier", ESPACE_CLIENT),
-  ].join(""));
-  await mailAgence(projet, `Paiement reçu — dossier ${projet.id} (${projet.nom}) : ${montant}`, "Paiement reçu", [
-    p(`${esc(projet.prenom)} ${esc(projet.nom)} a payé ${esc(montant)}. Le dossier passe à la production des documents.`),
-    tableau([["Montant", montant], ["Référence", ref === "manuel" ? "Paiement reçu hors du site (marqué par l'agence)" : ref]]),
-  ].join(""));
-  return true;
+  throw new Error(`paiement du dossier ${projet.id} : enregistrement impossible (dossier modifié pendant l'écriture)`);
 }
 
-async function stripe(chemin: string, params?: Record<string, string>, methode = "POST") {
+// Paiement par carte qui ne correspond pas au devis en cours (session d'un devis remplacé, autre montant).
+async function alerteEcart(projet: Projet, ref: string, montantPaye: number): Promise<void> {
+  const montant = euros(montantPaye);
+  console.error("paiement à vérifier : ne correspond pas au devis en cours", projet.id, ref, montantPaye, projet.montant_cents);
+  await mailAgence(projet, `Paiement à vérifier — dossier ${projet.id} (${projet.nom}) : ${montant}`, "Paiement à vérifier", [
+    p(`Un paiement par carte de ${esc(montant)} a été reçu pour ce dossier, mais il ne correspond pas au devis en cours (montant ou version du devis différents)&nbsp;: il n'a pas été enregistré et le dossier n'a pas avancé.`),
+    tableau([["Montant payé", montant], ["Référence Stripe", ref], ["Devis en cours", projet.montant_cents ? montantTexte(projet) : "Aucun"]]),
+    p("Remboursez ce paiement depuis le tableau de bord Stripe ou, s'il convient, enregistrez-le avec « Marquer comme payé » dans l'espace agence."),
+  ].join(""));
+}
+
+// Paiement par carte reçu pour un dossier déjà payé, avec une autre référence.
+async function alerteDoublon(projet: Projet, ref: string, montantPaye: number): Promise<void> {
+  const montant = euros(montantPaye);
+  console.error("paiement en double", projet.id, ref, projet.paiement_ref);
+  if (!projet.paiement_ref || projet.paiement_ref === "manuel") {
+    await mailAgence(projet, `Paiement à vérifier — dossier ${projet.id} (${projet.nom}) : ${montant}`, "Paiement à vérifier", [
+      p(`Un paiement par carte de ${esc(montant)} a été reçu pour ce dossier, déjà marqué payé hors du site. S'il s'agit du même règlement, il n'y a rien à faire&nbsp;; sinon, remboursez-le depuis le tableau de bord Stripe.`),
+      tableau([["Montant payé", montant], ["Référence Stripe", ref]]),
+    ].join(""));
+  } else {
+    await mailAgence(projet, `Paiement en double — dossier ${projet.id} (${projet.nom}) : ${montant}`, "Paiement en double", [
+      p(`Ce dossier a été payé une seconde fois par carte (${esc(montant)}). Remboursez ce second paiement depuis le tableau de bord Stripe.`),
+      tableau([["Second paiement", ref], ["Paiement enregistré", projet.paiement_ref]]),
+    ].join(""));
+  }
+}
+
+// Session de paiement mémorisée, avant un nouveau devis ou un paiement hors du site : expirée si elle est encore
+// ouverte. Renvoie la session si elle est déjà payée pour le devis en cours (paiement par carte à ne pas perdre).
+async function fermerSession(projet: Projet): Promise<Session> {
+  if (!projet.paiement_session || !STRIPE_KEY) return null;
+  const s = await stripe(`checkout/sessions/${projet.paiement_session}`, undefined, "GET", true);
+  if (!s) return null;
+  if (s.status === "open") {
+    await stripe(`checkout/sessions/${s.id}/expire`, {});
+    return null;
+  }
+  const conforme = s.payment_status === "paid" && s.metadata?.projet === projet.id && Number(s.amount_total) === projet.montant_cents &&
+    (s.metadata?.empreinte ?? null) === (projet.devis_empreinte ?? null);
+  return conforme ? s : null;
+}
+
+// API Stripe, version épinglée (le comportement ne dépend pas de la version par défaut du compte).
+// `absentNul` : une ressource introuvable (404) renvoie null au lieu d'un refus.
+async function stripe(chemin: string, params?: Record<string, string>, methode = "POST", absentNul = false): Promise<Session> {
   const r = await fetch(`https://api.stripe.com/v1/${chemin}`, {
     method: methode,
-    headers: { "Authorization": `Bearer ${STRIPE_KEY}`, "Content-Type": "application/x-www-form-urlencoded" },
+    headers: { "Authorization": `Bearer ${STRIPE_KEY}`, "Content-Type": "application/x-www-form-urlencoded", "Stripe-Version": STRIPE_VERSION },
     body: params ? new URLSearchParams(params).toString() : undefined,
     signal: AbortSignal.timeout(15000),
   });
   const j = await r.json().catch(() => ({}));
+  if (r.status === 404 && absentNul) return null;
   if (!r.ok) {
     console.error("stripe", r.status, j?.error?.message);
     throw new Refus("Le paiement en ligne est momentanément indisponible. Réessayez dans quelques minutes.", 502);
@@ -473,7 +618,7 @@ function euros(cents: number): string {
 }
 
 function montantTexte(projet: Projet): string {
-  return `${projet.montant_libelle || "Montant du devis"} : ${euros(projet.montant_cents ?? 0)}`;
+  return `${projet.montant_libelle || "Montant du devis"}\u00a0: ${euros(projet.montant_cents ?? 0)}`;
 }
 
 function dateParis(d: Date): string {

@@ -378,6 +378,12 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .case input::after{content:'';width:8px;height:8px;background:var(--ink);transform:scale(0);transition:transform .12s}
 .case input:checked::after{transform:scale(1)}
 .case input:focus-visible{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:3px}
+/* Contraste forcé (Windows) : l'état coché ne repose plus sur la seule couleur de fond, que le système remplace */
+@media (forced-colors:active){
+  .case input:checked::after{forced-color-adjust:none;background:CanvasText}
+  .choix-opt input:checked + span{forced-color-adjust:none;background:Highlight;color:HighlightText;border-color:Highlight}
+  .choix-opt input:focus-visible + span{outline-color:CanvasText}
+}
 .montant{margin:0;display:flex;justify-content:space-between;align-items:baseline;gap:8px 16px;flex-wrap:wrap;font:400 14px/1.5 var(--font);color:rgba(var(--ink-rgb),.75)}
 .montant strong{font:600 18px var(--font);color:var(--white)}
 .notice:focus{outline:none}
