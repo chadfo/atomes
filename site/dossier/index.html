@@ -5,17 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Espace client — Atomes studio</title>
 <meta name="robots" content="noindex, nofollow">
-<meta name="description" content="Espace client Atomes studio : suivi de votre dossier, devis à signer, paiement, documents et pièces à déposer.">
+<meta name="description" content="Espace client Atomes studio : avancement de votre dossier, documents échangés et historique de vos échanges.">
 <meta name="theme-color" content="#171512">
 <link rel="icon" type="image/png" href="../favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/site.css?v=2">
+<link rel="stylesheet" href="../assets/css/site.css?v=3">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" defer></script>
 <script src="../assets/js/config.js" defer></script>
 <script src="../assets/js/atom-logo.js" defer></script>
-<script src="../assets/js/dossier.js?v=2" defer></script>
+<script src="../assets/js/dossier.js?v=3" defer></script>
 </head>
 <body>
 <div class="page">
@@ -79,7 +79,8 @@
           <h1 data-d-titre></h1>
           <p class="espace-intro" data-d-sous></p>
         </div>
-        <div class="notice" data-notice role="status" aria-live="polite" tabindex="-1" hidden></div>
+        <!-- Particulier, devis signé, dans le délai : lien légal vers la page de rétractation (action/) -->
+        <p class="retractation" data-renoncer hidden></p>
 
         <section class="bloc" aria-labelledby="lbl-avancement">
           <div class="lbl bloc-lbl" id="lbl-avancement">Avancement</div>
@@ -100,13 +101,7 @@
         <section class="bloc" aria-labelledby="lbl-docs-client">
           <div class="lbl bloc-lbl" id="lbl-docs-client">Vos documents</div>
           <ul class="docs" role="list" data-docs-client></ul>
-          <p class="docs-vide" data-vide-client hidden>Aucune pièce déposée pour le moment.</p>
-          <label class="dropzone">
-            <span class="dropzone-cta">+ Ajouter des fichiers</span>
-            <input type="file" class="sr-only" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.pdf" data-depot aria-describedby="depot-err">
-            <span class="dropzone-info" data-depot-info>Photos (JPG, PNG, WEBP, HEIC) et PDF, 50 Mo max par fichier</span>
-          </label>
-          <div class="f-err" id="depot-err" data-depot-err role="alert" hidden></div>
+          <p class="docs-vide" data-vide-client hidden>Aucun document pour le moment. Les pièces jointes de vos e-mails apparaîtront ici.</p>
         </section>
 
         <section class="bloc" aria-labelledby="lbl-demande">

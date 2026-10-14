@@ -323,7 +323,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 }
 
 /* ==========================================================================
-   Espace client (dossier/index.html)
+   Espace client (dossier/index.html) : consultation seule depuis le parcours v3 (timeline, échanges, documents,
+   récapitulatif) ; le client agit par e-mail et sur la page d'action (action/index.html, plus bas).
    ========================================================================== */
 .espace{width:100%;max-width:760px;margin:0 auto;padding:clamp(40px,6vw,72px) var(--pad-x);box-sizing:border-box;display:flex;flex-direction:column;gap:40px}
 .espace > [data-vue="dossier"]{display:flex;flex-direction:column;gap:40px}
@@ -344,8 +345,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .bloc-lbl{color:rgba(var(--ink-rgb),.4);letter-spacing:.14em}
 /* Timeline */
 .timeline{list-style:none;margin:0;padding:0}
-.timeline li{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:0 16px;align-items:start;padding:14px 0;border-top:1px solid rgba(var(--ink-rgb),.16)}
-.timeline li:last-child{border-bottom:1px solid rgba(var(--ink-rgb),.16)}
+.timeline > li{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:0 16px;align-items:start;padding:14px 0;border-top:1px solid rgba(var(--ink-rgb),.16)}
+.timeline > li:last-child{border-bottom:1px solid rgba(var(--ink-rgb),.16)}
 .tl-mark{width:10px;height:10px;margin-top:5px;border:1px solid rgba(var(--ink-rgb),.45);box-sizing:border-box}
 .tl-fait .tl-mark{background:var(--ink);border-color:var(--ink)}
 .tl-en_cours .tl-mark{border-color:var(--white)}
@@ -355,24 +356,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .tl-desc{margin:4px 0 0;font:400 13.5px/1.55 var(--font);color:rgba(var(--ink-rgb),.6)}
 .tl-date{font:500 11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),.5);white-space:nowrap;padding-top:3px}
 .tl-en_cours .tl-date{color:var(--white)}
-/* Timeline v2 : numéro d'étape, étape en cours, actions du client (questions, signature, paiement, validation) */
+/* Timeline : numéro d'étape, étape en cours ; case à cocher (.case), montant et bloc d'action (page d'action) */
 .tl-num{display:inline-block;min-width:26px;margin-right:6px;font:500 11.5px var(--mono);letter-spacing:.08em;color:rgba(var(--ink-rgb),.45)}
 .tl-statut{display:inline-block;margin-top:8px;font:500 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--white)}
-.tl-action{grid-column:2 / -1;margin-top:16px;display:flex;flex-direction:column;gap:22px;padding:18px 20px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),.16)}
-.tl-action .form-actions{padding-top:0}
-.tl-action .link-more{align-self:flex-start;background:transparent;border:0;padding:4px 0;cursor:pointer}
-.tl-action-intro{margin:0;font:400 14px/1.6 var(--font);color:rgba(var(--ink-rgb),.8);text-wrap:pretty}
-.action-bloc,.questions,.signature{display:flex;flex-direction:column;gap:16px}
+.action-bloc{display:flex;flex-direction:column;gap:16px}
 .action-bloc:empty{display:none}
-.question{margin:0;padding:0;border:0;min-width:0;display:flex;flex-direction:column;gap:10px}
-.question-txt{padding:0;font:500 14.5px/1.5 var(--font);color:var(--ink)}
-.choix{display:flex;flex-wrap:wrap;gap:8px}
-.choix-opt{position:relative;cursor:pointer}
-.choix-opt input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
-.choix-opt span{display:inline-block;border:1px solid rgba(var(--ink-rgb),.25);padding:11px 14px;font:500 11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),.8);transition:background .15s,border-color .15s}
-.choix-opt:hover span{border-color:rgba(var(--ink-rgb),.75)}
-.choix-opt input:checked + span{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.choix-opt input:focus-visible + span{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:3px}
 .case{display:flex;gap:12px;align-items:flex-start;font:400 14px/1.5 var(--font);color:var(--ink);cursor:pointer}
 .case input{-webkit-appearance:none;appearance:none;flex:none;width:16px;height:16px;margin:2px 0 0;border:1px solid rgba(var(--ink-rgb),.6);background:transparent;display:grid;place-content:center;cursor:pointer}
 .case input::after{content:'';width:8px;height:8px;background:var(--ink);transform:scale(0);transition:transform .12s}
@@ -381,19 +369,20 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 /* Contraste forcé (Windows) : l'état coché ne repose plus sur la seule couleur de fond, que le système remplace */
 @media (forced-colors:active){
   .case input:checked::after{forced-color-adjust:none;background:CanvasText}
-  .choix-opt input:checked + span{forced-color-adjust:none;background:Highlight;color:HighlightText;border-color:Highlight}
-  .choix-opt input:focus-visible + span{outline-color:CanvasText}
 }
 .montant{margin:0;display:flex;justify-content:space-between;align-items:baseline;gap:8px 16px;flex-wrap:wrap;font:400 14px/1.5 var(--font);color:rgba(var(--ink-rgb),.75)}
 .montant strong{font:600 18px var(--font);color:var(--white)}
 .notice:focus{outline:none}
 .dossier-etat{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .dossier-etat .tl-statut{margin-top:0}
-/* Échanges : réponses aux questions, demandes de modification */
-.echanges{list-style:none;margin:0;padding:0}
-.echanges li{display:flex;flex-direction:column;gap:6px;padding:14px 0;border-top:1px solid rgba(var(--ink-rgb),.16)}
-.echanges li:last-child{border-bottom:1px solid rgba(var(--ink-rgb),.16)}
-.echanges .doc-meta{margin:0}
+/* Échanges (questions et réponses, messages du client, demandes de modification) et messages du client (espace
+   agence) : enfants directs seulement, une liste de pièces jointes peut s'y imbriquer */
+.echanges,.messages{list-style:none;margin:0;padding:0}
+.echanges > li,.messages > li{display:flex;flex-direction:column;gap:6px;padding:14px 0;border-top:1px solid rgba(var(--ink-rgb),.16)}
+.echanges > li:last-child,.messages > li:last-child{border-bottom:1px solid rgba(var(--ink-rgb),.16)}
+.echanges .doc-meta,.messages .doc-meta{margin:0}
+.messages .badge{align-self:flex-start}
+.messages button.link-more{align-self:flex-start;background:transparent;border:0;padding:0;cursor:pointer}
 .echange-q{margin:0;font:500 14px/1.5 var(--font)}
 .echange-r{margin:0;font:400 14px/1.6 var(--font);color:rgba(var(--ink-rgb),.75);white-space:pre-line;overflow-wrap:anywhere}
 /* Documents */
@@ -411,6 +400,65 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .recap-liste dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
 .espace-pied{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding-top:24px;border-top:1px solid var(--line)}
 /* ==========================================================================
+   Parcours v3 : espace client en lecture seule, page d'action (action/index.html) et éléments partagés avec
+   l'espace agence (virement, messages du client, rétractation)
+   ========================================================================== */
+/* Bouton indisponible (aria-disabled) : il reste focalisable et son clic explique ce qui manque */
+.btn[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
+.btn[aria-disabled="true"]:hover{background:var(--ink)}
+.btn--ghost[aria-disabled="true"]:hover{background:transparent;border-color:rgba(var(--ink-rgb),.35)}
+.espace .link-more:focus-visible{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:3px}
+/* Information en lecture seule sous l'étape en cours (espace client) : questions posées par e-mail, devis envoyé,
+   virement attendu, documents à valider, rétractation */
+.info-etape{grid-column:2 / -1;margin-top:16px;display:flex;flex-direction:column;gap:14px;padding:18px 20px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),.16);font:400 14px/1.6 var(--font);color:rgba(var(--ink-rgb),.8)}
+.info-etape p{margin:0;text-wrap:pretty}
+.info-etape .doc-meta{margin-top:2px}
+.info-questions{margin:0;padding:0 0 0 18px;display:flex;flex-direction:column;gap:10px;color:var(--ink)}
+.info-virement{display:flex;flex-direction:column;gap:10px}
+/* Coordonnées de virement : liste à deux colonnes (une seule sous 640 px) */
+.virement{margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 24px;font:400 14px/1.5 var(--font)}
+.virement dt{font:500 11.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:rgba(var(--ink-rgb),.5);padding-top:2px}
+.virement dd{margin:0;font:500 14px/1.5 var(--mono);color:var(--ink);overflow-wrap:anywhere}
+/* Pièces jointes d'un message */
+.pieces{list-style:none;margin:2px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.pieces li{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:2px 16px;font:400 13.5px/1.5 var(--font);color:rgba(var(--ink-rgb),.75)}
+.pieces li > span{min-width:0;overflow-wrap:anywhere}
+.pieces button.link-more{background:transparent;border:0;padding:0;cursor:pointer;white-space:nowrap}
+/* Bloc légal : information de rétractation, lien « Renoncer au contrat ici », formulaire type */
+.retractation{margin:0;padding:16px 18px;border:1px solid rgba(var(--ink-rgb),.25);font:400 13.5px/1.65 var(--font);color:rgba(var(--ink-rgb),.75);text-wrap:pretty;box-sizing:border-box;max-width:100%}
+.retractation p{margin:0}
+.retractation p + p{margin-top:10px}
+.retractation a{color:var(--ink)}
+.formulaire-type{white-space:pre-line;overflow-wrap:anywhere}
+.lien-legal{font:500 11.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink);text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+.lien-legal:hover{color:var(--white)}
+.lien-legal:focus-visible{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:3px}
+/* Page d'action : un lien reçu par e-mail, une action (signer le devis, valider les documents, renoncer au contrat) */
+.action-page > [data-vue="page"]{display:flex;flex-direction:column;gap:40px}
+.action-page h1:focus{outline:none} /* focus programmatique sur le titre d'un message plein écran */
+.action-page .notice{margin-top:0}
+.action-reessayer{margin-top:28px}
+.action-bloc > .btn{align-self:flex-start}
+.action-form{display:flex;flex-direction:column;gap:16px}
+.action-form .form-actions{padding-top:0}
+.action-texte{margin:0;font:400 15px/1.65 var(--font);color:rgba(var(--ink-rgb),.8);text-wrap:pretty}
+.action-texte a{color:var(--ink)}
+.action-ok{display:flex;flex-direction:column;gap:14px;padding:22px 24px;border:1px solid rgba(var(--ink-rgb),.25);font:400 14px/1.6 var(--font);color:rgba(var(--ink-rgb),.8)}
+.action-ok:focus{outline:none} /* focus programmatique : annoncé, sans contour natif */
+.action-ok p{margin:0}
+.action-ok-titre{font:500 18px/1.5 var(--font);color:var(--ink);text-wrap:pretty}
+.action-ok .recap-liste{gap:6px 24px}
+/* Timeline compacte (lecture seule) */
+.timeline--compacte > li{padding:10px 0}
+.timeline--compacte .tl-title{font-size:14px}
+.timeline--compacte .tl-courante .tl-title{color:var(--white)}
+@media (max-width:640px){
+  .virement{grid-template-columns:minmax(0,1fr);gap:2px}
+  .virement dd{margin-bottom:8px}
+  .info-etape{padding:16px}
+  .action-ok{padding:18px}
+}
+/* ==========================================================================
    Espace agence (admin/index.html) : liste des dossiers, fiche, actions de l'agence
    ========================================================================== */
 .espace.agence{max-width:1040px}
@@ -426,11 +474,17 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .admin-type{font:400 14px/1.4 var(--font);color:rgba(var(--ink-rgb),.75)}
 .admin-etape{font:500 11px/1.5 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:rgba(var(--ink-rgb),.6)}
 .badge{justify-self:end;white-space:nowrap;font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:6px 9px;border:1px solid rgba(var(--ink-rgb),.3);color:rgba(var(--ink-rgb),.7)}
-.badge--agence{border-color:var(--ink);color:var(--white)}
+.badge--agence,.badge--verifier{border-color:var(--ink);color:var(--white)} /* --verifier : message du client à vérifier */
 .badge--client{border-style:dashed}
 .badge--clos{border-color:rgba(var(--ink-rgb),.16);color:rgba(var(--ink-rgb),.45)}
 .admin-liens{display:flex;flex-wrap:wrap;gap:8px 22px;margin:14px 0 0}
-.admin-etapes li{grid-template-columns:12px minmax(0,1fr) auto auto}
+/* Bandeau d'alertes de la fiche (rétractation, e-mail légal à renvoyer, messages à vérifier ou incomplets) */
+.alertes{display:flex;flex-direction:column;gap:12px}
+.alerte-renvoi{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px}
+.alerte-renvoi > span{flex:1 1 260px;min-width:0}
+.alerte-renvoi .btn{padding:11px 16px}
+.alertes[hidden]{display:none}
+.admin-etapes > li{grid-template-columns:12px minmax(0,1fr) auto auto}
 .admin-etapes .link-more{background:transparent;border:0;padding:3px 0;cursor:pointer;white-space:nowrap}
 .admin-etapes .link-more:disabled{opacity:.35;cursor:not-allowed}
 .admin-etapes .is-option .tl-title,.admin-etapes .is-option .tl-num{color:rgba(var(--ink-rgb),.3)}
@@ -445,7 +499,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   .badge{grid-row:1;grid-column:2;align-self:start}
 }
 @media (max-width:640px){
-  .admin-etapes li{grid-template-columns:12px minmax(0,1fr)}
+  .admin-etapes > li{grid-template-columns:12px minmax(0,1fr)}
   .admin-etapes .link-more,.admin-etapes .tl-statut{grid-column:2;justify-self:start}
 }
 /* Écran « Demande envoyée » : numéro de dossier (quand la fonction « demande » est active) */
@@ -454,6 +508,6 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 @media (max-width:640px){
   .recap-liste{grid-template-columns:1fr;gap:4px}
   .recap-liste dd{margin-bottom:8px}
-  .timeline li{grid-template-columns:12px minmax(0,1fr);}
+  .timeline > li{grid-template-columns:12px minmax(0,1fr);}
   .tl-date{grid-column:2;padding-top:4px}
 }

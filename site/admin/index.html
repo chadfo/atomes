@@ -11,11 +11,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="stylesheet" href="../assets/css/site.css?v=3">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" defer></script>
 <script src="../assets/js/config.js" defer></script>
 <script src="../assets/js/atom-logo.js" defer></script>
-<script src="../assets/js/admin.js" defer></script>
+<script src="../assets/js/admin.js?v=3" defer></script>
 </head>
 <body>
 <div class="page">
@@ -98,6 +98,7 @@
           <p class="admin-liens" data-d-liens></p>
         </div>
         <div class="notice" data-notice role="status" aria-live="polite" tabindex="-1" hidden></div>
+        <div class="notice alertes" data-alertes hidden></div>
 
         <section class="bloc" aria-labelledby="lbl-av">
           <div class="lbl bloc-lbl" id="lbl-av">Avancement</div>
@@ -110,6 +111,13 @@
             </div>
             <div class="form-actions"><button type="submit" class="btn btn--ghost" data-btn-note>Enregistrer la note</button></div>
           </form>
+        </section>
+
+        <section class="bloc" aria-labelledby="lbl-messages">
+          <div class="lbl bloc-lbl" id="lbl-messages">Messages du client</div>
+          <p class="f-hint">Les réponses du client à nos e-mails s'ajoutent ici, avec leurs pièces jointes. Un message «&nbsp;À vérifier&nbsp;» vient d'une autre adresse que celle du dossier, ou n'a pas pu être authentifié&nbsp;: rattachez-le au dossier s'il vient bien du client, sinon supprimez-le.</p>
+          <ul class="echanges messages" role="list" data-messages></ul>
+          <p class="docs-vide" data-messages-vide>Aucun message reçu pour le moment.</p>
         </section>
 
         <section class="bloc" aria-labelledby="lbl-q">
@@ -148,10 +156,10 @@
                 <input class="input" id="a-libelle" maxlength="120" placeholder="Acompte de 40 %" data-libelle>
               </div>
             </div>
-            <p class="f-hint" data-devis-aide>Le client reçoit un e-mail, lit le devis, le signe en ligne puis paie ce montant par carte.</p>
+            <p class="f-hint" data-devis-aide>Le client reçoit le devis par e-mail (PDF joint) et le signe depuis le lien reçu, puis règle ce montant par virement avec le numéro du dossier en référence.</p>
             <div class="f-err" data-err-devis role="alert" hidden></div>
             <div class="form-actions">
-              <button type="button" class="btn btn--ghost" data-btn-paye hidden>Marquer comme payé</button>
+              <button type="button" class="btn btn--ghost" data-btn-paye hidden>Virement reçu</button>
               <button type="submit" class="btn" data-btn-devis>Envoyer le devis au client</button>
             </div>
           </form>
@@ -180,6 +188,7 @@
 
         <section class="bloc" aria-labelledby="lbl-modifs" data-bloc-modifs hidden>
           <div class="lbl bloc-lbl" id="lbl-modifs">Modifications demandées</div>
+          <p class="f-hint" data-modifs-aide hidden>Le dossier reste à l'étape «&nbsp;Validation de vos documents&nbsp;». Pour envoyer les documents corrigés&nbsp;: repassez-le à «&nbsp;Production de vos documents&nbsp;», déposez-les, puis «&nbsp;Documents prêts&nbsp;: demander la validation&nbsp;».</p>
           <ul class="echanges" role="list" data-modifs></ul>
         </section>
 

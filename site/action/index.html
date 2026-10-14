@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Votre dossier — Atomes studio</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Atomes studio : signature du devis, validation des documents ou rétractation, depuis le lien reçu par e-mail.">
+<meta name="theme-color" content="#171512">
+<link rel="icon" type="image/png" href="../favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css?v=3">
+<script src="../assets/js/config.js" defer></script>
+<script src="../assets/js/atom-logo.js" defer></script>
+<script src="../assets/js/action.js?v=3" defer></script>
+</head>
+<body>
+<div class="page">
+
+  <nav class="nav" aria-label="Navigation principale">
+    <a class="brand" href="../index.html"><atom-logo></atom-logo><span>atomes<span class="brand-tld">.studio</span></span></a>
+    <input type="checkbox" id="nav-toggle" class="nav-tgl" aria-label="Menu" aria-controls="nav-links">
+    <label for="nav-toggle" class="nav-btn"><span></span><span></span><span></span></label>
+    <div class="nav-links" id="nav-links">
+      <a href="../index.html">Accueil</a>
+      <a href="../projets.html">Projets</a>
+      <a href="../a-propos.html">À propos</a>
+      <a href="../contact.html">Contact</a>
+      <a href="../devis.html">Devis</a>
+    </div>
+  </nav>
+
+  <main class="main">
+    <section class="espace action-page">
+      <div class="lbl">Votre dossier</div>
+
+      <!-- Chargement : lecture des informations du lien (seule requête faite sans clic) -->
+      <div data-vue="chargement">
+        <p class="espace-intro">Chargement…</p>
+      </div>
+
+      <!-- Lien inutilisable (invalide, expiré), service indisponible : message plein écran -->
+      <div data-vue="erreur" hidden>
+        <h1 tabindex="-1" data-err-titre>Lien invalide</h1>
+        <p class="espace-intro" data-err-msg></p>
+        <p class="espace-intro">Une question&nbsp;? Écrivez-nous à <a href="mailto:contact@atomes.studio">contact@atomes.studio</a>.</p>
+        <div class="form-actions action-reessayer" data-reessayer-zone hidden>
+          <button type="button" class="btn btn--ghost" data-reessayer>Réessayer</button>
+        </div>
+      </div>
+
+      <!-- Page du lien : signature du devis, documents à valider ou rétractation -->
+      <div data-vue="page" hidden>
+        <div class="dossier-head">
+          <div class="num" data-d-num></div>
+          <h1 tabindex="-1" data-d-titre></h1>
+          <p class="espace-intro" data-d-sous></p>
+        </div>
+        <div class="notice" data-notice role="alert" tabindex="-1" hidden></div>
+
+        <section class="bloc" aria-labelledby="lbl-avancement">
+          <div class="lbl bloc-lbl" id="lbl-avancement">Avancement</div>
+          <ol class="timeline timeline--compacte" role="list" data-timeline></ol>
+        </section>
+
+        <section class="bloc" aria-labelledby="lbl-mode">
+          <div class="lbl bloc-lbl" id="lbl-mode" data-mode-lbl></div>
+          <div class="action-bloc" data-mode></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div>ATOMES.STUDIO — ARCHITECTURE DU DÉTAIL<br>SIMON CHARLES — ARCHITECTE HMONP · INGÉNIEUR GÉNIE CIVIL ET URBANISME<br><a href="../dossier/">ESPACE CLIENT <span aria-hidden="true">→</span></a></div>
+    <div class="footer-contact">
+      <span class="footer-line"><i class="ico ico-house" aria-hidden="true"></i><span class="sr-only">Adresse — </span>31 RUE CHEVALIER PAUL, 83000 TOULON</span>
+      <a class="footer-line" href="mailto:contact@atomes.studio"><i class="ico ico-mail" aria-hidden="true"></i><span class="sr-only">Mail — </span>CONTACT@ATOMES.STUDIO</a>
+      <a class="footer-line" href="https://www.instagram.com/atomes.studio" target="_blank" rel="noopener"><i class="ico ico-instagram" aria-hidden="true"></i><span class="sr-only">Instagram — </span>@ATOMES.STUDIO</a>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

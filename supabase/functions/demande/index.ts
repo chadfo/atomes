@@ -5,15 +5,17 @@
 //      la timeline est créée par le déclencheur SQL ;
 //   2. dépose les pièces jointes dans le bucket privé « dossiers/<id>/client/ » ;
 //   3. crée le compte client (ou rattache un compte existant) ;
-//   4. envoie deux e-mails via Resend : accusé de réception au client,
-//      notification à l'agence (même objet que l'ancien FormSubmit).
+//   4. envoie deux e-mails via Resend : accusé de réception au client (avec la timeline ;
+//      sa réponse va à l'adresse de réponse du dossier et s'ajoute au dossier, voir la
+//      fonction « espace »), notification à l'agence (même objet que l'ancien FormSubmit).
 // Une fois le dossier créé, la réponse est toujours ok:true ; les échecs partiels
 // (pièce non déposée, e-mail non envoyé, compte non créé) sont signalés dedans :
 //   { ok: true, id: "261012173615", fichiers: 2, fichiers_echoues: [], compte: true,
 //     mails: { client: true, agence: true } }
 //
-// Secrets (Edge Functions → Secrets) : RESEND_API_KEY ; facultatifs MAIL_AGENCE,
-// MAIL_FROM, SITE_URL, ORIGINES_AUTORISEES. SUPABASE_URL et
+// Secrets (Edge Functions → Secrets) : RESEND_API_KEY ; JETON_SECRET et REPONSES_DOMAINE
+// (mêmes valeurs que pour la fonction « espace » ; sans eux, le client répond à MAIL_AGENCE) ;
+// facultatifs MAIL_AGENCE, MAIL_FROM, SITE_URL, ORIGINES_AUTORISEES. SUPABASE_URL et
 // SUPABASE_SERVICE_ROLE_KEY sont fournis automatiquement.
 // =============================================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -28,6 +30,9 @@ const MAIL_FROM = Deno.env.get("MAIL_FROM") ?? "Atomes studio <contact@atomes.st
 const SITE_URL = (Deno.env.get("SITE_URL") ?? "https://atomes.studio").replace(/\/$/, "");
 const ORIGINES = (Deno.env.get("ORIGINES_AUTORISEES") ??
   `${SITE_URL},https://www.atomes.studio,http://localhost:3000`).split(",").map((s) => s.trim());
+// Adresse de réponse du dossier (même calcul que la fonction « espace ») : secret d'au moins 32 caractères.
+const JETON_SECRET = (Deno.env.get("JETON_SECRET") ?? "").trim().length >= 32 ? (Deno.env.get("JETON_SECRET") ?? "").trim() : "";
+const REPONSES_DOMAINE = (Deno.env.get("REPONSES_DOMAINE") ?? "").trim().toLowerCase().replace(/^@/, "");
 
 const MAX_FICHIERS = 10;
 const MAX_TOTAL = 10 * 1024 * 1024;          // 10 Mo au total, comme le formulaire
@@ -230,9 +235,9 @@ Deno.serve(async (req) => {
       });
       mails.client = await envoyerMail({
         to: d.email,
-        replyTo: MAIL_AGENCE,
+        replyTo: await adresseReponse(id),
         subject: `Votre demande est bien reçue — dossier ${id}`,
-        html: htmlClient(id, d, deposes, echoues),
+        html: htmlClient(id, d, deposes, echoues, await timeline(sb, id)),
       });
     } else {
       console.warn("RESEND_API_KEY absent : aucun e-mail envoyé pour le dossier", id);
@@ -324,6 +329,30 @@ function json(corps: unknown, statut: number, cors: Record<string, string>): Res
   return new Response(JSON.stringify(corps), { status: statut, headers: { ...cors, "Content-Type": "application/json; charset=utf-8" } });
 }
 
+// Adresse de réponse du dossier : d<id>-<mac>@REPONSES_DOMAINE, mac = 20 premiers caractères hexadécimaux de
+// HMAC-SHA256(JETON_SECRET, "reponse:" + id) (même calcul que la fonction « espace », qui reçoit les réponses).
+// Sans configuration : MAIL_AGENCE.
+async function adresseReponse(id: string): Promise<string> {
+  if (!JETON_SECRET || !REPONSES_DOMAINE) return MAIL_AGENCE;
+  const cle = await crypto.subtle.importKey("raw", new TextEncoder().encode(JETON_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", cle, new TextEncoder().encode(`reponse:${id}`)));
+  return `d${id}-${Array.from(mac, (x) => x.toString(16).padStart(2, "0")).join("").slice(0, 20)}@${REPONSES_DOMAINE}`;
+}
+
+// Timeline du dossier créé (étapes copiées du modèle par le déclencheur SQL) ; vide en cas d'échec de lecture.
+type Etape = { cle: string; ordre: number; libelle: string; statut: string; optionnelle: boolean; fait_le: string | null; debut_le: string | null };
+// deno-lint-ignore no-explicit-any
+async function timeline(sb: any, id: string): Promise<string> {
+  try {
+    const { data, error } = await sb.from("etapes").select("cle, ordre, libelle, statut, optionnelle, fait_le, debut_le").eq("projet_id", id).order("ordre");
+    if (error) throw error;
+    return timelineHtml(((data ?? []) as Etape[]).filter((e) => !e.optionnelle).sort((a, b) => a.ordre - b.ordre));
+  } catch (e) {
+    console.error("timeline du dossier", id, e);
+    return "";
+  }
+}
+
 async function envoyerMail(m: { to: string; subject: string; html: string; replyTo?: string }): Promise<boolean> {
   try {
     const r = await fetch("https://api.resend.com/emails", {
@@ -383,9 +412,11 @@ const p = (s: string) => `<p style="margin:0 0 14px;font-size:15px;line-height:2
 const titreBloc = (s: string, marge = "24px 0 6px") => `<div style="${KICKER};margin:${marge}">${esc(s)}</div>`;
 const alerte = (s: string) => `<p style="margin:0 0 14px;padding:12px 14px;border:1px solid #d8896b;font-size:14px;line-height:21px;color:#8a4a2c">${s}</p>`;
 
+// Tableau libellé / valeur (lignes vides omises). Libellé sur 38 % de la largeur, à la ligne si besoin : sur un
+// téléphone, la valeur garde la place de s'afficher (même tableau que la fonction « espace »).
 function tableau(lignes: [string, string][]): string {
   const tr = lignes.filter(([, v]) => v).map(([k, v]) =>
-    `<tr><td style="padding:7px 12px 7px 0;${KICKER};vertical-align:top;white-space:nowrap">${esc(k)}</td><td style="padding:7px 0;font-size:14px;line-height:21px;vertical-align:top">${esc(v).replace(/\n/g, "<br>")}</td></tr>`).join("");
+    `<tr><td style="padding:7px 12px 7px 0;${KICKER};width:38%;vertical-align:top">${esc(k)}</td><td style="padding:7px 0;font-size:14px;line-height:21px;vertical-align:top;word-break:break-word">${esc(v).replace(/\n/g, "<br>")}</td></tr>`).join("");
   return `<table style="border-collapse:collapse;width:100%;margin:8px 0 18px">${tr}</table>`;
 }
 
@@ -410,18 +441,41 @@ function listeFichiers(deposes: Depose[], echoues: string[]): string {
   return ok + rate;
 }
 
-function htmlClient(id: string, d: Demande, deposes: Depose[], echoues: string[]): string {
+// Timeline : marque (✓ faite, ● en cours, ○ à venir), numéro, libellé, date ; étape en cours en gras
+// (même présentation que les e-mails de la fonction « espace »).
+function timelineHtml(etapes: Etape[]): string {
+  if (!etapes.length) return "";
+  const lignes = etapes.map((e, i) => {
+    const marque = e.statut === "fait" ? "✓" : e.statut === "en_cours" ? "●" : "○";
+    const date = e.statut === "fait" && e.fait_le ? `le ${dateCourte(e.fait_le)}` : e.statut === "en_cours" && e.debut_le ? `depuis le ${dateCourte(e.debut_le)}` : "";
+    const style = e.statut === "en_cours" ? "font-weight:bold;color:#141414" : e.statut === "a_venir" ? "color:#8d8d8d" : "color:#3a3a3a";
+    const td = (s: string, plus = "") => `<td style="padding:5px 10px 5px 0;vertical-align:top;${style}${plus}">${s}</td>`;
+    return `<tr>${td(marque, ";width:14px")}${td(String(i + 1), ";width:18px")}${td(esc(e.libelle))}${td(esc(date), ";padding-right:0;text-align:right;white-space:nowrap")}</tr>`;
+  }).join("");
+  return `<div style="${KICKER};margin:28px 0 6px">Avancement de votre dossier</div><table role="presentation" style="border-collapse:collapse;width:100%;margin:0 0 18px;font-size:14px;line-height:20px">${lignes}</table>`;
+}
+
+// « 12 octobre » (« 1er octobre »), heure de Paris.
+function dateCourte(v: string): string {
+  return new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long" }).format(new Date(v)).replace(/^1(\s)/, "1er$1");
+}
+
+function htmlClient(id: string, d: Demande, deposes: Depose[], echoues: string[], timelineDossier = ""): string {
   const espace = `${SITE_URL}/dossier/`;
   return gabarit("Demande reçue", [
     `<h1 style="margin:0 0 18px;font-size:24px;line-height:30px;font-weight:bold">Merci ${esc(d.prenom)}, votre demande est bien reçue.</h1>`,
     p(`Votre dossier porte le numéro <strong>${id}</strong>. Nous étudions votre projet et revenons vers vous sous 48&nbsp;h ouvrées.`),
-    p(`Vous pouvez suivre l'avancement de votre dossier, consulter les documents que nous vous transmettrons et déposer des pièces dans votre espace client. Connectez-vous avec cette adresse e-mail (${esc(d.email)})&nbsp;: un lien de connexion vous est envoyé à chaque fois, sans mot de passe.`),
+    p(`Vous pouvez suivre l'avancement de votre dossier et consulter les documents que nous vous transmettrons dans votre espace client. Connectez-vous avec cette adresse e-mail (${esc(d.email)})&nbsp;: un lien de connexion vous est envoyé à chaque fois, sans mot de passe.`),
     `<p style="margin:0 0 26px"><a href="${espace}" style="display:inline-block;background:#171512;color:#ffffff;text-decoration:none;font-size:12px;line-height:16px;letter-spacing:2px;text-transform:uppercase;padding:14px 24px">Accéder à mon dossier</a></p>`,
     titreBloc("Votre demande"),
     tableau([["Type de projet", aff(d, d.type, "type")], ["Documents souhaités", d.docs.map((x) => aff(d, x, "documents")).join(", ")], ["Commune", d.commune], ["Démarrage souhaité", aff(d, d.calendrier, "calendrier")]]),
     titreBloc("Pièces jointes reçues", "0 0 6px"),
     listeFichiers(deposes, echoues),
-    echoues.length ? p("Vous pourrez déposer à nouveau ces pièces dans votre espace client.") : "",
+    echoues.length ? p("Vous pouvez nous renvoyer ces pièces en répondant à cet e-mail.") : "",
+    p("Une question&nbsp;? Répondez simplement à cet e-mail."),
+    timelineDossier,
+    // Pied de chaque e-mail au client (même lien que les e-mails de la fonction « espace »)
+    p(`<a href="${espace}" style="color:#171512">Suivre mon dossier en ligne</a>`),
   ].join(""));
 }
 
