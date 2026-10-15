@@ -6,3 +6,6 @@ supabase/.temp/
 supabase/.branches/
 .env
 .env.*
+
+# Identifiants locaux : ne jamais publier
+creds.json
