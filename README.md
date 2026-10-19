@@ -206,13 +206,22 @@ dossier), signe le devis et valide ses documents sur la page d'action ouverte pa
 par virement, avec le numéro de dossier pour référence. L'espace client ne sert plus qu'à consulter. Pas de
 Yousign ni de Stripe.
 
+**Moteur de l'agence (19 octobre 2026).** Le client écrit à contact@atomes.studio (adresse de réponse de tous les
+e-mails) ou à simon@atomes.studio. Le moteur, programme Python de l'ordinateur de l'agence (dossier
+`atomes-moteur`, à côté de ce dépôt, jamais publié ; mode d'emploi dans son README), lit ces deux boîtes par IMAP
+toutes les 5 minutes, sans rien y changer, et range les e-mails des clients dans leur dossier : `messages`
+(`resend_id = imap:<Message-ID>`), pièces dans `<id>/client/`, réponses aux questions, demandes de modification.
+Mêmes règles que la fonction `espace` (texte sans la citation, pièces, limites) ; vérification de l'expéditeur par
+sa signature DKIM, contrôlée par le moteur. Le webhook Resend ne sert plus qu'aux réponses envoyées aux anciennes
+adresses de dossier (`r.atomes.studio`), le temps de la transition.
+
 - `supabase/migrations/0001_espace_client.sql` : tables `projets` (une ligne par demande, identifiant
   `AAMMJJHHMMSS` à l'heure de Paris, ex. `261012173615`), `modele_etapes` et `etapes` (timeline), `admins` ;
   règles de sécurité (un client ne voit que ses dossiers, l'agence voit tout) ; bucket privé `dossiers`
   (`<id>/client/` pièces du client, `<id>/agence/` documents fournis par l'agence).
 - `supabase/functions/demande/index.ts` : fonction appelée par le formulaire de devis (devis.html). Crée le dossier, dépose les
   pièces, crée ou rattache le compte client (connexion par lien e-mail), envoie l'accusé de réception au
-  client (avec la timeline ; adresse de réponse du dossier) et la notification à l'agence (même objet
+  client (avec la timeline ; réponse à contact@) et la notification à l'agence (même objet
   `Nouveau projet — …` qu'avant) via Resend.
 - `supabase/migrations/0004_parcours_client.sql` : parcours v2. 11 étapes (`modele_etapes`) : Demande reçue ·
   Traitement de votre demande (répondre aux questions) · Production de votre devis · Validation de votre devis
@@ -235,12 +244,14 @@ Yousign ni de Stripe.
   l'éditeur Supabase : petites fonctions utilitaires dupliquées, pas de module partagé). Quatre entrées :
   - actions de l'agence, avec sa session : `questions`, `devis` (PDF joint à l'e-mail, lien de signature),
     `etape` (lien de validation à l'étape « Validation de vos documents »), `option`, `paye` (« Virement reçu »),
-    `rattacher` et `supprimer_message` (messages à vérifier ; `rattacher` reprend aussi un traitement interrompu),
+    `rattacher` et `supprimer_message` (messages à vérifier ; `rattacher` reprend aussi un traitement interrompu ;
+    message du moteur : marqué vérifié et à traiter, le moteur range ses pièces à son passage suivant),
     `renvoyer` (confirmation du contrat ou accusé de rétractation qui n'a pas pu partir) ; chaque action qui écrit
     au client renvoie `mail` (faux si l'e-mail n'est pas parti, ce que l'espace agence signale) ;
   - actions par lien, sans compte, avec le jeton reçu par e-mail : `infos`, `signer`, `valider`, `renoncer` ;
   - `infos_espace`, pour l'espace client, en lecture seule : coordonnées du virement, lien de rétractation ;
-  - webhook Resend `email.received` (signature Svix vérifiée sur le corps brut) : l'e-mail est lu par l'API de
+  - webhook Resend `email.received` (anciennes adresses de réponse, pendant la transition vers le moteur ;
+    signature Svix vérifiée sur le corps brut) : l'e-mail est lu par l'API de
     Resend (clé `RESEND_RECEPTION_KEY` si la réception est dans un compte Resend à part, sinon `RESEND_API_KEY`),
     rattaché au dossier par son adresse de réponse et enregistré dans `messages`. Il est vérifié si son expéditeur
     est l'adresse du dossier (adresse simple, la même dans le champ `from` de Resend et dans l'en-tête From) et si
@@ -253,7 +264,7 @@ Yousign ni de Stripe.
     de Resend reprend là où il s'est arrêté. Limites par dossier et par 24 h (30 messages, 20 à vérifier, 200 Mo
     de pièces), un avis « Message à vérifier » par heure au plus ; texte et HTML reçus analysés en temps linéaire.
 
-  E-mails Resend : timeline du dossier dans chaque e-mail au client, adresse de réponse propre au dossier, lien
+  E-mails Resend : timeline du dossier dans chaque e-mail au client, adresse de réponse contact@ (`MAIL_AGENCE`), lien
   « Suivre mon dossier en ligne » ; liens d'action toujours vers `SITE_URL` (jamais vers l'origine de la
   requête). « Verify JWT » désactivé : session, jeton ou signature de Resend vérifiés dans la fonction.
   Signature : nom, date, IP (celle ajoutée par la plateforme, chaîne X-Forwarded-For gardée), navigateur, montant,
@@ -266,10 +277,10 @@ Yousign ni de Stripe.
   expiration ; `d` : début de l'empreinte du devis pour signer, du contrat signé pour renoncer, soit
   `SHA-256(date de signature + empreinte du devis signé)`) ; placé dans le fragment, il n'est jamais envoyé au
   serveur des pages. Durées : signer 30 jours (un nouveau devis invalide les anciens liens), valider 90 jours,
-  renoncer jusqu'à la fin du délai de rétractation (le lien d'un contrat précédent ne vaut plus). Adresse de réponse : `d<id>-<mac>@<REPONSES_DOMAINE>` (`r.atomes.studio`), `mac` =
-  20 premiers caractères hexadécimaux de `HMAC-SHA256(JETON_SECRET, "reponse:" + id)`, calculée à l'identique
-  par `demande` et `espace`. Sans `JETON_SECRET` : pas de lien ; sans `REPONSES_DOMAINE` : réponses à
-  contact@atomes.studio.
+  renoncer jusqu'à la fin du délai de rétractation (le lien d'un contrat précédent ne vaut plus). Ancienne adresse de
+  réponse, encore reçue par le webhook pendant la transition : `d<id>-<mac>@<REPONSES_DOMAINE>` (`r.atomes.studio`),
+  `mac` = 20 premiers caractères hexadécimaux de `HMAC-SHA256(JETON_SECRET, "reponse:" + id)`. Sans `JETON_SECRET` :
+  pas de lien ; sans `REPONSES_DOMAINE` : le webhook n'ajoute plus rien.
 - `site/assets/js/config.js` : URL Supabase, clé anon, URL des fonctions `demande` (`apiUrl`) et `espace`
   (`espaceUrl`, aussi pour la page d'action). Vide = le formulaire de devis envoie via FormSubmit comme avant ;
   rempli = fonction « demande », FormSubmit en secours si elle ne répond pas.
@@ -290,7 +301,8 @@ Yousign ni de Stripe.
   `?demo=signer-pro`, `valider`, `renoncer` ; ses textes juridiques sont une copie de ceux de la fonction.
 - `site/admin/` + `assets/js/admin.js` : espace agence (compte inscrit dans `admins`). Liste filtrable (en
   cours, à traiter, clos), fiche : étapes (« Passer ici »), option de suivi, note pour le client, questions (et
-  retrait d'une question sans réponse), messages du client (« À vérifier » : rattacher au dossier ou supprimer),
+  retrait d'une question sans réponse), messages du client (« À vérifier » : rattacher au dossier ou supprimer ;
+  messages du moteur : « En attente du moteur », signature DKIM),
   envoi du devis (un fichier par version, `<id>/agence/devis-<id>-<AAMMJJHHMMSS>.pdf`, jamais écrasé ; montant,
   libellé), état de la signature (démarrage anticipé, rétractation), référence et « Virement reçu », documents,
   demande de validation, modifications demandées. Chaque opération reste attachée au dossier ouvert au moment
@@ -304,6 +316,7 @@ Yousign ni de Stripe.
 
 ## Suite prévue
 
+1. Moteur de l'agence : modules suivants (plans de situation et de masse, ArchiCAD 27), voir `atomes-moteur/README.md`.
 1. Avis clients (quand la fiche Google existera).
 2. Anti-spam (Cloudflare Turnstile) si nécessaire.
 3. Textes juridiques du parcours, médiateur de la consommation, devis et conditions générales : à faire valider

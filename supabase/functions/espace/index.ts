@@ -8,20 +8,26 @@
 //   Agence  : questions, devis (envoi du devis à signer), etape, option (suivi administratif),
 //             paye (« Virement reçu »), rattacher et supprimer_message (messages à vérifier), renvoyer (confirmation
 //             du contrat ou accusé de rétractation qui n'a pas pu partir)
-//   Resend  : webhook email.received (réponse du client à l'adresse de réponse du dossier : texte et pièces
+//   Resend  : webhook email.received (réponse du client à l'ancienne adresse de réponse du dossier,
+//             d<id>-…@REPONSES_DOMAINE, encore reçue pour les e-mails envoyés avant le moteur : texte et pièces
 //             jointes ajoutés au dossier), requête signée (en-têtes svix-id, svix-timestamp, svix-signature)
+//   Moteur  : le moteur de l'agence (dossier atomes-moteur, sur l'ordinateur de l'agence) lit contact@ et simon@
+//             et ajoute au dossier les e-mails des clients (messages « imap:<Message-ID> ») ; « rattacher » un tel
+//             message le marque à traiter, le moteur range ses pièces jointes à son passage suivant
+// Les e-mails au client ont pour adresse de réponse MAIL_AGENCE (contact@) : le client écrit toujours à l'agence.
 // Appel : POST JSON { action, projet, … } avec Authorization: Bearer <session Supabase>, ou { action, jeton, … }
 // pour les liens d'action. « Verify JWT » est désactivé : la session ou le jeton sont vérifiés ici (Resend
 // n'envoie ni l'un ni l'autre). Les transitions d'étapes passent par projets.etape : le déclencheur SQL
 // recalcule la timeline (migration 0004) ; table messages, colonnes demarrage_anticipe_* et retracte_* :
 // migration 0005.
 //
-// Secrets : RESEND_API_KEY, SB_SECRET_KEY, JETON_SECRET (au moins 32 caractères aléatoires, le même que pour
-// la fonction « demande »), RESEND_WEBHOOK_SECRET (whsec_… du webhook Resend), REPONSES_DOMAINE (ex.
-// r.atomes.studio), VIREMENT_IBAN, VIREMENT_BIC, VIREMENT_TITULAIRE ; facultatifs MAIL_AGENCE, MAIL_FROM,
-// SITE_URL, ORIGINES_AUTORISEES (mêmes valeurs que pour la fonction « demande ») et RESEND_RECEPTION_KEY (clé du
-// compte Resend qui reçoit les réponses, s'il est distinct de celui des envois : SETUP-ESPACE-CLIENT.md § 7).
-// Sans JETON_SECRET : aucun lien d'action (refus 503) et les réponses des clients arrivent à MAIL_AGENCE.
+// Secrets : RESEND_API_KEY, SB_SECRET_KEY, JETON_SECRET (au moins 32 caractères aléatoires), VIREMENT_IBAN,
+// VIREMENT_BIC, VIREMENT_TITULAIRE ; RESEND_WEBHOOK_SECRET (whsec_… du
+// webhook Resend) et REPONSES_DOMAINE (ex. r.atomes.studio), le temps de recevoir les réponses aux anciens
+// e-mails ; facultatifs MAIL_AGENCE, MAIL_FROM, SITE_URL, ORIGINES_AUTORISEES (mêmes valeurs que pour la fonction
+// « demande ») et RESEND_RECEPTION_KEY (clé du compte Resend qui reçoit les réponses, s'il est distinct de celui
+// des envois : SETUP-ESPACE-CLIENT.md § 7).
+// Sans JETON_SECRET : aucun lien d'action (refus 503). Sans REPONSES_DOMAINE : le webhook Resend n'ajoute plus rien.
 // Les liens placés dans les e-mails mènent toujours à SITE_URL (jamais à l'origine de la requête, par exemple un
 // essai depuis localhost) ; seuls les liens renvoyés à la page qui appelle suivent son origine (ORIGINES).
 // =============================================================================
@@ -432,7 +438,7 @@ const ACTIONS_CLIENT: Record<string, Action> = {
 
 const ACTIONS_AGENCE: Record<string, Action> = {
   // Questions au client (réponse libre, ou propositions données en exemple) : un seul e-mail ; le client répond
-  // à l'e-mail et sa réponse s'ajoute au dossier (webhook Resend).
+  // à l'e-mail (adresse de réponse contact@) et le moteur de l'agence ajoute sa réponse au dossier.
   async questions({ sb, projet, corps }) {
     const liste = (Array.isArray(corps.questions) ? corps.questions : []) as Record<string, unknown>[];
     const lignes = liste.map((x) => ({
@@ -444,13 +450,12 @@ const ACTIONS_AGENCE: Record<string, Action> = {
     const { error } = await sb.from("questions").insert(lignes.map((x) => ({ projet_id: projet.id, question: x.question, choix: x.choix.length ? x.choix : null })));
     if (error) throw error;
     const plusieurs = lignes.length > 1;
-    const rattachee = (await adresseDossier(projet.id)) !== MAIL_AGENCE;
     const mail = await mailClient(projet, `${plusieurs ? "Quelques questions" : "Une question"} sur votre dossier ${projet.id}`, plusieurs ? "Nos questions" : "Notre question", [
       `<h1 style="${H1}">Bonjour ${esc(projet.prenom)},</h1>`,
       p(`Pour affiner votre demande, nous avons ${plusieurs ? "quelques questions" : "une question"}&nbsp;:`),
       `<ul style="margin:0 0 18px;padding-left:18px;font-size:15px;line-height:24px">${lignes.map((x) =>
         `<li style="margin:0 0 8px">${esc(x.question)}${x.choix.length ? `<br><span style="color:#7a7368">Par exemple&nbsp;: ${esc(x.choix.join(" · "))}</span>` : ""}</li>`).join("")}</ul>`,
-      p(rattachee ? "Répondez simplement à cet e-mail&nbsp;: votre réponse s'ajoute à votre dossier." : "Répondez simplement à cet e-mail."),
+      p("Répondez simplement à cet e-mail&nbsp;: votre réponse s'ajoute à votre dossier."),
       p("Vous pouvez y joindre des photos ou des documents PDF."),
     ].join(""));
     return { posees: lignes.length, mail };
@@ -618,6 +623,17 @@ const ACTIONS_AGENCE: Record<string, Action> = {
   // vérifié dont le traitement s'est interrompu (« Traitement incomplet ») : traitement repris là où il s'est arrêté.
   async rattacher({ sb, projet, corps }) {
     const message = await lireMessage(sb, projet, corps.message);
+    // Message lu par le moteur de l'agence (contact@ ou simon@) : ses pièces jointes ne sont pas chez Resend mais
+    // dans la copie gardée par le moteur. Il est marqué vérifié et à traiter : le moteur range ses pièces, répond
+    // aux questions et note la demande de modification à son passage suivant (toutes les 5 minutes).
+    if (duMoteur(message)) {
+      if (message.verifie) return message.traite === false ? { moteur: true, reprise: true } : { deja: true };
+      const { data, error } = await sb.from("messages").update({ verifie: true, traite: false, traitement_le: null })
+        .eq("id", message.id).eq("verifie", false).select("id");
+      if (error) throw error;
+      if (!data?.length) return { deja: true };
+      return { rattache: true, moteur: true };
+    }
     if (message.verifie) {
       if (message.traite !== false) return { deja: true };
       let bilan: Bilan | null;
@@ -984,6 +1000,11 @@ async function lireMessage(sb: Sb, projet: Projet, v: unknown): Promise<Message>
   return versMessage(data);
 }
 
+// Message enregistré par le moteur de l'agence (lecture de contact@ et simon@) : identifiant « imap:<Message-ID> ».
+function duMoteur(message: Message): boolean {
+  return typeof message.resend_id === "string" && message.resend_id.startsWith("imap:");
+}
+
 function versMessage(ligne: Json): Message {
   return { ...ligne, pieces: Array.isArray(ligne?.pieces) ? ligne.pieces : [] } as Message;
 }
@@ -1345,6 +1366,8 @@ async function macReponse(id: string): Promise<string> {
   return hex(await hmac(JETON_SECRET, `reponse:${id}`)).slice(0, 20);
 }
 
+// Ancienne adresse de réponse du dossier (plus donnée comme adresse de réponse ; encore reçue par le webhook tant
+// que REPONSES_DOMAINE est configuré).
 async function adresseDossier(id: string): Promise<string> {
   return JETON_SECRET && REPONSES_DOMAINE ? `d${id}-${await macReponse(id)}@${REPONSES_DOMAINE}` : MAIL_AGENCE;
 }
@@ -1687,12 +1710,12 @@ async function envoyerMail(m: { to: string[]; subject: string; html: string; rep
   }
 }
 
-// E-mail au client : réponse à l'adresse du dossier (sa réponse s'ajoute au dossier), timeline et lien vers
-// l'espace client en pied. Un e-mail qui échoue ne fait jamais échouer l'action (déjà enregistrée) : le résultat
-// (faux si l'e-mail n'est pas parti) est renvoyé à l'appelant, qui le signale.
+// E-mail au client : réponse à MAIL_AGENCE (contact@ ; le moteur de l'agence ajoute la réponse au dossier),
+// timeline et lien vers l'espace client en pied. Un e-mail qui échoue ne fait jamais échouer l'action (déjà
+// enregistrée) : le résultat (faux si l'e-mail n'est pas parti) est renvoyé à l'appelant, qui le signale.
 async function mailClient(projet: Projet, sujet: string, titre: string, corps: string, pieces: PieceJointe[] = []): Promise<boolean> {
   return envoyerMail({
-    to: [projet.email], replyTo: await adresseDossier(projet.id), subject: sujet, attachments: pieces,
+    to: [projet.email], replyTo: MAIL_AGENCE, subject: sujet, attachments: pieces,
     html: gabarit(titre, corps + timelineHtml(projet) + p(`<a href="${ESPACE_CLIENT}" style="color:#171512">Suivre mon dossier en ligne</a>`)),
   });
 }

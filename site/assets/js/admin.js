@@ -299,7 +299,11 @@
   // Message vérifié dont le traitement s'est interrompu (pièces jointes, réponse) : plus aucun traitement en cours
   // depuis 10 minutes (bail de la fonction) ; l'agence le reprend (« Reprendre le traitement »).
   const BAIL = 10 * 60000;
-  const incomplet = (m) => !!m.verifie && m.traite === false && (!m.traitement_le || Date.now() - new Date(m.traitement_le).getTime() > BAIL);
+  // Message lu par le moteur de l'agence (e-mails reçus sur contact@ et simon@, identifiant « imap:… ») : vérifié et
+  // pas encore traité (rattaché par l'agence, ou traitement interrompu), le moteur le termine à son passage suivant.
+  const duMoteur = (m) => String(m.resend_id || '').startsWith('imap:');
+  const enAttenteMoteur = (m) => !!m.verifie && m.traite === false && duMoteur(m);
+  const incomplet = (m) => !duMoteur(m) && !!m.verifie && m.traite === false && (!m.traitement_le || Date.now() - new Date(m.traitement_le).getTime() > BAIL);
   const incomplets = (d) => (d.messages || []).filter(incomplet);
   // E-mails légaux au client qui n'ont pas pu partir et peuvent être renvoyés : confirmation du contrat (signé, pas
   // rétracté), accusé de rétractation (rétractation enregistrée).
@@ -658,17 +662,29 @@
   });
 
   // ---------- Messages du client ----------
-  // Réponses du client à nos e-mails, ajoutées au dossier par la fonction « espace ». Un message « à vérifier » vient
+  // E-mails du client, ajoutés au dossier par le moteur de l'agence (reçus sur contact@ et simon@) ou, pour les
+  // réponses aux anciennes adresses de réponse des dossiers, par la fonction « espace ». Un message « à vérifier » vient
   // d'une autre adresse que celle du dossier ou n'a pas passé l'authentification : rattaché, il est traité comme une
   // réponse du client (visible dans son espace, pièces rangées, questions en attente répondues, demande de modification
   // à l'étape « validation ») ; sinon il est supprimé.
   const enCours = new Map();   // message → action en cours : ses boutons restent occupés même si la liste est redessinée
   const adresse = (s) => { const x = String(s || '').match(/<([^>]+)>/); return (x ? x[1] : String(s || '')).trim().toLowerCase(); };
-  const RESULTATS = { pass: 'validé', fail: 'échec', gray: 'non concluant', processing_failed: 'erreur de contrôle', unknown: 'inconnu' };
+  const RESULTATS = {
+    pass: 'validé', fail: 'échec', gray: 'non concluant', processing_failed: 'erreur de contrôle', unknown: 'inconnu',
+    none: 'absente', temperror: 'erreur temporaire (DNS)', permerror: 'illisible'
+  };
   const resultat = (v) => { const s = typeof v === 'string' ? v : v && typeof v === 'object' ? String(v.result || v.status || '') : ''; return RESULTATS[s] || s || 'inconnu'; };
+  // Contrôle fait par le moteur (controle « moteur ») : signature DKIM seulement, rien si l'adresse diffère (non
+  // contrôlée) ; sinon résultats SPF, DKIM et DMARC fournis par Resend.
+  const authentification = (m) => {
+    const a = m.auth && typeof m.auth === 'object' ? m.auth : null;
+    if (!a) return 'Authentification inconnue';
+    if (a.controle === 'moteur') return a.dkim ? 'Signature DKIM : ' + resultat(a.dkim) + (typeof a.dkim_domaine === 'string' && a.dkim_domaine ? ' (' + a.dkim_domaine + ')' : '') : '';
+    return 'Authentification : ' + [['spf', 'SPF'], ['dkim', 'DKIM'], ['dmarc', 'DMARC']].map(([k, n]) => n + ' ' + resultat(a[k])).join(', ');
+  };
   const pourquoi = (d, m) => [
     adresse(m.expediteur) !== adresse(d.email) ? 'Adresse différente de celle du dossier (' + d.email + ')' : '',
-    m.auth && typeof m.auth === 'object' ? 'Authentification : ' + [['spf', 'SPF'], ['dkim', 'DKIM'], ['dmarc', 'DMARC']].map(([k, n]) => n + ' ' + resultat(m.auth[k])).join(', ') : 'Authentification inconnue'
+    authentification(m)
   ].filter(Boolean).join(' · ');
 
   const rendreMessages = (d) => {
@@ -681,9 +697,11 @@
       const de = m.expediteur || 'expéditeur inconnu', quand = fmtHeure(m.recu_le);
       if (!m.verifie) li.appendChild(el('span', 'badge badge--verifier', 'À vérifier'));
       if (incomplet(m)) li.appendChild(el('span', 'badge badge--verifier', 'Traitement incomplet'));
+      if (enAttenteMoteur(m)) li.appendChild(el('span', 'badge badge--verifier', 'En attente du moteur'));
       li.appendChild(el('span', 'doc-meta', 'Reçu le ' + quand + ' · ' + de));
       if (!m.verifie) li.appendChild(el('span', 'doc-meta', pourquoi(d, m)));
       if (incomplet(m)) li.appendChild(el('span', 'doc-meta', 'Le traitement de ce message s’est interrompu : pièces jointes peut-être non rangées, réponse peut-être non enregistrée.'));
+      if (enAttenteMoteur(m)) li.appendChild(el('span', 'doc-meta', 'Le moteur de l’agence range ses pièces jointes et enregistre la réponse à son prochain passage (toutes les 5 minutes, ordinateur de l’agence allumé).'));
       if (m.sujet) li.appendChild(el('p', 'echange-q', m.sujet));
       const texte = String(m.texte || '').trim(), complet = String(m.texte_complet || '').trim();
       li.appendChild(el('p', 'echange-r', texte || complet || 'Message sans texte'));
@@ -755,6 +773,11 @@
   // absente ou d'un autre format est ignorée.
   const bilanRattachement = (j) => {
     if (j.deja) return 'Ce message était déjà rattaché au dossier.';
+    // Message du moteur : rattaché tout de suite, pièces rangées par le moteur à son passage suivant.
+    if (j.moteur === true) {
+      return j.reprise === true ? 'Le moteur de l’agence termine le traitement de ce message à son prochain passage.'
+        : 'Message rattaché au dossier : le moteur de l’agence range ses pièces jointes et enregistre la réponse à son prochain passage (toutes les 5 minutes, ordinateur de l’agence allumé).';
+    }
     const nb = (v) => (Array.isArray(v) ? v.length : Number.isInteger(v) ? v : 0);
     const p = nb(j.pieces), q = nb(j.questions), faits = [];
     if (p) faits.push(p > 1 ? p + ' pièces jointes rangées' : '1 pièce jointe rangée');

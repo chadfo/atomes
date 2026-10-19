@@ -12,7 +12,8 @@ ouvre un espace client et envoie les e-mails. Compter une heure, en suivant les 
 | Fichiers (pièces du client, documents de l'agence) | Supabase Storage, bucket privé `dossiers` | Un dossier par projet, liens de téléchargement temporaires, 1 Go gratuit puis 100 Go (offre Pro) |
 | Réception du formulaire | Supabase Edge Function `demande` | Code serveur sans serveur à maintenir |
 | Suivi du dossier (e-mails au client, signature, réponses) | Supabase Edge Function `espace` | Même principe ; reçoit aussi les réponses des clients |
-| E-mails (envoi, et réception des réponses des clients) | Resend | 3 000 e-mails/mois gratuits (envoyés et reçus), envoi depuis contact@atomes.studio, réponses reçues sur r.atomes.studio |
+| E-mails (envoi, et réception des réponses aux anciennes adresses de dossier) | Resend | 3 000 e-mails/mois gratuits (envoyés et reçus), envoi depuis contact@atomes.studio, réponses reçues sur r.atomes.studio jusqu'à leur retrait (§ 8) |
+| Lecture des e-mails des clients (contact@, simon@) | Moteur de l'agence, sur ton ordinateur (§ 8) | Le client écrit à l'agence, pas à une adresse technique ; aucun service de plus |
 | Signature du devis | Page du site ouverte par un lien reçu par e-mail | Signature électronique simple, sans abonnement (pas de Yousign) |
 | Paiement | Virement bancaire | Sans frais ; le numéro de dossier sert de référence |
 | Site (vitrine + espace client) | GitHub Pages, inchangé | Statique, gratuit |
@@ -157,6 +158,28 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
 4. Le parcours complet (réponses par e-mail, signature, virement) se teste au § 7, point 7.
 
 ## Mises à jour à appliquer
+
+### Moteur de l'agence (19 octobre 2026)
+
+Les clients écrivent désormais à contact@atomes.studio ou à simon@atomes.studio : contact@ devient l'adresse de
+réponse de tous les e-mails, et le moteur de l'agence, sur ton ordinateur, range dans les dossiers les e-mails des
+clients reçus dans ces deux boîtes (§ 8). Dans la même séance, dans cet ordre :
+
+1. **Installer le moteur et faire l'essai** (§ 8, points 1 à 4).
+2. **Redéployer la fonction `espace`** (§ 7, point 1) avec le `index.ts` à jour : adresse de réponse contact@, et
+   « Rattacher au dossier » d'un message lu par le moteur. Entre les étapes 1 et 2, ne pas cliquer « Rattacher au
+   dossier » sur un message du moteur (l'ancienne fonction le rattacherait sans ses pièces).
+3. **Redéployer la fonction `demande`** (§ 3, même méthode) : l'accusé de réception a contact@ pour adresse de
+   réponse. Elle ne lit plus `JETON_SECRET` ni `REPONSES_DOMAINE` (rien à changer dans les secrets).
+4. **Publier le site** (VS Code → Sync Changes), attendre le vert dans l'onglet Actions de GitHub, puis une dizaine
+   de minutes : l'espace agence affiche les messages du moteur (« En attente du moteur », « Signature DKIM »).
+5. **Lancement automatique du moteur** (§ 8, point 5), puis le test du § 8, point 6.
+
+Garder pour l'instant `REPONSES_DOMAINE`, le webhook de Resend et le compte Resend de réception : un client qui
+répond à un e-mail envoyé avant cette mise à jour écrit encore à l'adresse de son dossier, en `@r.atomes.studio`, et
+sa réponse continue de s'ajouter au dossier. Les retirer dans un mois (§ 8, point 7).
+
+### Parcours v3 (mis en ligne le 15 octobre 2026)
 
 État au 14 octobre 2026 : le parcours v2 est en ligne (migrations 0001 à 0004, fonctions `espace` et `demande`,
 site du 13 octobre). Le parcours v3 (tout par e-mail, signature par lien, virement, espace client en consultation)
@@ -324,6 +347,56 @@ plus qu'à consulter. La fonction reçoit aussi les actions de l'espace agence.
    Si une réponse n'arrive pas dans le dossier : voir « En dépannage ». Le dossier de test se supprime ensuite
    comme indiqué dans « À savoir » (RGPD).
 
+## 8. Moteur de l'agence : e-mails des clients reçus sur contact@ et simon@
+
+Le moteur est un programme qui tourne sur ton ordinateur (dossier `atomes-moteur`, à côté de ce dépôt, jamais
+publié ; mode d'emploi complet dans son `README.md`). Toutes les 5 minutes, tant que ta session Windows est ouverte,
+il lit les nouveaux e-mails de contact@atomes.studio et de simon@atomes.studio, sans rien y changer (rien n'est
+marqué lu, déplacé ni supprimé), et range dans leur dossier ceux des clients, comme la fonction `espace` le fait
+pour les réponses reçues par Resend : texte sans la citation, pièces jointes (images et PDF, 25 Mo au plus) dans
+`<numéro>/client/`, réponse aux questions en attente, demande de modification à l'étape « Validation de vos
+documents ». Il n'envoie aucun e-mail : l'original est déjà dans ta boîte.
+
+Règles :
+- le numéro de dossier dans l'objet (« Re: Quelques questions sur votre dossier 261014093512 ») désigne le dossier ;
+  sans numéro, l'e-mail va au dernier dossier (le plus récent) de l'adresse de l'expéditeur ;
+- un expéditeur inconnu sans numéro de dossier est ignoré, rien n'est enregistré (prospects, fournisseurs,
+  publicités) ; les e-mails de l'agence (atomes.studio), les réponses automatiques et les indésirables aussi ;
+- l'e-mail est rangé aussitôt s'il vient de l'adresse du dossier et porte une signature DKIM valable de son
+  domaine, contrôlée par le moteur : c'est le cas des messageries courantes (Gmail, Outlook, Orange, Free,
+  iCloud…). Sinon (autre adresse, signature absente ou fausse), il s'affiche « À vérifier » dans la fiche :
+  « Rattacher au dossier » le confie au moteur (badge « En attente du moteur »), qui range ses pièces à son passage
+  suivant ; ou « Supprimer » ;
+- ordinateur éteint ou hors ligne : rien n'est perdu, le moteur reprend au dernier e-mail lu ;
+- un même e-mail envoyé à contact@ et à simon@ n'est enregistré qu'une fois.
+
+1. **Clé secrète du moteur** : Supabase → **Project Settings → API Keys → Secret keys → New secret key**, nom
+   `moteur` → copier la clé `sb_secret_…` (ne pas la coller ailleurs que dans le moteur). Elle ne sert qu'à lui : si
+   l'ordinateur est perdu ou volé, la supprimer ici ; le moteur s'arrête, le site continue.
+2. **Configurer** : dans le dossier `atomes-moteur`, ouvrir PowerShell (clic droit → Ouvrir dans le terminal) et
+   lancer `.\moteur configurer`. Il demande la clé (point 1), puis le serveur IMAP (`mail92.lwspanel.com`, port
+   993, proposés) et le mot de passe de chaque boîte (ceux de LWS). Il vérifie chaque connexion. La clé et les mots
+   de passe restent dans le Gestionnaire d'identification de Windows, jamais dans un fichier.
+3. **Essai** : `.\moteur courrier`. Le moteur lit les e-mails des 7 derniers jours et montre ce qu'il rangerait,
+   sans rien écrire (rapport gardé dans un fichier, chemin affiché).
+4. **Premier passage réel** : `.\moteur courrier --ecrire`. Le départ est fixé au dernier e-mail présent : les
+   e-mails déjà reçus ne sont pas rangés (pour en rattraper : `.\moteur courrier --ecrire --depuis 2026-10-15`).
+5. **Lancement automatique** : `.\moteur installer` (tâche planifiée « Atomes studio\Moteur courrier », toutes les
+   5 minutes, session ouverte). Suivi : `.\moteur etat` ; arrêt : `.\moteur desinstaller`.
+6. **Tester**, depuis ton adresse personnelle, sur un dossier de test : répondre à un e-mail du dossier (son objet
+   contient le numéro) avec une photo jointe ; dans les 5 minutes, la fiche montre le message et la photo. Puis
+   écrire depuis une autre adresse, avec le numéro dans l'objet : badge « À vérifier » ; « Rattacher au dossier »,
+   puis 5 minutes : la photo est rangée.
+7. **Dans un mois**, quand plus personne ne répond aux anciennes adresses en `@r.atomes.studio` : supprimer les
+   secrets `REPONSES_DOMAINE`, `RESEND_WEBHOOK_SECRET` et `RESEND_RECEPTION_KEY`, le webhook chez Resend, le
+   domaine `r.atomes.studio` dans le compte Resend de réception (puis ce compte), et chez LWS les enregistrements du
+   sous-domaine `r` (MX et ceux de Resend).
+
+Certificat : `mail.atomes.studio`, le nom habituel du serveur e-mail de LWS, présente un certificat expiré (constaté
+le 19 octobre 2026). Le moteur utilise `mail92.lwspanel.com`, le même serveur, au certificat valable. Si ta
+messagerie affiche un avertissement de sécurité, mettre aussi `mail92.lwspanel.com` dans ses réglages, ou demander
+à LWS de renouveler le certificat de `mail.atomes.studio`.
+
 ## Au quotidien : l'espace agence (https://atomes.studio/admin/)
 
 Connexion avec ton compte agence (§ 5), par lien e-mail. La liste montre les dossiers en cours ; le filtre
@@ -353,6 +426,11 @@ d'un dossier :
   sinon « Supprimer ». Le faire sans attendre : Resend ne garde les e-mails reçus que 30 jours. Un message au
   badge « Traitement incomplet » (pièces jointes ou réponse interrompues, par exemple par une panne, et que Resend
   n'a pas pu reprendre) : « Reprendre le traitement ».
+- **Messages lus par le moteur** (e-mails reçus sur contact@ et simon@, § 8) : mêmes règles, sans e-mail
+  « Réponse du client » ni « Message à vérifier » (l'original est dans ta boîte). Un message « À vérifier » indique
+  l'adresse différente ou le résultat de la signature DKIM (« Signature DKIM : absente », « échec »…). « Rattacher
+  au dossier » le marque « En attente du moteur » : ses pièces sont rangées et sa réponse enregistrée au passage
+  suivant du moteur (5 minutes, ordinateur allumé).
 - **E-mail à renvoyer** : si la confirmation du contrat (« Devis signé ») ou l'accusé de réception d'une
   rétractation n'a pas pu partir (quota d'e-mails atteint, panne de Resend), le dossier s'affiche « E-mail à
   renvoyer » et un bandeau en tête de la fiche propose « Renvoyer ». Ces deux e-mails sont des obligations
@@ -428,6 +506,13 @@ d'un dossier :
   plusieurs fois : les tentatives refusées en « 503 » pendant ce temps sont normales. Au-delà de 30 messages du
   client (ou 20 messages à vérifier) pour un même dossier en 24 heures, la fonction n'enregistre plus rien : l'e-mail
   reste lisible dans Resend (Logs : « limite de messages du dossier atteinte »).
+- **Un e-mail d'un client, reçu sur contact@ ou simon@, n'apparaît pas dans le dossier** : `.\moteur etat` (dans
+  le dossier `atomes-moteur`) montre le dernier passage et ses erreurs ; `.\moteur courrier` (essai) dit ce que le
+  moteur décide pour les e-mails récents et pourquoi (par exemple « expéditeur inconnu » : le client a écrit d'une
+  autre adresse sans numéro de dossier dans l'objet ; transférer alors son e-mail n'aide pas, déposer ses pièces
+  depuis l'espace agence). Autres causes : ordinateur éteint (le moteur rattrape au démarrage), e-mail déplacé
+  hors de la boîte de réception par une règle de ta messagerie avant le passage du moteur. Journal :
+  `%LOCALAPPDATA%\AtomesMoteur\journal\moteur.log`.
 - **Un e-mail légal n'est pas parti** (fiche « E-mail à renvoyer ») : « Renvoyer » dans le bandeau de la fiche. Si
   l'envoi échoue encore (quota de Resend atteint pour la journée), réessayer le lendemain, ou écrire au client
   depuis ta messagerie : confirmation du contrat = devis signé en pièce jointe, date de signature, coordonnées et
@@ -495,6 +580,10 @@ d'un dossier :
   20 messages à vérifier au plus ; un seul e-mail « Message à vérifier » par heure ; 200 Mo de pièces jointes du
   client par dossier en tout (au-delà, « non rangée »). Ces limites évitent qu'un afflux d'e-mails remplisse la
   base et le stockage, mais chaque e-mail reçu compte quand même dans le quota de Resend.
+- Moteur de l'agence : il lit tes boîtes contact@ et simon@ sur ton ordinateur et n'en copie dans Supabase que les
+  e-mails des clients (texte et pièces jointes). Les e-mails « à vérifier » gardent une copie locale (dossier
+  `%LOCALAPPDATA%\AtomesMoteur\en-attente`) jusqu'à leur traitement, 45 jours au plus. À mentionner aussi dans les
+  mentions légales (traitement des e-mails reçus).
 - Données : Supabase les héberge en Europe (région choisie à l'étape 1). Resend envoie depuis l'Irlande
   (eu-west-1), mais garde ses journaux et les métadonnées des e-mails aux États-Unis, et conserve les e-mails,
   réponses des clients comprises, 30 jours. Pour le RGPD : mentionner dans les mentions légales l'espace client,

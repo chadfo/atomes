@@ -6,15 +6,14 @@
 //   2. dépose les pièces jointes dans le bucket privé « dossiers/<id>/client/ » ;
 //   3. crée le compte client (ou rattache un compte existant) ;
 //   4. envoie deux e-mails via Resend : accusé de réception au client (avec la timeline ;
-//      sa réponse va à l'adresse de réponse du dossier et s'ajoute au dossier, voir la
-//      fonction « espace »), notification à l'agence (même objet que l'ancien FormSubmit).
+//      sa réponse va à MAIL_AGENCE, contact@, et le moteur de l'agence l'ajoute au dossier),
+//      notification à l'agence (même objet que l'ancien FormSubmit).
 // Une fois le dossier créé, la réponse est toujours ok:true ; les échecs partiels
 // (pièce non déposée, e-mail non envoyé, compte non créé) sont signalés dedans :
 //   { ok: true, id: "261012173615", fichiers: 2, fichiers_echoues: [], compte: true,
 //     mails: { client: true, agence: true } }
 //
-// Secrets (Edge Functions → Secrets) : RESEND_API_KEY ; JETON_SECRET et REPONSES_DOMAINE
-// (mêmes valeurs que pour la fonction « espace » ; sans eux, le client répond à MAIL_AGENCE) ;
+// Secrets (Edge Functions → Secrets) : RESEND_API_KEY ;
 // facultatifs MAIL_AGENCE, MAIL_FROM, SITE_URL, ORIGINES_AUTORISEES. SUPABASE_URL et
 // SUPABASE_SERVICE_ROLE_KEY sont fournis automatiquement.
 // =============================================================================
@@ -30,9 +29,6 @@ const MAIL_FROM = Deno.env.get("MAIL_FROM") ?? "Atomes studio <contact@atomes.st
 const SITE_URL = (Deno.env.get("SITE_URL") ?? "https://atomes.studio").replace(/\/$/, "");
 const ORIGINES = (Deno.env.get("ORIGINES_AUTORISEES") ??
   `${SITE_URL},https://www.atomes.studio,http://localhost:3000`).split(",").map((s) => s.trim());
-// Adresse de réponse du dossier (même calcul que la fonction « espace ») : secret d'au moins 32 caractères.
-const JETON_SECRET = (Deno.env.get("JETON_SECRET") ?? "").trim().length >= 32 ? (Deno.env.get("JETON_SECRET") ?? "").trim() : "";
-const REPONSES_DOMAINE = (Deno.env.get("REPONSES_DOMAINE") ?? "").trim().toLowerCase().replace(/^@/, "");
 
 const MAX_FICHIERS = 10;
 const MAX_TOTAL = 10 * 1024 * 1024;          // 10 Mo au total, comme le formulaire
@@ -235,7 +231,7 @@ Deno.serve(async (req) => {
       });
       mails.client = await envoyerMail({
         to: d.email,
-        replyTo: await adresseReponse(id),
+        replyTo: MAIL_AGENCE,
         subject: `Votre demande est bien reçue — dossier ${id}`,
         html: htmlClient(id, d, deposes, echoues, await timeline(sb, id)),
       });
@@ -327,16 +323,6 @@ function corsHeaders(origin: string): Record<string, string> {
 
 function json(corps: unknown, statut: number, cors: Record<string, string>): Response {
   return new Response(JSON.stringify(corps), { status: statut, headers: { ...cors, "Content-Type": "application/json; charset=utf-8" } });
-}
-
-// Adresse de réponse du dossier : d<id>-<mac>@REPONSES_DOMAINE, mac = 20 premiers caractères hexadécimaux de
-// HMAC-SHA256(JETON_SECRET, "reponse:" + id) (même calcul que la fonction « espace », qui reçoit les réponses).
-// Sans configuration : MAIL_AGENCE.
-async function adresseReponse(id: string): Promise<string> {
-  if (!JETON_SECRET || !REPONSES_DOMAINE) return MAIL_AGENCE;
-  const cle = await crypto.subtle.importKey("raw", new TextEncoder().encode(JETON_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", cle, new TextEncoder().encode(`reponse:${id}`)));
-  return `d${id}-${Array.from(mac, (x) => x.toString(16).padStart(2, "0")).join("").slice(0, 20)}@${REPONSES_DOMAINE}`;
 }
 
 // Timeline du dossier créé (étapes copiées du modèle par le déclencheur SQL) ; vide en cas d'échec de lecture.
