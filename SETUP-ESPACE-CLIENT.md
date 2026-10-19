@@ -374,7 +374,7 @@ Règles :
    `moteur` → copier la clé `sb_secret_…` (ne pas la coller ailleurs que dans le moteur). Elle ne sert qu'à lui : si
    l'ordinateur est perdu ou volé, la supprimer ici ; le moteur s'arrête, le site continue.
 2. **Configurer** : dans le dossier `atomes-moteur`, ouvrir PowerShell (clic droit → Ouvrir dans le terminal) et
-   lancer `.\moteur configurer`. Il demande la clé (point 1), puis le serveur IMAP (`mail92.lwspanel.com`, port
+   lancer `.\moteur configurer`. Il demande la clé (point 1), puis le serveur IMAP (`mail.atomes.studio`, port
    993, proposés) et le mot de passe de chaque boîte (ceux de LWS). Il vérifie chaque connexion. La clé et les mots
    de passe restent dans le Gestionnaire d'identification de Windows, jamais dans un fichier.
 3. **Essai** : `.\moteur courrier`. Le moteur lit les e-mails des 7 derniers jours et montre ce qu'il rangerait,
@@ -391,11 +391,6 @@ Règles :
    secrets `REPONSES_DOMAINE`, `RESEND_WEBHOOK_SECRET` et `RESEND_RECEPTION_KEY`, le webhook chez Resend, le
    domaine `r.atomes.studio` dans le compte Resend de réception (puis ce compte), et chez LWS les enregistrements du
    sous-domaine `r` (MX et ceux de Resend).
-
-Certificat : `mail.atomes.studio`, le nom habituel du serveur e-mail de LWS, présente un certificat expiré (constaté
-le 19 octobre 2026). Le moteur utilise `mail92.lwspanel.com`, le même serveur, au certificat valable. Si ta
-messagerie affiche un avertissement de sécurité, mettre aussi `mail92.lwspanel.com` dans ses réglages, ou demander
-à LWS de renouveler le certificat de `mail.atomes.studio`.
 
 ## Au quotidien : l'espace agence (https://atomes.studio/admin/)
 
