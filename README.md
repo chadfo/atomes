@@ -307,11 +307,37 @@ adresses de dossier (`r.atomes.studio`), le temps de la transition.
   libellé), état de la signature (démarrage anticipé, rétractation), référence et « Virement reçu », documents,
   demande de validation, modifications demandées. Chaque opération reste attachée au dossier ouvert au moment
   du clic, même si une autre fiche est ouverte pendant l'envoi.
-  **Mode démo : `admin/?demo`**.
+  **Mode démo : `admin/?demo`**, ou `?demo=lien` (arrivée par le lien de l'e-mail de connexion).
+- **Lien direct** (19 octobre 2026, décisions de Simon) : chaque e-mail de la fonction `espace` au client porte un lien
+  personnel vers son espace, `https://atomes.studio/dossier/#connexion=<jeton>&dossier=<id>`, à la place de chaque
+  lien vers l'espace client (« Suivre mon dossier en ligne » et boutons du corps), avec une phrase sous le lien du
+  pied (texte proposé, à faire valider par Simon). Jeton : `hashed_token` de
+  `auth.admin.generateLink({ type: 'magiclink', email })`, créé par `lienEspace`, que seul `mailClient` appelle, avec
+  l'adresse du compte du dossier (generateLink crée le compte d'une adresse inconnue). Pas de lien sans compte, pour
+  un compte de l'agence, pour une adresse de dossier autre que celle du compte, si le type rendu n'est pas `magiclink`
+  ou si le code (`email_otp`) a moins de 10 chiffres (seule sa longueur est lue) ; Supabase Auth sans réponse en
+  5 s : e-mail envoyé sans lien. Usage unique, 24 heures (Supabase : « Email OTP Length » = 10, puis « Email OTP
+  Expiration » = 86400 ; le jeton est l'empreinte de ce code, que Supabase accepte aussi seul, d'où les 10 chiffres),
+  un seul jeton valable par compte : le dernier créé (e-mail de l'agence, même non parti, ou lien de connexion) annule
+  les autres. Jamais de lien dans les e-mails à l'agence, dans l'accusé de rétractation envoyé à une autre adresse ni
+  dans l'accusé de réception de la fonction `demande` (adresse tout juste saisie). Jeton jamais journalisé, jamais
+  renvoyé au navigateur, seulement dans le fragment. Pages `dossier/` et `admin/` (même mécanisme pour l'e-mail de
+  connexion, `{{ .RedirectTo }}#connexion={{ .TokenHash }}`, sans `dossier`) : fragment lu puis effacé de la barre
+  d'adresse avant tout appel réseau (l'adresse d'origine reste dans l'historique du navigateur) ; rien n'est appelé
+  au chargement, `verifyOtp({ token_hash, type: 'email' })` seulement au clic sur « Ouvrir mon espace » ou « Ouvrir
+  l'espace agence » (les filtres de messagerie ouvrent les liens avant le destinataire), 20 s au plus. Navigateur déjà
+  connecté : dossier du lien lisible par le compte (le sien ; n'importe lequel pour l'agence, par exemple depuis un
+  e-mail de client qui cite le nôtre) → ouvert, jeton intact ; autre compte → confirmation, puis
+  `signOut({ scope: 'local' })` et vérification ; lien sans dossier, ou espace agence déjà ouvert → jeton ignoré (avec
+  une session client, « Accès réservé » le signale). Lien refusé (403 : déjà servi, expiré ou remplacé) : formulaire
+  de connexion ; 429 et autres erreurs : nouvel essai avec le même jeton. Les deux pages ont
+  `<meta name="referrer" content="no-referrer">`. Mode démo : `dossier/?demo=lien`, `admin/?demo=lien`. Réglages
+  Supabase et Resend, ordre de mise en ligne (pages publiées avant la fonction et le modèle) : SETUP-ESPACE-CLIENT.md,
+  « Mises à jour à appliquer ».
 - Un champ caché anti-robots (`_honey`) est présent dans les deux formulaires (devis et Contact). La page
   Contact ne charge pas config.js : elle envoie par FormSubmit dans tous les cas.
 - `emails/` : la signature commune à tous les e-mails de l'agence (`signature.html`, à coller aussi dans le
-  webmail) et le modèle Supabase du lien de connexion (`supabase-magic-link.html`). La fonction `demande`
+  webmail) et le modèle Supabase du lien de connexion (`supabase-magic-link.html`, lien direct : voir plus haut). La fonction `demande`
   embarque la même signature. Logo : `site/images/logo-signature.gif` (animation du logo d’après `<atom-logo>`, 120 px, boucle de 10 s, encre sombre sur fond blanc) ; `logo-signature.png` en est la version fixe et `logo-mail.png` l’ancien badge, à supprimer quand plus aucun e-mail envoyé n’y fait référence.
 
 ## Suite prévue

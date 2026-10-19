@@ -5,16 +5,43 @@
 // l'agence, pièces du client, modifications demandées.
 // Les actions qui préviennent le client ou touchent aux messages passent par la fonction « espace » ; dépôts et notes
 // passent directement par Supabase (règles RLS de l'agence). Chaque opération est attachée au dossier ouvert au moment du
-// clic : changer de fiche pendant un envoi ne la détourne pas vers un autre dossier. Mode démo sans backend : admin/?demo
+// clic : changer de fiche pendant un envoi ne la détourne pas vers un autre dossier. Lien de l'e-mail de connexion
+// (#connexion=<jeton>) : une seule fois, pendant 24 heures, vérifié seulement au clic sur « Ouvrir l'espace agence ».
+// Mode démo sans backend : admin/?demo, ou ?demo=lien (arrivée par le lien de connexion).
 (() => {
   const cfg = window.ATOMES_CONFIG || {};
-  const demo = new URLSearchParams(location.search).has('demo');
+  const params = new URLSearchParams(location.search);
+  const demo = params.has('demo');
+
+  // ---------- Lien de connexion : lu et effacé de l'adresse avant toute autre chose ----------
+  // https://atomes.studio/admin/#connexion=<jeton> (modèle Supabase « Magic link ») : jeton à usage unique, valable
+  // 24 heures. Le fragment n'est envoyé ni au serveur de pages ni dans le Referer ; il est effacé de la barre d'adresse
+  // avant tout appel réseau, et le jeton, gardé en mémoire, n'est jamais journalisé. Limite : l'adresse d'origine reste
+  // dans l'historique du navigateur (replaceState ne l'en retire pas) ; le jeton n'y vaut que tant qu'il n'a pas servi,
+  // 24 heures au plus, et jusqu'au lien suivant. Résultat : undefined sans lien, null pour un lien illisible,
+  // { jeton, dossier } sinon (numéro de dossier facultatif, gardé dans l'adresse : #<id>).
+  const lireLien = () => {
+    const h = location.hash.replace(/^#/, '');
+    if (!/(^|&)connexion=/.test(h)) return undefined;
+    const p = new URLSearchParams(h);
+    const jeton = p.get('connexion') || '';
+    const dossier = /^\d{12}$/.test(p.get('dossier') || '') ? p.get('dossier') : '';
+    history.replaceState(null, '', location.pathname + location.search + (dossier ? '#' + dossier : ''));
+    return /^[0-9a-f]{20,128}$/.test(jeton) ? { jeton, dossier } : null;
+  };
+  let lien = lireLien();
+  let ouverture = false;   // vérification du jeton en cours (clic sur « Ouvrir l'espace agence »)
+  // Démo : ?demo=lien montre l'arrivée par le lien de connexion (sans session) ; un vrai lien est ignoré.
+  if (demo) lien = params.get('demo') === 'lien' ? { jeton: 'demo', dossier: '' } : undefined;
+
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
   const vues = {};
   $$('[data-vue]').forEach((v) => { vues[v.dataset.vue] = v; });
   const montrer = (nom) => { Object.keys(vues).forEach((k) => { vues[k].hidden = k !== nom; }); };
-  const erreur = (msg) => { const e = $('[data-erreur]'); e.textContent = msg || ''; e.hidden = !msg; };
+  // Message dans une zone (vide : zone masquée)
+  const afficher = (sel, msg) => { const e = $(sel); e.textContent = msg || ''; e.hidden = !msg; };
+  const erreur = (msg) => afficher('[data-erreur]', msg);
   const el = (tag, cls, texte) => { const n = document.createElement(tag); if (cls) n.className = cls; if (texte !== undefined) n.textContent = texte; return n; };
   const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
   const fmtCourt = (iso) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
@@ -43,6 +70,9 @@
       surChangement: (fn) => sb.auth.onAuthStateChange((evt, session) => fn(session, evt)),
       connexion: (email) => sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname.replace(/index\.html$/, ''), shouldCreateUser: false } }).then(ok),
       deconnexion: () => sb.auth.signOut(),
+      // Lien de connexion : jeton vérifié (POST /auth/v1/verify, usage unique), session enregistrée, événement SIGNED_IN.
+      verifier: (jeton) => sb.auth.verifyOtp({ token_hash: jeton, type: 'email' }).then(ok)
+        .then((d) => { if (!d || !d.session) throw new Error('session absente'); return d; }),
       estAdmin: (uid) => sb.from('admins').select('user_id').eq('user_id', uid).maybeSingle().then(ok).then((d) => !!d),
       dossiers: () => lireDossiers((s) => sb.from('projets').select(s).order('cree_le', { ascending: false }).then(ok)),
       lister: (id, dossier) => sb.storage.from('dossiers').list(id + '/' + dossier, { limit: 200, sortBy: { column: 'created_at', order: 'desc' } }).then(ok)
@@ -155,7 +185,9 @@
         client: piecesRangees(d).concat([{ nom: '01-photos.jpg', chemin: 'demo', taille: 2411520, date: d.cree_le }])
       };
     });
-    let session = { user: { id: 'admin', email: 'contact@atomes.studio' } }, ecouteur = null;
+    // Arrivée par le lien de connexion (?demo=lien) : pas encore de session, ouverte au clic sur « Ouvrir l'espace agence ».
+    const compteDemo = { user: { id: 'admin', email: 'contact@atomes.studio' } };
+    let session = lien ? null : compteDemo, ecouteur = null;
     const trouver = (id) => dossiers.find((d) => d.id === id);
     const refus = (message, statut) => { const e = new Error(message); e.statut = statut || 400; return e; };
     const actions = {
@@ -223,6 +255,7 @@
       surChangement: (fn) => { ecouteur = fn; setTimeout(() => fn(session), 0); },
       connexion: () => Promise.resolve(),
       deconnexion: () => { session = null; ecouteur(null); return Promise.resolve(); },
+      verifier: () => new Promise((res) => setTimeout(() => { session = compteDemo; ecouteur(session, 'SIGNED_IN'); res({ session }); }, 300)),
       estAdmin: () => Promise.resolve(true),
       dossiers: () => Promise.resolve(JSON.parse(JSON.stringify(dossiers))),
       lister: (id, dossier) => Promise.resolve((docs[id] && docs[id][dossier] || []).slice()),
@@ -273,11 +306,15 @@
     const btn = $('[data-btn-connexion]');
     btn.disabled = true; btn.textContent = 'Envoi…';
     // Même message qu'un compte existe ou non : la page ne révèle pas quelles adresses ont un compte (clients compris).
-    const envoye = () => { $('[data-lien-envoye]').textContent = 'Si un compte est associé à ' + email + ', un lien de connexion vient de lui être envoyé. Ouvrez l’e-mail et cliquez sur le lien.'; };
+    const envoye = () => {
+      afficher('[data-connexion-err]', '');   // lien déjà servi ou illisible : remplacé par le nouveau lien
+      $('[data-lien-envoye]').textContent = 'Si un compte est associé à ' + email + ', un lien de connexion vient de lui être envoyé. Ouvrez l’e-mail et cliquez sur le lien.';
+    };
     api.connexion(email).then(envoye).catch((ex) => {
       const msg = String((ex && ex.message) || '');
       if (/signup|not allowed|user not found/i.test(msg)) { envoye(); return; }
-      err.textContent = /rate limit|too many/i.test(msg) ? 'Trop de demandes de lien : patientez quelques minutes.' : 'Impossible d’envoyer le lien pour le moment.';
+      // 429 : lien demandé moins d'une minute après le précédent (Supabase : « For security purposes, you can only request this after … seconds. »).
+      err.textContent = (ex && ex.status === 429) || /rate limit|too many/i.test(msg) ? 'Trop de demandes de lien : patientez quelques minutes.' : 'Impossible d’envoyer le lien pour le moment.';
       err.hidden = false;
     }).finally(() => { btn.disabled = false; btn.textContent = 'Recevoir mon lien de connexion'; });
   });
@@ -433,6 +470,7 @@
     actualiser();
   });
   window.addEventListener('hashchange', () => {
+    if (/(^#|&)connexion=/.test(location.hash)) { recevoirLien(); return; }
     if (!charge || !autorise) return;
     const d = dossiers.find((x) => x.id === location.hash.replace('#', ''));
     if (d) ouvrir(d); else rendreListe();
@@ -1126,22 +1164,93 @@
     ['#a-recherche', '[data-note]', '[data-montant]', '[data-libelle]', '[data-devis-fichier]'].forEach((sel) => { const n = $(sel); if (n) n.value = ''; });
     $('[data-alertes]').hidden = true;
     annoncer(''); erreur('');
+    afficher('[data-connexion-err]', '');
+    afficher('[data-refus-lien]', '');
   };
+
+  // ---------- Lien de connexion : page d'arrivée, ouverture au clic ----------
+  // Rien n'est vérifié au chargement : les filtres de messagerie (Safe Links, Proofpoint, Mimecast…) ouvrent les liens,
+  // et parfois exécutent le JavaScript, avant le destinataire. Le jeton n'est consommé qu'au clic sur « Ouvrir l'espace
+  // agence » ; l'événement de connexion (SIGNED_IN) affiche ensuite l'espace habituel. Session déjà ouverte : jeton ignoré
+  // (cahier des charges) ; si son compte n'a pas accès à l'espace agence, la page « Accès réservé » le dit (REFUS_LIEN).
+  const LIEN_ILLISIBLE = 'Ce lien n’est pas valide : ouvrez-le de nouveau depuis l’e-mail reçu, en entier.';
+  // Lien refusé (403) : déjà servi, expiré, ou remplacé par un lien plus récent (texte proposé, à faire valider par Simon).
+  const LIEN_MORT = 'Ce lien ne fonctionne plus : il ne vaut qu’une fois, pendant 24 heures, et seul celui de notre dernier e-mail est valable. Ouvrez notre e-mail le plus récent, ou recevez un nouveau lien de connexion :';
+  const LIEN_TROP = 'Trop de tentatives en peu de temps. Patientez quelques minutes.';
+  const LIEN_ECHEC = 'Impossible d’ouvrir votre espace pour le moment. Réessayez dans quelques minutes.';
+  // Lien ignoré parce qu'un compte sans accès à l'espace agence est connecté (par exemple après l'essai d'un lien client)
+  const REFUS_LIEN = 'Le lien de connexion reçu par e-mail n’a pas servi : cliquez sur « Se déconnecter », puis rouvrez-le.';
+  const DELAI_VERIF = 20000;   // vérification du jeton sans réponse au-delà : échec, nouvel essai possible
+  const BOUTON_LIEN = $('[data-btn-lien]').textContent;   // « Ouvrir l'espace agence » (libellé de la page)
+  const refuser = (lienIgnore) => { montrer('refus'); afficher('[data-refus-lien]', lienIgnore ? REFUS_LIEN : ''); };
+  const montrerLien = () => {
+    const btn = $('[data-btn-lien]');
+    if (!ouverture) { btn.disabled = false; btn.textContent = BOUTON_LIEN; }
+    montrer('lien');
+  };
+  // Lien ouvert dans l'onglet de la page déjà chargée (même adresse, nouveau fragment) : il remplace le précédent.
+  const recevoirLien = () => {
+    const l = lireLien();
+    if (demo || ouverture) return;                                     // fragment effacé, lien ignoré
+    if (!vues.chargement.hidden) { lien = l; return; }                 // session pas encore lue : traité à son arrivée
+    if (charge) {                                                      // session ouverte : lien ignoré, adresse de la fiche
+      history.replaceState(null, '', location.pathname + location.search + (courant ? '#' + courant.id : ''));
+      if (l && !autorise && !vues.refus.hidden) afficher('[data-refus-lien]', REFUS_LIEN);
+      return;
+    }
+    if (l) { lien = l; afficher('[data-lien-err]', ''); montrerLien(); }
+    else { lien = undefined; montrer('connexion'); afficher('[data-connexion-err]', LIEN_ILLISIBLE); }
+  };
+  // Réponse attendue au plus `ms` millisecondes, sinon échec (bouton rétabli, nouvel essai possible avec le même jeton).
+  const avecDelai = (promesse, ms) => new Promise((res, rej) => {
+    const t = setTimeout(() => rej(new Error('délai dépassé')), ms);
+    promesse.then((v) => { clearTimeout(t); res(v); }, (e) => { clearTimeout(t); rej(e); });
+  });
+  $('[data-form-lien]').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (!lien || ouverture || charge) return;
+    const l = lien, btn = $('[data-btn-lien]'), form = ev.currentTarget;
+    ouverture = true; lien = undefined;
+    afficher('[data-lien-err]', '');
+    btn.disabled = true; btn.textContent = 'Ouverture…';
+    form.setAttribute('aria-busy', 'true');
+    if (l.dossier) history.replaceState(null, '', location.pathname + location.search + '#' + l.dossier);   // ouvert une fois connecté
+    let echec = null;
+    try { await avecDelai(api.verifier(l.jeton), DELAI_VERIF); }   // succès : SIGNED_IN affiche l'espace agence
+    catch (ex) { echec = ex || {}; }
+    ouverture = false;
+    form.removeAttribute('aria-busy');
+    if (!echec) return;
+    if (echec.status === 403 || echec.code === 'otp_expired') {   // déjà servi, expiré, ou annulé par un lien plus récent
+      // Message focalisé : lu, et le champ e-mail suit au clavier
+      if (!charge) { montrer('connexion'); afficher('[data-connexion-err]', LIEN_MORT); $('[data-connexion-err]').focus(); }
+      return;
+    }
+    lien = l;   // jeton intact : nouvel essai possible
+    montrerLien();
+    afficher('[data-lien-err]', echec.status === 429 ? LIEN_TROP : LIEN_ECHEC);
+    btn.focus();
+  });
+
   api.surChangement((session, evt) => {
     if (evt === 'TOKEN_REFRESHED' || evt === 'USER_UPDATED') return;
     if (session && session.user) {
+      const lienIgnore = !!lien;   // lien valable laissé de côté : signalé si le compte n'a pas accès à l'espace agence
+      lien = undefined;   // session déjà ouverte : lien de connexion ignoré
       $('[data-compte]').hidden = false;
       $('[data-compte-email]').textContent = session.user.email || '';
       if (charge === session.user.id) return;
       const uid = session.user.id;
       charge = uid; autorise = false;
-      api.estAdmin(uid).then((admin) => { if (charge !== uid) return; autorise = admin; if (admin) charger(); else montrer('refus'); })
-        .catch(() => { if (charge !== uid) return; montrer('refus'); erreur('Vérification du compte impossible pour le moment.'); });
+      api.estAdmin(uid).then((admin) => { if (charge !== uid) return; autorise = admin; if (admin) charger(); else refuser(lienIgnore); })
+        .catch(() => { if (charge !== uid) return; refuser(lienIgnore); erreur('Vérification du compte impossible pour le moment.'); });
     } else {
       charge = null; autorise = false;
       oublier();
       $('[data-compte]').hidden = true;
+      if (lien || ouverture) { montrerLien(); return; }   // lien de connexion : ouvert au clic sur le bouton
       montrer('connexion');
+      if (lien === null) { lien = undefined; afficher('[data-connexion-err]', LIEN_ILLISIBLE); }
     }
   });
 })();

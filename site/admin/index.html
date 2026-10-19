@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Espace agence — Atomes studio</title>
 <meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
 <meta name="description" content="Espace agence Atomes studio : suivi des dossiers clients.">
 <meta name="theme-color" content="#171512">
 <link rel="icon" type="image/png" href="../favicon.png">
@@ -15,7 +16,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" defer></script>
 <script src="../assets/js/config.js" defer></script>
 <script src="../assets/js/atom-logo.js" defer></script>
-<script src="../assets/js/admin.js?v=4" defer></script>
+<script src="../assets/js/admin.js?v=5" defer></script>
 </head>
 <body>
 <div class="page">
@@ -46,9 +47,22 @@
         <p class="espace-intro" data-config-msg>L'espace agence n'est pas encore activé : renseignez Supabase dans config.js.</p>
       </div>
 
+      <!-- Lien de connexion reçu par e-mail (#connexion=…) : le jeton n'est vérifié qu'au clic sur le bouton -->
+      <div data-vue="lien" hidden>
+        <h1>Connexion</h1>
+        <p class="espace-intro">Ce lien personnel ouvre l'espace agence.</p>
+        <form class="form espace-form" data-form-lien novalidate>
+          <div class="form-actions">
+            <button type="submit" class="btn" data-btn-lien>Ouvrir l'espace agence</button>
+          </div>
+          <div class="f-err" data-lien-err role="alert" hidden></div>
+        </form>
+      </div>
+
       <!-- Connexion sans mot de passe (compte agence) -->
       <div data-vue="connexion" hidden>
         <h1>Connexion</h1>
+        <div class="notice" data-connexion-err role="alert" tabindex="-1" hidden></div>
         <p class="espace-intro">Entrez l'adresse e-mail du compte agence&nbsp;: vous recevrez un lien de connexion, sans mot de passe.</p>
         <form class="form espace-form" data-form-connexion novalidate>
           <div class="field">
@@ -67,6 +81,7 @@
       <div data-vue="refus" hidden>
         <h1>Accès réservé</h1>
         <p class="espace-intro">Ce compte n'a pas accès à l'espace agence. Pour suivre un dossier client, utilisez l'<a href="../dossier/">espace client</a>.</p>
+        <p class="espace-intro" data-refus-lien hidden></p>
       </div>
 
       <!-- Liste des dossiers -->

@@ -7,12 +7,39 @@
 // (page action/), paie par virement. Seule exception, imposée par la loi : le lien « Renoncer au contrat ici »
 // (particulier, devis signé, dans le délai), qui mène à la page action/. Ce lien et les coordonnées bancaires viennent
 // de l'action « infos_espace » de la fonction « espace » (lecture seule, config.js : espaceUrl).
+// Lien personnel (#connexion=<jeton>&dossier=<id>) des e-mails de l'agence et de l'e-mail de connexion : il ouvre
+// l'espace sans ressaisir d'adresse, une seule fois, pendant 24 heures ; le jeton n'est vérifié qu'au clic sur « Ouvrir
+// mon espace » (voir « Lien personnel » plus bas).
 // Mode démo sans backend : dossier/?demo, ou ?demo=signature, paiement, production, validation, suivi, clos (étape de
-// départ), ou ?demo=retracte (rétractation reçue pendant le paiement).
+// départ), ou ?demo=retracte (rétractation reçue pendant le paiement), ou ?demo=lien (arrivée par un lien personnel).
 (() => {
   const cfg = window.ATOMES_CONFIG || {};
   const params = new URLSearchParams(location.search);
   const demo = params.has('demo');
+
+  // ---------- Lien personnel : lu et effacé de l'adresse avant toute autre chose ----------
+  // https://atomes.studio/dossier/#connexion=<jeton>&dossier=<id> : lien des e-mails envoyés par la fonction « espace »,
+  // et de l'e-mail de connexion (modèle Supabase « Magic link », sans dossier). Jeton à usage unique, valable 24 heures ;
+  // le dernier envoyé annule les précédents. Le fragment n'est envoyé ni au serveur de pages ni dans le Referer ; il est
+  // effacé de la barre d'adresse avant tout appel réseau, et le jeton, gardé en mémoire, n'est jamais journalisé. Limite :
+  // l'adresse d'origine reste dans l'historique du navigateur (replaceState ne l'en retire pas) ; le jeton n'y vaut que
+  // tant qu'il n'a pas servi, 24 heures au plus, et jusqu'au lien suivant.
+  // Résultat : undefined sans lien, null pour un lien illisible, { jeton, dossier } sinon. Le numéro de dossier reste dans
+  // l'adresse (#<id>) : le dossier est ouvert une fois connecté.
+  const lireLien = () => {
+    const h = location.hash.replace(/^#/, '');
+    if (!/(^|&)connexion=/.test(h)) return undefined;
+    const p = new URLSearchParams(h);
+    const jeton = p.get('connexion') || '';
+    const dossier = /^\d{12}$/.test(p.get('dossier') || '') ? p.get('dossier') : '';
+    history.replaceState(null, '', location.pathname + location.search + (dossier ? '#' + dossier : ''));
+    return /^[0-9a-f]{20,128}$/.test(jeton) ? { jeton, dossier } : null;
+  };
+  let lien = lireLien();
+  let ouverture = false;   // vérification du jeton en cours (clic sur « Ouvrir mon espace »)
+  // Démo : ?demo=lien montre l'arrivée par un lien personnel (sans session) ; un vrai lien est ignoré.
+  if (demo) lien = params.get('demo') === 'lien' ? { jeton: 'demo', dossier: '' } : undefined;
+
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
@@ -20,7 +47,9 @@
   $$('[data-vue]').forEach((v) => { vues[v.dataset.vue] = v; });
   const montrer = (nom) => { Object.keys(vues).forEach((k) => { vues[k].hidden = k !== nom; }); };
   const compte = $('[data-compte]');
-  const erreur = (msg) => { const e = $('[data-erreur]'); e.textContent = msg || ''; e.hidden = !msg; };
+  // Message dans une zone (vide : zone masquée)
+  const afficher = (sel, msg) => { const e = $(sel); e.textContent = msg || ''; e.hidden = !msg; };
+  const erreur = (msg) => afficher('[data-erreur]', msg);
 
   const el = (tag, cls, texte) => { const n = document.createElement(tag); if (cls) n.className = cls; if (texte !== undefined) n.textContent = texte; return n; };
   const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
@@ -50,6 +79,11 @@
       surChangement: (fn) => sb.auth.onAuthStateChange((evt, session) => fn(session, evt)),
       connexion: (email) => sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname.replace(/index\.html$/, ''), shouldCreateUser: false } }).then(ok),
       deconnexion: () => sb.auth.signOut(),
+      // Lien personnel : jeton vérifié (POST /auth/v1/verify, usage unique), session enregistrée, événement SIGNED_IN.
+      verifier: (jeton) => sb.auth.verifyOtp({ token_hash: jeton, type: 'email' }).then(ok)
+        .then((d) => { if (!d || !d.session) throw new Error('session absente'); return d; }),
+      // Changement de compte : fin de la session de cet appareil seulement (les autres appareils restent connectés).
+      deconnexionLocale: () => sb.auth.signOut({ scope: 'local' }),
       // Messages du client (migration 0005) ; table absente, avant la migration : dossiers lus sans eux.
       dossiers: () => lire(true).catch((e) => {
         if (e && (e.code === 'PGRST200' || /messages/.test(String(e.message || '')))) return lire(false);
@@ -171,7 +205,8 @@
     }
     if (jusqua === 'clos') { projet.documents_valides_le = iso(now - 20 * 3600000); avance('clos', now - 20 * 3600000); }
 
-    let session = { user: { email: projet.email } };
+    // Arrivée par un lien personnel (?demo=lien) : pas encore de session, ouverte au clic sur « Ouvrir mon espace ».
+    let session = lien ? null : { user: { email: projet.email } };
     let ecouteur = null;
     // Délai de démonstration : 14 jours après la signature (le calcul réel, jours fériés compris, est fait par la fonction).
     const limite = () => new Date(new Date(projet.signe_le).getTime() + 14 * j).toISOString().slice(0, 10);
@@ -179,6 +214,8 @@
       surChangement: (fn) => { ecouteur = fn; setTimeout(() => fn(session), 0); },
       connexion: () => Promise.resolve(),
       deconnexion: () => { session = null; ecouteur(null); return Promise.resolve(); },
+      verifier: () => new Promise((res) => setTimeout(() => { session = { user: { email: projet.email } }; ecouteur(session, 'SIGNED_IN'); res({ session }); }, 300)),
+      deconnexionLocale: () => { session = null; ecouteur(null); return Promise.resolve(); },
       dossiers: () => Promise.resolve([JSON.parse(JSON.stringify(projet))]),
       lister: (_id, dossier) => Promise.resolve(docs[dossier].slice()),
       lien: () => Promise.resolve('#'),
@@ -224,6 +261,7 @@
     // Même message qu'une adresse ait un dossier ou non (« Signups not allowed for otp » pour une adresse inconnue) :
     // la page ne révèle pas qui est client de l'agence.
     const envoye = () => {
+      afficher('[data-connexion-err]', '');   // lien déjà servi ou illisible : remplacé par le nouveau lien
       const z = $('[data-lien-envoye]');
       z.textContent = '';
       z.appendChild(document.createTextNode('Si un dossier est associé à '));
@@ -235,11 +273,16 @@
       const msg = String((ex && ex.message) || '');
       if (/signup|not allowed|user not found/i.test(msg)) { envoye(); return; }
       console.warn('connexion :', msg);
+      // 429 « For security purposes, you can only request this after … seconds. » : lien demandé moins d'une minute
+      // après le précédent envoi au même compte, lien personnel d'un e-mail de l'agence compris (texte proposé, à faire
+      // valider par Simon) ; autre 429 : trop de demandes.
       err.textContent = /sending|smtp|mail/i.test(msg)
         ? 'L’envoi de l’e-mail de connexion a échoué de notre côté. Réessayez plus tard ou écrivez-nous à contact@atomes.studio.'
-        : /rate limit|too many/i.test(msg)
-          ? 'Trop de demandes de lien en peu de temps. Patientez quelques minutes avant de réessayer.'
-          : 'Impossible d’envoyer le lien pour le moment. Réessayez dans quelques minutes.';
+        : /only request this after/i.test(msg)
+          ? 'Un lien vient peut-être déjà de vous être envoyé : ouvrez notre dernier e-mail, ou réessayez dans une minute.'
+          : (ex && ex.status === 429) || /rate limit|too many/i.test(msg)
+            ? 'Trop de demandes de lien en peu de temps. Patientez quelques minutes avant de réessayer.'
+            : 'Impossible d’envoyer le lien pour le moment. Réessayez dans quelques minutes.';
       err.hidden = false;
     }).finally(() => { btn.disabled = false; btn.textContent = 'Recevoir mon lien de connexion'; });
   });
@@ -262,6 +305,7 @@
       .forEach((sel) => { const n = $(sel); if (n) n.textContent = ''; });
     $('[data-renoncer]').hidden = true;
     erreur('');
+    afficher('[data-connexion-err]', '');
   };
 
   const etapeCourante = (d) => (d.etapes || []).find((e) => e.cle === d.etape);
@@ -282,12 +326,17 @@
     dossiers = liste || [];
     infos = {};
     erreur('');
+    if (lienAutreCompte()) return;    // lien personnel d'un autre compte : confirmation avant d'en changer
     const voulu = location.hash.replace('#', '');
     const cible = dossiers.find((d) => d.id === voulu) || (dossiers.length === 1 ? dossiers[0] : null);
     if (cible) ouvrir(cible);
     else if (dossiers.length) rendreListe();
     else { montrer('liste'); $('[data-dossiers]').textContent = ''; $('[data-dossiers]').appendChild(el('p', 'docs-vide', 'Aucun dossier n’est associé à ce compte pour le moment.')); }
-  }).catch(() => { if (!utilisateurCharge) return; montrer('liste'); erreur('Impossible de charger vos dossiers. Réessayez dans quelques minutes.'); });
+  }).catch(() => {
+    if (!utilisateurCharge) return;
+    if (!ouverture) lien = undefined;   // compte du lien indéterminable : lien laissé de côté (rouvrable depuis l'e-mail)
+    montrer('liste'); erreur('Impossible de charger vos dossiers. Réessayez dans quelques minutes.');
+  });
 
   const rendreListe = () => {
     const cont = $('[data-dossiers]');
@@ -326,6 +375,7 @@
 
   $('[data-retour]').addEventListener('click', (e) => { e.preventDefault(); history.pushState(null, '', location.pathname + location.search); rendreListe(); });
   window.addEventListener('hashchange', () => {
+    if (/(^#|&)connexion=/.test(location.hash)) { recevoirLien(); return; }
     if (!utilisateurCharge) return;
     const d = dossiers.find((x) => x.id === location.hash.replace('#', ''));
     if (d) ouvrir(d); else if (dossiers.length > 1) rendreListe();
@@ -588,18 +638,120 @@
     api.lister(id, 'client').then(pour((l) => rendreDocs($('[data-docs-client]'), $('[data-vide-client]'), l))).catch(() => erreur('Vos documents sont indisponibles pour le moment.'));
   };
 
+  // ---------- Lien personnel : page d'arrivée, ouverture au clic ----------
+  // Rien n'est vérifié au chargement : les filtres de messagerie (Safe Links, Proofpoint, Mimecast…) ouvrent les liens,
+  // et parfois exécutent le JavaScript, avant le destinataire. Le jeton n'est consommé qu'au clic sur « Ouvrir mon
+  // espace » ; l'événement de connexion (SIGNED_IN) affiche ensuite l'espace habituel, sur le dossier du lien. Navigateur
+  // déjà connecté : dossier du lien lisible par le compte connecté (le sien ; pour le compte de l'agence, qui lit tous les
+  // dossiers, celui du client, par exemple depuis la réponse d'un client qui cite notre e-mail) → ouvert directement,
+  // jeton laissé intact ; sinon (autre compte) → confirmation, puis fin de la session de cet appareil et vérification ;
+  // lien sans dossier (e-mail de connexion) → compte connecté gardé, jeton ignoré.
+  const LIEN_ILLISIBLE = 'Ce lien n’est pas valide : ouvrez-le de nouveau depuis l’e-mail reçu, en entier.';
+  // Lien refusé (403) : déjà servi, expiré, ou remplacé par un lien plus récent (texte proposé, à faire valider par Simon).
+  const LIEN_MORT = 'Ce lien ne fonctionne plus : il ne vaut qu’une fois, pendant 24 heures, et seul celui de notre dernier e-mail est valable. Ouvrez notre e-mail le plus récent, ou recevez un nouveau lien de connexion :';
+  const LIEN_TROP = 'Trop de tentatives en peu de temps. Patientez quelques minutes.';
+  const LIEN_ECHEC = 'Impossible d’ouvrir votre espace pour le moment. Réessayez dans quelques minutes.';
+  const DELAI_VERIF = 20000;   // vérification du jeton sans réponse au-delà : échec, nouvel essai possible
+  let emailCharge = '';   // adresse du compte connecté (message « autre compte »)
+  const BOUTON_LIEN = $('[data-btn-lien]').textContent;   // « Ouvrir mon espace » (libellé de la page)
+  // Adresse e-mail avec des points de coupure (après « @ », « . », « - », « _ », « + », et tous les 20 caractères) : une
+  // adresse longue ne fait pas déborder la page d'un téléphone.
+  const adresseCoupable = (email) => {
+    const f = document.createDocumentFragment();
+    let morceau = '';
+    Array.from(String(email)).forEach((c) => {
+      morceau += c;
+      if ('@.-_+'.includes(c) || morceau.length >= 20) { f.appendChild(document.createTextNode(morceau)); f.appendChild(document.createElement('wbr')); morceau = ''; }
+    });
+    if (morceau) f.appendChild(document.createTextNode(morceau));
+    return f;
+  };
+  const montrerLien = () => {
+    const autre = !!utilisateurCharge;
+    const z = $('[data-lien-compte]');
+    z.textContent = '';
+    if (autre) {
+      z.appendChild(document.createTextNode('Vous êtes connecté avec un autre compte ('));
+      z.appendChild(adresseCoupable(emailCharge));
+      z.appendChild(document.createTextNode('). Ouvrir l’espace de ce lien le déconnecte de cet appareil.'));
+    }
+    z.hidden = !autre;
+    const btn = $('[data-btn-lien]');
+    if (!ouverture) { btn.disabled = false; btn.textContent = autre ? 'Ouvrir l’espace de ce lien' : BOUTON_LIEN; }
+    montrer('lien');
+  };
+  // Dossiers du compte connecté lus, lien en attente : vrai si la confirmation (autre compte) est affichée. Dossier du
+  // lien lisible (règles RLS : ceux du client, tous pour l'agence) : ouvert par charger(), jeton laissé intact.
+  const lienAutreCompte = () => {
+    if (!lien || ouverture) return false;
+    if (!lien.dossier || dossiers.some((d) => d.id === lien.dossier)) { lien = undefined; return false; }
+    montrerLien();
+    return true;
+  };
+  // Lien ouvert dans l'onglet de la page déjà chargée (même adresse, nouveau fragment) : il remplace le précédent.
+  const recevoirLien = () => {
+    const l = lireLien();
+    if (demo || ouverture) return;                                         // fragment effacé, lien ignoré
+    if (!vues.chargement.hidden) { lien = l; return; }                     // session pas encore lue : traité à son arrivée
+    if (utilisateurCharge) {
+      if (l) { lien = l; charger(); }                                      // dossiers relus : même compte ou confirmation
+      else history.replaceState(null, '', location.pathname + location.search + (courant ? '#' + courant.id : ''));   // illisible : ignoré
+      return;
+    }
+    if (l) { lien = l; afficher('[data-lien-err]', ''); montrerLien(); }
+    else { lien = undefined; montrer('connexion'); afficher('[data-connexion-err]', LIEN_ILLISIBLE); }
+  };
+  // Réponse attendue au plus `ms` millisecondes, sinon échec (bouton rétabli, nouvel essai possible avec le même jeton).
+  const avecDelai = (promesse, ms) => new Promise((res, rej) => {
+    const t = setTimeout(() => rej(new Error('délai dépassé')), ms);
+    promesse.then((v) => { clearTimeout(t); res(v); }, (e) => { clearTimeout(t); rej(e); });
+  });
+  $('[data-form-lien]').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (!lien || ouverture) return;
+    const l = lien, btn = $('[data-btn-lien]'), form = ev.currentTarget;
+    ouverture = true; lien = undefined;
+    afficher('[data-lien-err]', '');
+    btn.disabled = true; btn.textContent = 'Ouverture…';
+    form.setAttribute('aria-busy', 'true');
+    if (l.dossier) history.replaceState(null, '', location.pathname + location.search + '#' + l.dossier);   // ouvert une fois connecté
+    let echec = null;
+    try {
+      if (utilisateurCharge) await api.deconnexionLocale().catch(() => {});   // autre compte : session de cet appareil fermée
+      if (utilisateurCharge) throw new Error('session non fermée');           // rien n'est vérifié
+      await avecDelai(api.verifier(l.jeton), DELAI_VERIF);                   // succès : SIGNED_IN affiche l'espace
+    } catch (ex) { echec = ex || {}; }
+    ouverture = false;
+    form.removeAttribute('aria-busy');
+    if (!echec) return;
+    if (echec.status === 403 || echec.code === 'otp_expired') {   // déjà servi, expiré, ou annulé par un lien plus récent
+      // Message focalisé : lu, et le champ e-mail suit au clavier
+      if (!utilisateurCharge) { montrer('connexion'); afficher('[data-connexion-err]', LIEN_MORT); $('[data-connexion-err]').focus(); }
+      return;
+    }
+    lien = l;   // jeton intact : nouvel essai possible
+    montrerLien();
+    afficher('[data-lien-err]', echec.status === 429 ? LIEN_TROP : LIEN_ECHEC);
+    btn.focus();
+  });
+
   // ---------- Session ----------
   api.surChangement((session, evt) => {
     if (evt === 'TOKEN_REFRESHED' || evt === 'USER_UPDATED') return;
     if (session && session.user) {
       compte.hidden = false;
-      $('[data-compte-email]').textContent = session.user.email || '';
+      emailCharge = session.user.email || '';
+      $('[data-compte-email]').textContent = emailCharge;
+      if (lien === null) lien = undefined;   // lien illisible, compte déjà connecté : rien à signaler
       if (utilisateurCharge !== (session.user.id || session.user.email)) { utilisateurCharge = session.user.id || session.user.email; charger(); }
     } else {
       utilisateurCharge = null;
+      emailCharge = '';
       oublier();
       compte.hidden = true;
+      if (lien || ouverture) { montrerLien(); return; }   // lien personnel : ouvert au clic sur le bouton
       montrer('connexion');
+      if (lien === null) { lien = undefined; afficher('[data-connexion-err]', LIEN_ILLISIBLE); }
       if (erreurLien) { const err = $('#e-err'); err.textContent = 'Ce lien a expiré ou a déjà été utilisé. Demandez un nouveau lien ci-dessous.'; err.hidden = false; }
     }
   });
