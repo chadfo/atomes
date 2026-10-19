@@ -15,7 +15,6 @@
 //             et ajoute au dossier les e-mails des clients (messages « imap:<Message-ID> ») ; « rattacher » un tel
 //             message le marque à traiter, le moteur range ses pièces jointes à son passage suivant
 // Les e-mails au client ont pour adresse de réponse MAIL_AGENCE (contact@) : le client écrit toujours à l'agence.
-// Lien direct : chaque e-mail au client porte un lien personnel qui ouvre son espace (une fois, 24 h : lienEspace).
 // Appel : POST JSON { action, projet, … } avec Authorization: Bearer <session Supabase>, ou { action, jeton, … }
 // pour les liens d'action. « Verify JWT » est désactivé : la session ou le jeton sont vérifiés ici (Resend
 // n'envoie ni l'un ni l'autre). Les transitions d'étapes passent par projets.etape : le déclencheur SQL
@@ -54,8 +53,6 @@ const ESPACE_AGENCE = `${SITE_URL}/admin/`;
 
 const DUREE_SIGNER = 30 * 86400;                  // validité des liens, en secondes
 const DUREE_VALIDER = 90 * 86400;
-const LIEN_OTP_MIN = 10;                          // lien direct : chiffres du code de Supabase (« Email OTP Length ») au moins
-const LIEN_DELAI_MS = 5000;                       // lien direct : attente de Supabase Auth au plus, puis e-mail sans lien
 const MAX_DEVIS_JOINT = 15 * 1024 * 1024;         // au-delà, le devis n'est pas joint à l'e-mail (lien seulement)
 const MAX_PIECE = 25 * 1024 * 1024;               // pièces jointes reçues du client
 const MAX_PIECES = 20;                            // par message
@@ -324,7 +321,7 @@ const ACTIONS_LIEN: Record<string, ActionLien> = {
     // Lien renvoyé à la page qui signe (son origine) ; celui de l'e-mail mène toujours au site (mailConfirmation).
     const renoncer = particulier ? await lienRenoncer(maj, base) : null;
     // Confirmation du contrat (cahier des charges § 5) ; si elle ne part pas, c'est noté pour l'agence (« Renvoyer »).
-    const mail = await mailConfirmation(sb, maj, pdf);
+    const mail = await mailConfirmation(maj, pdf);
     if (!mail) await majEchecs(sb, maj, [], { quoi: "confirmation", sujet: `Devis signé — dossier ${projet.id}`, le: new Date().toISOString() });
     await mailAgence(maj, `Devis signé — dossier ${projet.id} (${projet.nom})`, "Devis signé", [
       p(`${esc(projet.prenom)} ${esc(projet.nom)} a signé le devis en ligne (bouton «&nbsp;${esc(TEXTES.bouton)}&nbsp;»).`),
@@ -361,12 +358,12 @@ const ACTIONS_LIEN: Record<string, ActionLien> = {
     await mailAgence(maj, `Documents validés — dossier ${projet.id} (${projet.nom})`, "Documents validés",
       p(`${esc(projet.prenom)} ${esc(projet.nom)} a validé ses documents. ${suivante === "depot" ? "Option de suivi administratif : le dossier passe au dépôt." : "Le dossier est clos."}`));
     const mail = suivante === "clos"
-      ? await mailClient(sb, maj, `Dossier clos — dossier ${projet.id}`, "Dossier clos", [
+      ? await mailClient(maj, `Dossier clos — dossier ${projet.id}`, "Dossier clos", [
         `<h1 style="${H1}">Merci ${esc(projet.prenom)}, vos documents sont validés.</h1>`,
         p("Votre dossier est clos. Vos documents restent disponibles dans votre espace client. Merci de votre confiance."),
         bouton("Ouvrir mon espace client", ESPACE_CLIENT),
       ].join(""))
-      : await mailClient(sb, maj, `Documents validés — dossier ${projet.id}`, "Documents validés", [
+      : await mailClient(maj, `Documents validés — dossier ${projet.id}`, "Documents validés", [
         `<h1 style="${H1}">Merci ${esc(projet.prenom)}, vos documents sont validés.</h1>`,
         p("Nous préparons le dépôt de votre démarche administrative et vous tenons informé de son avancement."),
         bouton("Suivre mon dossier", ESPACE_CLIENT),
@@ -402,7 +399,7 @@ const ACTIONS_LIEN: Record<string, ActionLien> = {
     // Accusé de réception (à l'adresse du dossier, et séparément à l'adresse saisie si elle diffère) ; s'il ne part
     // nulle part, c'est noté pour l'agence (« Renvoyer ») et la page le dit au client. Une confirmation du contrat
     // restée à renvoyer n'a plus lieu d'être (contrat rétracté).
-    const mail = await mailsAccuse(sb, maj);
+    const mail = await mailsAccuse(maj);
     await majEchecs(sb, maj, ["confirmation"], mail ? null : { quoi: "retractation", sujet: `Rétractation reçue — dossier ${projet.id}`, le: new Date().toISOString() });
     const signeLe = dateParis(new Date(projet.signe_le));
     await mailAgence(maj, `Rétractation — dossier ${projet.id} (${projet.nom})`, "Rétractation", [
@@ -453,7 +450,7 @@ const ACTIONS_AGENCE: Record<string, Action> = {
     const { error } = await sb.from("questions").insert(lignes.map((x) => ({ projet_id: projet.id, question: x.question, choix: x.choix.length ? x.choix : null })));
     if (error) throw error;
     const plusieurs = lignes.length > 1;
-    const mail = await mailClient(sb, projet, `${plusieurs ? "Quelques questions" : "Une question"} sur votre dossier ${projet.id}`, plusieurs ? "Nos questions" : "Notre question", [
+    const mail = await mailClient(projet, `${plusieurs ? "Quelques questions" : "Une question"} sur votre dossier ${projet.id}`, plusieurs ? "Nos questions" : "Notre question", [
       `<h1 style="${H1}">Bonjour ${esc(projet.prenom)},</h1>`,
       p(`Pour affiner votre demande, nous avons ${plusieurs ? "quelques questions" : "une question"}&nbsp;:`),
       `<ul style="margin:0 0 18px;padding-left:18px;font-size:15px;line-height:24px">${lignes.map((x) =>
@@ -501,7 +498,7 @@ const ACTIONS_AGENCE: Record<string, Action> = {
     const lien = await lienAction(SITE_URL, "signer", projet.id, Math.floor(Date.now() / 1000) + DUREE_SIGNER, empreinte.slice(0, 16));
     const fichier = chemin.split("/").pop() ?? "devis.pdf";
     const joint = pdf.byteLength <= MAX_DEVIS_JOINT;
-    const mail = await mailClient(sb, maj, `Votre devis est prêt — dossier ${projet.id}`, "Votre devis", [
+    const mail = await mailClient(maj, `Votre devis est prêt — dossier ${projet.id}`, "Votre devis", [
       `<h1 style="${H1}">Bonjour ${esc(projet.prenom)}, votre devis est prêt.</h1>`,
       p(joint ? "Vous le trouverez en pièce jointe. Lisez-le, puis signez-le en ligne&nbsp;:" : "Lisez-le, puis signez-le en ligne&nbsp;:"),
       bouton("Lire et signer mon devis", lien),
@@ -545,10 +542,10 @@ const ACTIONS_AGENCE: Record<string, Action> = {
     if (!prevenir) return { etape: cle, mail: false, ...(mailEtape ? { retracte: true } : {}) };
     const maj = await relire(sb, projet, valeurs as Partial<Projet>);
     let mail: boolean;
-    if (cle === "validation") mail = await mailDocumentsPrets(sb, maj, docs);
+    if (cle === "validation") mail = await mailDocumentsPrets(maj, docs);
     else {
       const m = MAILS_ETAPE[cle];
-      mail = await mailClient(sb, maj, `${m.sujet} — dossier ${projet.id}`, m.sujet, [
+      mail = await mailClient(maj, `${m.sujet} — dossier ${projet.id}`, m.sujet, [
         `<h1 style="${H1}">Bonjour ${esc(projet.prenom)},</h1>`, p(m.texte), bouton(m.bouton, ESPACE_CLIENT),
       ].join(""));
     }
@@ -588,7 +585,7 @@ const ACTIONS_AGENCE: Record<string, Action> = {
     const maj = await relire(sb, projet, valeurs as Partial<Projet>);
     const montant = euros(projet.montant_cents);
     const production = valeurs.etape === "production";
-    const mail = await mailClient(sb, maj, `Paiement reçu — dossier ${projet.id}`, "Paiement reçu", [
+    const mail = await mailClient(maj, `Paiement reçu — dossier ${projet.id}`, "Paiement reçu", [
       `<h1 style="${H1}">Merci ${esc(projet.prenom)}, votre virement est bien reçu.</h1>`,
       p(`Nous avons bien reçu votre virement de ${esc(montant)} (référence ${projet.id}).${production ? " Nous lançons la production de vos documents et vous prévenons dès qu'ils sont prêts." : ""}`),
     ].join(""));
@@ -612,10 +609,10 @@ const ACTIONS_AGENCE: Record<string, Action> = {
       if (projet.retracte_le) throw new Refus("Le client a renoncé au contrat : renvoyez-lui plutôt l'accusé de réception de sa rétractation.", 409);
       const { octets, empreinte } = await empreinteFichier(sb, projet.devis_chemin);
       if (empreinte !== projet.signe_empreinte) throw new Refus("Le PDF du devis signé a changé dans le stockage : la confirmation n'est pas renvoyée.", 409);
-      mail = await mailConfirmation(sb, projet, octets);
+      mail = await mailConfirmation(projet, octets);
     } else if (quoi === "retractation") {
       if (!projet.retracte_le) throw new Refus("Aucune rétractation n'est enregistrée sur ce dossier.", 409);
-      mail = await mailsAccuse(sb, projet);
+      mail = await mailsAccuse(projet);
     } else throw new Refus("E-mail à renvoyer inconnu");
     if (mail) await majEchecs(sb, projet, [quoi], null);
     return { renvoye: quoi, mail };
@@ -695,9 +692,9 @@ const MAILS_ETAPE: Record<string, { sujet: string; texte: string; bouton: string
 // E-mail « Vos documents sont prêts » (passage à l'étape « Validation de vos documents ») : liste des documents
 // de l'agence, lien de validation (90 jours) ; une modification se demande en répondant à l'e-mail. Faux si l'e-mail
 // n'est pas parti.
-async function mailDocumentsPrets(sb: Sb, projet: Projet, docs: Doc[]): Promise<boolean> {
+async function mailDocumentsPrets(projet: Projet, docs: Doc[]): Promise<boolean> {
   const lien = JETON_SECRET ? await lienAction(SITE_URL, "valider", projet.id, Math.floor(Date.now() / 1000) + DUREE_VALIDER) : "";
-  return await mailClient(sb, projet, `Vos documents sont prêts — dossier ${projet.id}`, "Vos documents sont prêts", [
+  return await mailClient(projet, `Vos documents sont prêts — dossier ${projet.id}`, "Vos documents sont prêts", [
     `<h1 style="${H1}">Bonjour ${esc(projet.prenom)}, vos documents sont prêts.</h1>`,
     docs.length
       ? p("Voici les documents de votre dossier&nbsp;:") + `<ul style="margin:0 0 18px;padding-left:18px;font-size:14px;line-height:24px">${docs.map((d) =>
@@ -1713,77 +1710,13 @@ async function envoyerMail(m: { to: string[]; subject: string; html: string; rep
   }
 }
 
-// Lien direct : lien personnel vers l'espace client, ESPACE_CLIENT#connexion=<jeton>&dossier=<id>. Jeton de connexion
-// Supabase (hashed_token de generateLink, aucun e-mail envoyé par Supabase) : valable une fois, pendant « Email OTP
-// Expiration » (24 h) ; chaque nouveau jeton du compte annule le précédent. La page /dossier/ ne s'en sert qu'au clic sur
-// « Ouvrir mon espace » (les filtres de messagerie ouvrent les liens avant le destinataire). null sans compte, compte
-// introuvable, e-mail du compte autre que celui du dossier, compte de l'agence, code de Supabase trop court, ou lien
-// impossible à créer. generateLink crée le compte d'une adresse inconnue (type « signup ») : appelé seulement avec
-// l'e-mail du compte du dossier, type contrôlé. Le jeton vaut ce que vaut le code (email_otp) dont il est l'empreinte :
-// Supabase accepte aussi ce code seul (POST /auth/v1/verify { email, token }) pendant toute la durée du lien, et à moins
-// de 10 chiffres (« Email OTP Length ») il se devine en 24 h par essais répétés : lien refusé, seule la longueur du code
-// est lue. Jeton, action_link et email_otp jamais journalisés ni renvoyés au navigateur.
-async function lienEspace(sb: Sb, projet: Projet): Promise<string | null> {
-  if (!projet.client_id) return null;
-  try {
-    const { data: compte, error: errCompte } = await sb.auth.admin.getUserById(projet.client_id);
-    if (errCompte || !compte?.user) {
-      console.warn("lien direct : compte du dossier introuvable, e-mail sans lien personnel", projet.id, String(errCompte?.message ?? "").slice(0, 200));
-      return null;
-    }
-    const email = String(compte.user.email ?? "").trim().toLowerCase();
-    if (!email || email !== projet.email.trim().toLowerCase()) {
-      console.warn("lien direct : l'e-mail du compte n'est pas celui du dossier, e-mail sans lien personnel", projet.id);
-      return null;
-    }
-    if (await estAdmin(sb, projet.client_id)) return null;
-    const { data, error } = await sb.auth.admin.generateLink({ type: "magiclink", email });
-    if (error || !data?.properties) {
-      console.error("lien direct impossible, e-mail sans lien personnel", projet.id, String(error?.message ?? "réponse vide").slice(0, 200));
-      return null;
-    }
-    const type = data.properties.verification_type, jeton = String(data.properties.hashed_token ?? "");
-    if (type !== "magiclink") {
-      console.error("lien direct : type de lien inattendu, e-mail sans lien personnel", projet.id, type ? String(type).slice(0, 40) : "type absent");
-      return null;
-    }
-    if (String(data.properties.email_otp ?? "").length < LIEN_OTP_MIN) {
-      console.error("lien direct : « Email OTP Length » inférieur à 10 dans Supabase, e-mail sans lien personnel", projet.id);
-      return null;
-    }
-    if (!/^[0-9a-f]{20,128}$/.test(jeton)) { console.error("lien direct : jeton mal formé, e-mail sans lien personnel", projet.id); return null; }
-    return `${ESPACE_CLIENT}#connexion=${jeton}&dossier=${projet.id}`;
-  } catch (e) {
-    console.error("lien direct impossible, e-mail sans lien personnel", projet.id, e instanceof Error ? e.message.slice(0, 200) : "erreur");
-    return null;
-  }
-}
-
 // E-mail au client : réponse à MAIL_AGENCE (contact@ ; le moteur de l'agence ajoute la réponse au dossier),
-// timeline et lien vers l'espace client en pied. Lien direct : un seul lien personnel par e-mail (lienEspace), à la
-// place de chaque lien vers l'espace client (corps et pied), avec une phrase sous celui du pied ; sans lien personnel,
-// e-mail inchangé. Un e-mail qui échoue ne fait jamais échouer l'action (déjà enregistrée) : le résultat (faux si
-// l'e-mail n'est pas parti) est renvoyé à l'appelant, qui le signale.
-async function mailClient(sb: Sb, projet: Projet, sujet: string, titre: string, corps: string, pieces: PieceJointe[] = []): Promise<boolean> {
-  // Sans clé Resend, rien ne part : pas de nouveau jeton (il annulerait celui du dernier e-mail reçu). Supabase Auth
-  // trop lent : l'e-mail part sans lien personnel au bout de LIEN_DELAI_MS (confirmation et accusé légaux compris).
-  let minuteur: ReturnType<typeof setTimeout> | undefined;
-  const lien = RESEND_KEY
-    ? await Promise.race([
-      lienEspace(sb, projet),
-      new Promise<null>((fin) => {
-        minuteur = setTimeout(() => { console.warn("lien direct : Supabase Auth trop lent, e-mail sans lien personnel", projet.id); fin(null); }, LIEN_DELAI_MS);
-      }),
-    ]).finally(() => clearTimeout(minuteur))
-    : null;
-  // Phrase du pied : texte proposé, à faire valider par Simon.
-  const pied = lien
-    ? `<p style="margin:0 0 4px;font-size:15px;line-height:24px"><a href="${esc(lien)}" style="color:#171512">Suivre mon dossier en ligne</a></p>`
-      + `<p style="margin:0 0 14px;font-size:13px;line-height:20px;color:#7a7368">Lien personnel&nbsp;: il ouvre directement votre espace, une seule fois, pendant 24&nbsp;heures&nbsp;; celui de notre e-mail suivant le remplace. Ensuite, connectez-vous depuis ${esc(ESPACE_CLIENT.replace(/^https?:\/\//, ""))}. Si vous transférez cet e-mail, retirez-en ce lien.</p>`
-    : p(`<a href="${ESPACE_CLIENT}" style="color:#171512">Suivre mon dossier en ligne</a>`);
+// timeline et lien vers l'espace client en pied. Un e-mail qui échoue ne fait jamais échouer l'action (déjà
+// enregistrée) : le résultat (faux si l'e-mail n'est pas parti) est renvoyé à l'appelant, qui le signale.
+async function mailClient(projet: Projet, sujet: string, titre: string, corps: string, pieces: PieceJointe[] = []): Promise<boolean> {
   return envoyerMail({
     to: [projet.email], replyTo: MAIL_AGENCE, subject: sujet, attachments: pieces,
-    html: gabarit(titre, (lien ? corps.split(`href="${esc(ESPACE_CLIENT)}"`).join(`href="${esc(lien)}"`) : corps) + timelineHtml(projet) + pied),
+    html: gabarit(titre, corps + timelineHtml(projet) + p(`<a href="${ESPACE_CLIENT}" style="color:#171512">Suivre mon dossier en ligne</a>`)),
   });
 }
 
@@ -1844,12 +1777,12 @@ function preuveSignature(projet: Projet): [string, string][] {
 
 // Confirmation du contrat (cahier des charges § 5) : envoyée à la signature, puis par l'agence (« Renvoyer ») si elle
 // n'est pas partie. pdf : devis signé, joint s'il fait 15 Mo au plus. Faux si l'e-mail n'est pas parti.
-async function mailConfirmation(sb: Sb, projet: Projet, pdf: ArrayBuffer | null): Promise<boolean> {
+async function mailConfirmation(projet: Projet, pdf: ArrayBuffer | null): Promise<boolean> {
   const particulier = estParticulier(projet);
   const fichier = (projet.devis_chemin ?? "").split("/").pop() || "devis.pdf";
   const joint = !!pdf && pdf.byteLength <= MAX_DEVIS_JOINT;
   const renoncer = particulier ? await lienRenoncer(projet, SITE_URL) : null;
-  return await mailClient(sb, projet, `Devis signé — dossier ${projet.id}`, "Devis signé", [
+  return await mailClient(projet, `Devis signé — dossier ${projet.id}`, "Devis signé", [
     `<h1 style="${H1}">Merci ${esc(projet.prenom)}, votre devis est signé.</h1>`,
     tableau(preuveSignature(projet)),
     p(joint ? "Cet e-mail confirme votre commande&nbsp;: votre devis signé y est joint." : "Cet e-mail confirme votre commande. Votre devis signé est disponible dans votre espace client."),
@@ -1860,9 +1793,9 @@ async function mailConfirmation(sb: Sb, projet: Projet, pdf: ArrayBuffer | null)
 }
 
 // Accusé de réception de la rétractation : complet (timeline, réponse à l'adresse du dossier) à l'adresse du dossier ;
-// à l'adresse saisie, si elle diffère, un envoi séparé, sans timeline ni lien personnel, réponse à l'agence (cette
-// adresse est choisie par le détenteur du lien). Vrai si l'accusé est parti vers au moins une des deux adresses.
-async function mailsAccuse(sb: Sb, projet: Projet): Promise<boolean> {
+// à l'adresse saisie, si elle diffère, un envoi séparé, sans timeline, réponse à l'agence (cette adresse est choisie
+// par le détenteur du lien). Vrai si l'accusé est parti vers au moins une des deux adresses.
+async function mailsAccuse(projet: Projet): Promise<boolean> {
   const sujet = `Rétractation reçue — dossier ${projet.id}`;
   const corps = [
     `<h1 style="${H1}">Votre rétractation est bien reçue.</h1>`,
@@ -1873,7 +1806,7 @@ async function mailsAccuse(sb: Sb, projet: Projet): Promise<boolean> {
     ]),
     p("Conservez cet e-mail&nbsp;: il en est la preuve."),
   ].join("");
-  const auDossier = await mailClient(sb, projet, sujet, "Accusé de réception", corps);
+  const auDossier = await mailClient(projet, sujet, "Accusé de réception", corps);
   const saisie = (projet.retracte_email ?? "").trim().toLowerCase();
   const autre = saisie && saisie !== projet.email.trim().toLowerCase()
     ? await envoyerMail({ to: [saisie], replyTo: MAIL_AGENCE, subject: sujet, html: gabarit("Accusé de réception", corps) })

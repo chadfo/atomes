@@ -1,17 +1,6 @@
 <!-- Modèle Supabase : Authentication → Emails → Templates → Magic link or OTP → onglet Source.
      Objet : Votre lien de connexion — Atomes studio
-     Variables de Supabase utilisées (nommées ici sans accolades, pour qu'aucune ne soit remplacée dans ce
-     commentaire) : RedirectTo, page qui a demandé le lien (https://atomes.studio/dossier/ ou https://atomes.studio/admin/,
-     à inscrire dans les Redirect URLs), et TokenHash, jeton du lien, à usage unique. Lien : RedirectTo, puis
-     « #connexion= » et TokenHash ; la page lit le jeton dans le fragment et ne le vérifie qu'au clic sur son bouton
-     (« Ouvrir mon espace », « Ouvrir l'espace agence »), car les filtres de messagerie ouvrent les liens avant le
-     destinataire. Plus de ConfirmationURL : ce lien-là était consommé dès sa première ouverture.
-     Réglages Supabase (Authentication → Sign In / Providers → Email), dans cet ordre : « Email OTP Length » = 10, puis
-     « Email OTP Expiration » = 86400 (24 heures). Le jeton est l'empreinte d'un code de « Email OTP Length » chiffres que
-     Supabase accepte aussi seul : à 6 chiffres, valable 24 heures, il se devinerait par essais répétés ; si la longueur
-     ne peut pas passer à 10, ne pas allonger la durée. Ne coller ce modèle qu'une fois publiées les pages dossier/ et
-     admin/ du lien direct (SETUP-ESPACE-CLIENT.md, « Mises à jour à appliquer ») : les anciennes ne lisent pas
-     « #connexion= ». -->
+     Variables Supabase : {{ .ConfirmationURL }} (lien de connexion), {{ .Email }} (adresse). -->
 <!doctype html>
 <html lang="fr">
 <body style="margin:0;padding:32px 16px;background:#f4f2ee;font-family:Helvetica,Arial,sans-serif;color:#141414">
@@ -21,9 +10,9 @@
 <div style="font-size:11px;line-height:16px;letter-spacing:2px;text-transform:uppercase;color:#8d8d8d;margin-bottom:14px">Espace client</div>
 <h1 style="margin:0 0 18px;font-size:24px;line-height:30px;font-weight:bold;color:#141414">Votre lien de connexion</h1>
 <p style="margin:0 0 14px;font-size:15px;line-height:24px">Bonjour,</p>
-<p style="margin:0 0 22px;font-size:15px;line-height:24px">Cliquez sur le bouton ci-dessous pour accéder à votre dossier. Ce lien est valable 24 heures et ne fonctionne qu'une fois ; le lien de notre e-mail suivant le remplace.</p>
-<p style="margin:0 0 26px"><a href="{{ .RedirectTo }}#connexion={{ .TokenHash }}" style="display:inline-block;background:#171512;color:#ffffff;text-decoration:none;font-size:12px;line-height:16px;letter-spacing:2px;text-transform:uppercase;padding:14px 24px">Accéder à mon dossier</a></p>
-<p style="margin:0 0 14px;font-size:13px;line-height:20px;color:#7a7a7a">Si le bouton ne fonctionne pas, copiez cette adresse dans votre navigateur :<br><a href="{{ .RedirectTo }}#connexion={{ .TokenHash }}" style="color:#3a3a3a;word-break:break-all">{{ .RedirectTo }}#connexion={{ .TokenHash }}</a></p>
+<p style="margin:0 0 22px;font-size:15px;line-height:24px">Cliquez sur le bouton ci-dessous pour accéder à votre dossier. Ce lien est valable une heure et ne fonctionne qu'une fois.</p>
+<p style="margin:0 0 26px"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#171512;color:#ffffff;text-decoration:none;font-size:12px;line-height:16px;letter-spacing:2px;text-transform:uppercase;padding:14px 24px">Accéder à mon dossier</a></p>
+<p style="margin:0 0 14px;font-size:13px;line-height:20px;color:#7a7a7a">Si le bouton ne fonctionne pas, copiez cette adresse dans votre navigateur :<br><a href="{{ .ConfirmationURL }}" style="color:#3a3a3a;word-break:break-all">{{ .ConfirmationURL }}</a></p>
 <p style="margin:0;font-size:13px;line-height:20px;color:#7a7a7a">Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet e-mail.</p>
 <div style="margin-top:36px;padding-top:24px;border-top:1px solid #e3ded4">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Helvetica,Arial,sans-serif;color:#141414">

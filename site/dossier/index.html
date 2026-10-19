@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Espace client — Atomes studio</title>
 <meta name="robots" content="noindex, nofollow">
-<meta name="referrer" content="no-referrer">
 <meta name="description" content="Espace client Atomes studio : avancement de votre dossier, documents échangés et historique de vos échanges.">
 <meta name="theme-color" content="#171512">
 <link rel="icon" type="image/png" href="../favicon.png">
@@ -16,7 +15,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" defer></script>
 <script src="../assets/js/config.js" defer></script>
 <script src="../assets/js/atom-logo.js" defer></script>
-<script src="../assets/js/dossier.js?v=4" defer></script>
+<script src="../assets/js/dossier.js?v=3" defer></script>
 </head>
 <body>
 <div class="page">
@@ -49,23 +48,9 @@
         <p class="espace-intro" data-config-msg>L'espace client n'est pas encore activé. Pour tout suivi de dossier, écrivez-nous à <a href="mailto:contact@atomes.studio">contact@atomes.studio</a>.</p>
       </div>
 
-      <!-- Lien personnel reçu par e-mail (#connexion=…) : le jeton n'est vérifié qu'au clic sur le bouton -->
-      <div data-vue="lien" hidden>
-        <h1>Votre espace client</h1>
-        <p class="espace-intro">Ce lien personnel ouvre votre espace client.</p>
-        <p class="espace-intro" data-lien-compte hidden></p>
-        <form class="form espace-form" data-form-lien novalidate>
-          <div class="form-actions">
-            <button type="submit" class="btn" data-btn-lien>Ouvrir mon espace</button>
-          </div>
-          <div class="f-err" data-lien-err role="alert" hidden></div>
-        </form>
-      </div>
-
       <!-- Connexion sans mot de passe -->
       <div data-vue="connexion" hidden>
         <h1>Suivre votre dossier</h1>
-        <div class="notice" data-connexion-err role="alert" tabindex="-1" hidden></div>
         <p class="espace-intro">Entrez l'adresse e-mail utilisée pour votre demande&nbsp;: vous recevrez un lien de connexion, sans mot de passe.</p>
         <form class="form espace-form" data-form-connexion novalidate>
           <div class="field">

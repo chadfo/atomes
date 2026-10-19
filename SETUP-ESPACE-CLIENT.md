@@ -46,16 +46,13 @@ de dossier.
    ```
 3. **Authentication → Sign In / Providers → Email** : laisser le provider Email activé (c'est lui qui
    envoie les liens de connexion). Laisser « Confirm email » tel quel : les comptes sont créés déjà
-   confirmés par la fonction. Régler « Email OTP Length » = **10**, puis « Email OTP Expiration » = **86400** :
-   les liens de connexion et les liens personnels des e-mails valent 24 heures (voir « Mises à jour à appliquer »,
-   lien direct).
+   confirmés par la fonction.
 4. **Authentication → Sign In / Providers → User Signups** (ou « Settings ») : **désactiver « Allow new
    users to sign up »**. Important : sinon n'importe qui pourrait créer un compte avec l'adresse e-mail
    d'un futur client et récupérer son dossier. Les comptes sont créés uniquement par la fonction
    `demande` (ou par toi, voir § 5), et les clients existants continuent de recevoir leurs liens.
 5. **Authentication → URL Configuration** : Site URL = `https://atomes.studio` ; Redirect URLs : ajouter
-   `https://atomes.studio/dossier/`, `https://atomes.studio/admin/`, `http://localhost:3000/dossier/` et
-   `http://localhost:3000/admin/`.
+   `https://atomes.studio/dossier/` et `http://localhost:3000/dossier/`.
 6. Le modèle de l'e-mail de connexion se personnalise seulement après l'étape 2.4 (Supabase bloque les
    modèles tant qu'aucun SMTP personnalisé n'est configuré) : voir l'étape 2.5.
 7. **Project Settings → API Keys** : noter la **Project URL** et la clé publique. Selon la date de
@@ -87,8 +84,7 @@ de dossier.
    contenu de `emails/supabase-magic-link.html` (même mise en page et même signature que les e-mails de la
    fonction `demande`), puis « Save changes ». Le logo de la signature est
    `https://atomes.studio/images/logo-signature.gif` : il s'affiche dès que le site est publié avec le dossier
-   `images/` à jour. Le lien du modèle mène à la page qui l'a demandé (`/dossier/` ou `/admin/`), qui ne s'en sert
-   qu'au clic sur son bouton : il suppose les réglages du § 1.3 et du § 1.5, et les pages du lien direct publiées.
+   `images/` à jour.
 
 La réception des réponses des clients (sous-domaine `r.atomes.studio`) se règle plus loin, au § 7.
 
@@ -148,7 +144,7 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
    l'étape 5.1 n'existe pas : le créer, puis relancer l'insert. Tu vois alors tous les dossiers dans
    l'espace client, avec tous les documents.
 3. Ouvrir `https://atomes.studio/dossier/` (ou localhost:3000/dossier/), entrer contact@atomes.studio,
-   cliquer sur le lien reçu, puis sur « Ouvrir mon espace ».
+   cliquer sur le lien reçu.
 
 ## 6. Tester
 
@@ -162,62 +158,6 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
 4. Le parcours complet (réponses par e-mail, signature, virement) se teste au § 7, point 7.
 
 ## Mises à jour à appliquer
-
-### Lien direct vers l'espace client (19 octobre 2026)
-
-Chaque e-mail que la fonction `espace` envoie au client (questions, devis, confirmation du contrat, paiement,
-documents, étapes, accusé de rétractation) se termine par un lien personnel, « Suivre mon dossier en ligne », qui
-ouvre son espace sans ressaisir son adresse : une seule fois, pendant 24 heures, et le lien d'un nouvel e-mail annule
-les précédents. L'accusé de réception de la demande (fonction `demande`) n'en a pas : l'adresse vient d'être saisie,
-et une faute de frappe ouvrirait l'espace à un inconnu. La page ne se sert du lien qu'au clic sur « Ouvrir mon
-espace » (les filtres de messagerie ouvrent les liens avant le destinataire) ; ensuite, le client reste connecté sur
-cet appareil. L'e-mail de connexion (modèle « Magic link ») passe au même mécanisme, pour l'espace client comme pour
-l'espace agence (« Ouvrir l'espace agence »).
-
-À faire **une fois la mise à jour du moteur (ci-dessous) terminée**, dans la même séance et dans cet ordre :
-
-1. **Supabase, Authentication → Sign In / Providers → Email** : « Email OTP Length » = **10**, enregistrer ; puis
-   seulement « Email OTP Expiration » = **86400** (24 heures), enregistrer. Pourquoi cet ordre : le lien est
-   l'empreinte d'un code de « Email OTP Length » chiffres, que Supabase accepte aussi tapé seul, pendant toute la
-   durée du lien. À 6 chiffres (la valeur par défaut) et valable 24 heures, il se devinerait par essais répétés ; à
-   10 chiffres, c'est hors de portée. Si le champ refuse 10, ne pas changer la durée et t'arrêter là : la fonction
-   n'ajoute de lien personnel qu'avec un code de 10 chiffres. Le Security Advisor de Supabase signalera ensuite
-   « OTP long expiry » (durée de plus d'une heure) : c'est attendu.
-2. **Authentication → URL Configuration → Redirect URLs** : ajouter `https://atomes.studio/admin/` et
-   `http://localhost:3000/admin/` s'ils n'y sont pas (`/dossier/` y est déjà, § 1.5). Le lien de l'e-mail de
-   connexion mène à la page qui l'a demandé, si Supabase l'accepte (toujours sur atomes.studio ; en local, seulement
-   si elle figure dans cette liste) ; sinon, il mènerait à l'accueil du site, où il ne sert à rien.
-3. **Resend, Domains → atomes.studio** : vérifier que le suivi des clics (**Click Tracking**) est désactivé ; sinon,
-   le désactiver. Activé, il remplace chaque lien des e-mails par un lien de suivi de Resend qui contient l'adresse
-   complète, jeton compris : le jeton passerait par les serveurs et les journaux de Resend. Ce réglage vaut aussi pour
-   les e-mails de connexion, que Supabase envoie par le SMTP de Resend.
-4. **Publier le site** (VS Code → Sync Changes), attendre le vert dans l'onglet Actions de GitHub, puis une dizaine
-   de minutes (cache des navigateurs). Les nouvelles pages comprennent les nouveaux liens et acceptent encore les
-   anciens : elles passent en premier.
-5. **Redéployer la fonction `espace`** (§ 7, point 1) avec le `index.ts` à jour : dès lors, chaque e-mail au client
-   porte son lien personnel.
-6. **Recoller le modèle « Magic link »** (§ 2.5) avec le contenu à jour de `emails/supabase-magic-link.html`, en
-   **dernier** : jamais avant la fin de l'étape 4, car les anciennes pages ne lisent pas le nouveau lien, et plus
-   personne ne pourrait se connecter, toi compris.
-7. **Tester**, en fenêtre privée (dans un même navigateur, l'espace client et l'espace agence partagent la
-   connexion, et les fenêtres privées ouvertes en même temps la partagent entre elles), sur un dossier de test dont
-   l'adresse est à toi mais n'est pas celle d'un compte de l'agence : un compte de l'agence ne reçoit jamais de lien
-   personnel, et un essai avec contact@ donnerait un e-mail sans lien.
-   1. Espace agence : poser une question sur ce dossier. L'e-mail reçu se termine par « Suivre mon dossier en ligne »
-      et la phrase « Lien personnel : … ».
-   2. Copier ce lien (clic droit → copier l'adresse du lien) et le coller dans une fenêtre privée : un clic dans
-      l'e-mail l'ouvrirait dans ta fenêtre habituelle, connectée à l'espace agence. Page « Votre espace client »,
-      bouton « Ouvrir mon espace » ; cliquer : le dossier s'ouvre, sans saisir d'adresse.
-   3. Fermer la fenêtre privée, en ouvrir une nouvelle, y coller le même lien et cliquer : « Ce lien ne fonctionne
-      plus… », puis le formulaire de connexion.
-   4. Fermer la fenêtre privée ; dans une nouvelle, ouvrir https://atomes.studio/admin/ et demander un lien pour
-      contact@atomes.studio. Coller le lien de l'e-mail reçu dans cette fenêtre : page « Connexion », bouton « Ouvrir
-      l'espace agence », puis la liste des dossiers.
-
-Si la fonction `espace` est redéployée avec cette version avant les étapes 1 à 4 (par exemple pour la mise à jour du
-moteur), faire les étapes 1 à 3 avant ce déploiement, puis l'étape 4 aussitôt après ; entre les deux, n'envoyer aucun
-e-mail au client depuis l'espace agence : les anciennes pages ne lisent pas le lien personnel. Les liens des e-mails
-déjà envoyés, et ceux des e-mails de connexion envoyés avant l'étape 6, continuent de marcher.
 
 ### Moteur de l'agence (19 octobre 2026)
 
@@ -486,27 +426,6 @@ d'un dossier :
   l'adresse différente ou le résultat de la signature DKIM (« Signature DKIM : absente », « échec »…). « Rattacher
   au dossier » le marque « En attente du moteur » : ses pièces sont rangées et sa réponse enregistrée au passage
   suivant du moteur (5 minutes, ordinateur allumé).
-- **Lien personnel des e-mails** (lien direct) : chaque e-mail de la fonction au client se termine par « Suivre mon
-  dossier en ligne », qui ouvre son espace sans ressaisir son adresse, au clic sur « Ouvrir mon espace » : une seule
-  fois, pendant 24 heures ; ensuite, il reste connecté sur cet appareil. Seul le dernier lien envoyé au client
-  fonctionne : chaque nouvel e-mail de l'agence, même pour un autre de ses dossiers, et chaque lien de connexion qu'il
-  demande annulent le précédent, même si l'e-mail n'a pas pu partir (quota de Resend atteint). Un client qui voit « Ce
-  lien ne fonctionne plus » ouvre ton dernier e-mail, ou demande un lien de connexion sur la page. Une demande de lien
-  faite moins d'une minute après un e-mail de l'agence est refusée par Supabase (« Un lien vient peut-être déjà de
-  vous être envoyé… ») : une minute plus tard, elle passe. Les comptes de l'agence ne reçoivent jamais de lien
-  personnel, et l'accusé de réception d'une demande non plus.
-- **Ne jamais cliquer « Suivre mon dossier en ligne » dans un e-mail de client**, ni transférer à un tiers un e-mail
-  envoyé au client : la réponse d'un client cite souvent notre e-mail, lien compris, et ce lien ouvre son espace.
-  Dans ton navigateur habituel, connecté à l'espace agence, la page ouvre simplement le dossier, sans se servir du
-  lien ; dans un autre navigateur, « Ouvrir mon espace » te connecterait avec le compte du client, et son propre lien
-  ne marcherait plus. Pour essayer un lien client, une fenêtre privée. Si l'espace agence affiche « Accès réservé »
-  (un compte client est resté connecté dans ce navigateur) : « Se déconnecter », puis rouvrir le lien de connexion.
-- **Déconnexion et durée des connexions** : « Se déconnecter » ferme la connexion du compte sur tous ses appareils ;
-  changer de compte depuis un lien personnel (« Ouvrir l'espace de ce lien ») ne ferme que celle de l'appareil
-  utilisé. Une connexion ouverte n'expire pas d'elle-même : les réglages qui la limitent (« Time-box user sessions »,
-  « Inactivity timeout ») sont réservés aux offres payantes de Supabase (à vérifier dans Authentication → Sessions). Le
-  lien personnel est effacé de la barre d'adresse, mais l'adresse complète reste dans l'historique du navigateur : il
-  n'y vaut que tant qu'il n'a pas servi, 24 heures au plus, jusqu'au lien suivant.
 - **E-mail à renvoyer** : si la confirmation du contrat (« Devis signé ») ou l'accusé de réception d'une
   rétractation n'a pas pu partir (quota d'e-mails atteint, panne de Resend), le dossier s'affiche « E-mail à
   renvoyer » et un bandeau en tête de la fiche propose « Renvoyer ». Ces deux e-mails sont des obligations
@@ -599,8 +518,7 @@ d'un dossier :
 - **Un client demande un nouveau lien** (« Ce lien a expiré ») : pour signer, renvoyer le devis depuis l'espace
   agence (même PDF, même montant) ; pour valider, « Passer ici » sur « Production de vos documents », puis
   « Documents prêts : demander la validation ». Un nouvel e-mail part avec un nouveau lien. Le lien de
-  rétractation, lui, expire avec le délai. Le lien personnel vers son espace (« Suivre mon dossier en ligne ») se
-  remplace sans toi : lien de connexion demandé sur https://atomes.studio/dossier/, ou ton prochain e-mail.
+  rétractation, lui, expire avec le délai.
 - **Rétractation reçue par lettre ou par simple e-mail** : elle vaut autant que le lien. En accuser réception au
   client par e-mail, puis l'enregistrer : Table Editor → `projets` → le dossier → `retracte_le` (date et heure de
   réception) et `retracte_nom`. La fiche et l'espace client l'affichent alors.
@@ -646,9 +564,8 @@ d'un dossier :
   ou accepter ce risque au début.
 - Offre gratuite Resend : 3 000 e-mails par mois et 100 par jour, envoyés et reçus confondus, et un seul webhook.
   Au-delà, offre Pro (20 $/mois). Une fois le quota du jour atteint, plus rien ne part ce jour-là, pas même les
-  liens de connexion à l'espace client : d'où le compte de réception séparé (§ 7, point 3). Un e-mail au client qui
-  ne part pas annule quand même le lien personnel de son e-mail précédent (Supabase ne sait pas revenir au jeton
-  d'avant). Surveiller l'usage dans Resend (**Usage**), et regarder la fiche des dossiers « E-mail à renvoyer ».
+  liens de connexion à l'espace client : d'où le compte de réception séparé (§ 7, point 3). Surveiller l'usage dans
+  Resend (**Usage**), et regarder la fiche des dossiers « E-mail à renvoyer ».
 - Protections anti-abus de la fonction : champ piège, validation de tous les champs, 10 fichiers et 10 Mo
   maximum, images et PDF uniquement, 3 demandes par adresse e-mail et par jour, 30 demandes par heure au
   total (au-delà, FormSubmit prend le relais). Si des demandes automatisées arrivent malgré tout, l'étape
