@@ -318,7 +318,7 @@ adresses de dossier (`r.atomes.studio`), le temps de la transition.
   unique (modèle « Magic link » = `emails/supabase-magic-link.html`, avec seulement `{{ .Token }}`, aucun lien) ;
   étape 2, le code saisi sur la page (espaces et tirets retirés, 6 à 10 chiffres acceptés),
   `verifyOtp({ email, token, type: 'email' })`, puis la suite habituelle (SIGNED_IN). Réglages Supabase : « Email OTP
-  Length » = 8, « Email OTP Expiration » = 3600 ; un seul code valable à la fois (une nouvelle demande annule le
+  Length » = 6, « Email OTP Expiration » = 3600 ; un seul code valable à la fois (une nouvelle demande annule le
   précédent). Même affichage dans la page qu'une adresse ait un compte ou non, sauf dans un cas de « J'ai déjà un
   code » (plus bas) : à l'étape 1, l'envoi, une adresse inconnue (422) et un code redemandé moins d'une minute après le précédent
   (429 « For security purposes… », le précédent reste valable) mènent à la même étape 2 ; « Recevoir un nouveau code »

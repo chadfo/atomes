@@ -85,7 +85,7 @@ de dossier.
    fonction `demande` ; l'e-mail ne contient que le code, aucun lien de connexion), puis « Save changes ». Le logo
    de la signature est `https://atomes.studio/images/logo-signature.gif` : il s'affiche dès que le site est publié
    avec le dossier `images/` à jour. Vérifier aussi, dans **Authentication → Sign In / Providers → Email**,
-   « Email OTP Length » = **8** et « Email OTP Expiration » = **3600** (une heure, comme le dit l'e-mail).
+   « Email OTP Length » = **6** et « Email OTP Expiration » = **3600** (une heure, comme le dit l'e-mail).
 
 La réception des réponses des clients (sous-domaine `r.atomes.studio`) se règle plus loin, au § 7.
 
@@ -163,14 +163,14 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
 ### Connexion par code (19 octobre 2026)
 
 Pour entrer dans l'espace client (https://atomes.studio/dossier/) comme dans l'espace agence (/admin/), on tape son
-adresse, puis le code reçu par e-mail (8 chiffres, valable une heure, une seule fois) : plus aucun lien de connexion.
+adresse, puis le code reçu par e-mail (6 chiffres, valable une heure, une seule fois) : plus aucun lien de connexion.
 Les e-mails automatiques (fonctions `espace` et `demande`) gardent le simple lien « Suivre mon dossier en ligne », qui
 mène à cette page : un e-mail transféré (banque, notaire, entreprise) ne donne accès à rien. Cette mise à jour remplace
 le lien direct, publié le 19 octobre au soir puis abandonné : ne pas appliquer ses réglages ; si tu l'as fait, ils sont
 défaits ici. Dans la même séance, dans cet ordre :
 
 1. **Supabase → Authentication → Sign In / Providers → Email** : « Email OTP Expiration » = **3600**, enregistrer ;
-   puis « Email OTP Length » = **8**, enregistrer. Cet ordre, pour qu'un code court ne soit jamais valable 24 heures,
+   puis « Email OTP Length » = **6**, enregistrer. Cet ordre, pour qu'un code court ne soit jamais valable 24 heures,
    même un instant. Si ces valeurs y sont déjà, rien à changer.
 2. **Redéployer la fonction `espace`** (§ 7, point 1), puis **la fonction `demande`** (§ 3) : même copier-coller que
    d'habitude. Ce redéploiement couvre aussi les étapes 2 et 3 du moteur (sous-section suivante).
@@ -188,7 +188,7 @@ défaits ici. Dans la même séance, dans cet ordre :
    compris.
 5. **Tester**, en fenêtre privée : ouvrir https://atomes.studio/admin/, entrer contact@atomes.studio, « Recevoir mon
    code de connexion ». Aussitôt, sans attendre l'e-mail, cliquer « Recevoir un nouveau code » : la page demande de
-   patienter une minute. Quand l'e-mail arrive, taper d'abord un faux code de 8 chiffres : il est refusé. Puis taper
+   patienter une minute. Quand l'e-mail arrive, taper d'abord un faux code de 6 chiffres : il est refusé. Puis taper
    le code reçu : l'espace agence s'affiche. Si l'e-mail contient un bouton ou un lien au lieu d'un code, le modèle
    de l'étape 4 n'est pas enregistré : le recoller. (Si un second e-mail arrive quand même, seul son code est
    valable.)
