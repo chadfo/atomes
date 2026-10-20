@@ -11,11 +11,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/site.css?v=3">
+<link rel="stylesheet" href="../assets/css/site.css?v=4">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" defer></script>
 <script src="../assets/js/config.js" defer></script>
 <script src="../assets/js/atom-logo.js" defer></script>
-<script src="../assets/js/dossier.js?v=5" defer></script>
+<script src="../assets/js/dossier.js?v=6" defer></script>
 </head>
 <body>
 <div class="page">
@@ -102,9 +102,34 @@
           <ol class="timeline" role="list" data-timeline></ol>
         </section>
 
-        <section class="bloc" aria-labelledby="lbl-echanges" data-bloc-echanges hidden>
-          <div class="lbl bloc-lbl" id="lbl-echanges">Échanges</div>
-          <ul class="echanges" role="list" data-echanges></ul>
+        <!-- Discussion : messages des deux côtés et étapes clés, du plus ancien au plus récent ; message du client envoyé
+             à la fonction « espace » (multipart). Champs sans name (aucun envoi natif) ni maxlength (contrôle à l'envoi). -->
+        <section class="bloc discussion-bloc" aria-labelledby="lbl-discussion">
+          <div class="lbl bloc-lbl" id="lbl-discussion">Discussion</div>
+          <button type="button" class="link-more discussion-plus" data-discussion-plus hidden>Afficher les messages précédents</button>
+          <ol class="discussion" role="list" data-discussion></ol>
+          <p class="docs-vide" data-discussion-vide hidden>Aucun message pour le moment. Écrivez-nous ci-dessous, ou répondez à l'un de nos e-mails.</p>
+          <form class="composeur" data-form-message novalidate>
+            <div class="field">
+              <label class="lbl" for="e-message">Votre message</label>
+              <textarea class="input" id="e-message" rows="4" aria-describedby="e-message-aide e-message-err"></textarea>
+              <p class="f-hint composeur-compte" data-message-compte hidden></p>
+            </div>
+            <div class="field">
+              <span class="lbl" id="lbl-e-fichiers">Pièces jointes <span class="lbl-opt">(facultatif — photos, plans, PDF)</span></span>
+              <label class="dropzone" aria-labelledby="lbl-e-fichiers">
+                <span class="dropzone-cta">+ Ajouter des fichiers</span>
+                <input type="file" class="sr-only" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.pdf" data-message-fichiers aria-describedby="e-message-aide e-message-err">
+                <span class="dropzone-info" data-message-label>Aucun fichier sélectionné</span>
+              </label>
+              <div class="files" data-message-liste hidden></div>
+            </div>
+            <p class="f-hint" id="e-message-aide">Photos et PDF, 10 fichiers et 10&nbsp;Mo au plus par message. Vous pouvez aussi répondre à nos e-mails&nbsp;: vos réponses s'ajoutent ici, parfois avec quelques heures de décalage.</p>
+            <div class="f-err" id="e-message-err" role="alert" hidden></div>
+            <div class="form-actions"><button type="submit" class="btn" data-btn-message>Envoyer</button></div>
+            <p class="f-hint composeur-statut" data-message-statut role="status"></p>
+          </form>
+          <p class="f-hint" data-composeur-agence hidden>Compte agence&nbsp;: écrivez au client depuis l'espace agence.</p>
         </section>
 
         <section class="bloc" aria-labelledby="lbl-docs-agence">
@@ -116,7 +141,7 @@
         <section class="bloc" aria-labelledby="lbl-docs-client">
           <div class="lbl bloc-lbl" id="lbl-docs-client">Vos documents</div>
           <ul class="docs" role="list" data-docs-client></ul>
-          <p class="docs-vide" data-vide-client hidden>Aucun document pour le moment. Les pièces jointes de vos e-mails apparaîtront ici.</p>
+          <p class="docs-vide" data-vide-client hidden>Aucun document pour le moment. Les pièces jointes de vos e-mails et de vos messages apparaîtront ici.</p>
         </section>
 
         <section class="bloc" aria-labelledby="lbl-demande">

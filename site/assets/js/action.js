@@ -14,16 +14,18 @@
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
   const el = (tag, cls, texte) => { const n = document.createElement(tag); if (cls) n.className = cls; if (texte !== undefined) n.textContent = texte; return n; };
 
-  // Dates à l'heure de Paris (comme les e-mails et le délai de rétractation).
+  // Dates à l'heure de Paris (comme les e-mails et le délai de rétractation) ; « 1er » comme dans les e-mails (règle
+  // premier() de la fonction « espace ») : « jeudi 1er octobre 2026 ».
+  const premier = (s) => s.replace(/(^|\s)1(\s)/, '$11er$2');
   const fmt = (o) => new Intl.DateTimeFormat('fr-FR', Object.assign({ timeZone: 'Europe/Paris' }, o));
   const dateValide = (iso) => !!iso && !isNaN(new Date(iso).getTime());
-  const fmtDate = (iso) => (dateValide(iso) ? fmt({ day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso)) : '');
-  const fmtCourt = (iso) => (dateValide(iso) ? fmt({ day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso)) : '');
-  const fmtHeure = (iso) => (dateValide(iso) ? fmt({ dateStyle: 'long', timeStyle: 'short' }).format(new Date(iso)) : '');
+  const fmtDate = (iso) => (dateValide(iso) ? premier(fmt({ day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso))) : '');
+  const fmtCourt = (iso) => (dateValide(iso) ? premier(fmt({ day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso))) : '');
+  const fmtHeure = (iso) => (dateValide(iso) ? premier(fmt({ dateStyle: 'long', timeStyle: 'short' }).format(new Date(iso))) : '');
   // Date limite « AAAA-MM-JJ » (dernier jour du délai, heure de Paris) : « mercredi 28 octobre 2026 ».
   const fmtLimite = (jour) => {
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(jour || ''));
-    return m ? fmt({ weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12))) : '';
+    return m ? premier(fmt({ weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12)))) : '';
   };
   const fmtTaille = (o) => (o >= 1048576 ? (o / 1048576).toFixed(1).replace('.', ',') + ' Mo' : Math.max(1, Math.round((o || 0) / 1024)) + ' Ko');
   const euros = (c) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format((c || 0) / 100);
@@ -370,7 +372,7 @@
       zone.appendChild(texte('Vos documents ne sont pas en attente de validation pour le moment. Nous vous écrirons dès qu’ils le seront.'));
       return;
     }
-    zone.appendChild(el('p', 'f-hint', 'Pour demander une modification, répondez simplement à l’e-mail reçu.'));
+    zone.appendChild(el('p', 'f-hint', 'Pour demander une modification, répondez simplement à l’e-mail reçu ou écrivez-nous depuis votre espace client.'));
     const err = champErreur();
     const valider = el('button', 'btn', 'Je valide mes documents'); valider.type = 'button';
     const actions = el('div', 'form-actions'); actions.appendChild(valider);

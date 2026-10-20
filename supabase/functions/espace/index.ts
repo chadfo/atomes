@@ -1,33 +1,38 @@
 // =============================================================================
-// atomes.studio — fonction « espace » (Supabase Edge Function, Deno) — parcours v3 : tout par e-mail
-// Les échanges avec le client passent par e-mail (chaque e-mail montre la timeline du dossier) ; l'espace
-// client est en lecture seule.
+// atomes.studio — fonction « espace » (Supabase Edge Function, Deno) — parcours v3 et discussion du dossier
+// Chaque dossier a sa discussion, la même dans l'espace agence et dans l'espace client (table messages) : e-mails du
+// client rangés par le moteur de l'agence, messages écrits par le client dans son espace (texte, photos et PDF), messages
+// de l'agence (envoyés en entier au client par e-mail), entre les étapes clés du dossier (table evenements, notées par
+// un déclencheur SQL). Chaque e-mail au client montre la timeline du dossier.
 //   Liens d'action (page site/action/, jeton signé reçu par e-mail, sans session) :
 //             infos (lecture), signer (devis), valider (documents), renoncer (rétractation d'un particulier)
-//   Client  : infos_espace (coordonnées de virement, lien de rétractation ; lecture seule, session Supabase)
-//   Agence  : questions, devis (envoi du devis à signer), etape, option (suivi administratif),
-//             paye (« Virement reçu »), rattacher et supprimer_message (messages à vérifier), renvoyer (confirmation
-//             du contrat ou accusé de rétractation qui n'a pas pu partir)
-//   Resend  : webhook email.received (réponse du client à l'ancienne adresse de réponse du dossier,
-//             d<id>-…@REPONSES_DOMAINE, encore reçue pour les e-mails envoyés avant le moteur : texte et pièces
-//             jointes ajoutés au dossier), requête signée (en-têtes svix-id, svix-timestamp, svix-signature)
+//   Client  : infos_espace (coordonnées de virement, lien de rétractation), message_client (message de la discussion,
+//             avec pièces jointes : envoi multipart ; avis à l'agence au plus une fois par quart d'heure) ; session Supabase
+//   Agence  : devis (envoi du devis à signer), etape, option (suivi administratif), paye (« Virement reçu »),
+//             message_agence (message de la discussion, envoyé au client par e-mail), renvoyer_message (e-mail d'un
+//             message qui n'est pas parti), messages_lus, rattacher et supprimer_message (messages à vérifier), renvoyer
+//             (confirmation du contrat ou accusé de rétractation qui n'a pas pu partir)
+//   Resend  : webhook email.received, inactif depuis le 20 octobre 2026 (réception retirée, secrets supprimés) ; code
+//             gardé, car ses fonctions de texte et de pièces jointes sont la référence de la parité du moteur ; requête
+//             signée (en-têtes svix-…)
 //   Moteur  : le moteur de l'agence (dossier atomes-moteur, sur l'ordinateur de l'agence) lit contact@ et simon@
 //             et ajoute au dossier les e-mails des clients (messages « imap:<Message-ID> ») ; « rattacher » un tel
 //             message le marque à traiter, le moteur range ses pièces jointes à son passage suivant
 // Les e-mails au client ont pour adresse de réponse MAIL_AGENCE (contact@) : le client écrit toujours à l'agence.
-// Appel : POST JSON { action, projet, … } avec Authorization: Bearer <session Supabase>, ou { action, jeton, … }
-// pour les liens d'action. « Verify JWT » est désactivé : la session ou le jeton sont vérifiés ici (Resend
-// n'envoie ni l'un ni l'autre). Les transitions d'étapes passent par projets.etape : le déclencheur SQL
-// recalcule la timeline (migration 0004) ; table messages, colonnes demarrage_anticipe_* et retracte_* :
-// migration 0005.
+// Appel : POST JSON { action, projet, … } (64 Ko au plus) avec Authorization: Bearer <session Supabase>, ou { action,
+// jeton, … } pour les liens d'action ; message_client seulement en multipart/form-data (champs action, projet, cle,
+// texte, fichiers ; session vérifiée avant toute lecture du corps, 10,5 Mo au plus). « Verify JWT » est désactivé : la
+// session ou le jeton sont vérifiés ici (Resend n'envoie ni l'un ni l'autre). Les transitions d'étapes passent par
+// projets.etape : le déclencheur SQL recalcule la timeline (migration 0004) ; table messages, colonnes
+// demarrage_anticipe_* et retracte_* : migration 0005 ; discussion (colonnes auteur, origine, lu_agence_le, mail_etat,
+// cle… de messages) et étapes clés (evenements) : migration 0006. Le client lit par l'API toutes les colonnes de ses
+// messages visibles (la RLS filtre les lignes, pas les colonnes) : rien d'interne n'y est écrit.
 //
 // Secrets : RESEND_API_KEY, SB_SECRET_KEY, JETON_SECRET (au moins 32 caractères aléatoires), VIREMENT_IBAN,
-// VIREMENT_BIC, VIREMENT_TITULAIRE ; RESEND_WEBHOOK_SECRET (whsec_… du
-// webhook Resend) et REPONSES_DOMAINE (ex. r.atomes.studio), le temps de recevoir les réponses aux anciens
-// e-mails ; facultatifs MAIL_AGENCE, MAIL_FROM, SITE_URL, ORIGINES_AUTORISEES (mêmes valeurs que pour la fonction
-// « demande ») et RESEND_RECEPTION_KEY (clé du compte Resend qui reçoit les réponses, s'il est distinct de celui
-// des envois : SETUP-ESPACE-CLIENT.md § 7).
-// Sans JETON_SECRET : aucun lien d'action (refus 503). Sans REPONSES_DOMAINE : le webhook Resend n'ajoute plus rien.
+// VIREMENT_BIC, VIREMENT_TITULAIRE ; facultatifs MAIL_AGENCE, MAIL_FROM, SITE_URL, ORIGINES_AUTORISEES (mêmes valeurs
+// que pour la fonction « demande »). RESEND_WEBHOOK_SECRET, REPONSES_DOMAINE et RESEND_RECEPTION_KEY (réception des
+// réponses par Resend) : supprimés le 20 octobre 2026 : sans eux, tout appel du webhook est refusé (400).
+// Sans JETON_SECRET : aucun lien d'action (refus 503).
 // Les liens placés dans les e-mails mènent toujours à SITE_URL (jamais à l'origine de la requête, par exemple un
 // essai depuis localhost) ; seuls les liens renvoyés à la page qui appelle suivent son origine (ORIGINES).
 // =============================================================================
@@ -78,6 +83,24 @@ const TYPES_PIECES: Record<string, string> = {
   jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp",
   heic: "image/heic", heif: "image/heif", pdf: "application/pdf",
 };
+// Discussion du dossier. Message écrit par le client dans son espace : limites du formulaire de devis.
+const MAX_TEXTE_MESSAGE = 5000;                   // caractères (retours à la ligne en \n, comptés comme dans la page)
+const MAX_FICHIERS_MESSAGE = 10;                  // pièces jointes par message (client et agence)
+const MAX_TOTAL_MESSAGE = 10 * 1024 * 1024;       // pièces jointes d'un message du client, en tout
+const MAX_CORPS_MESSAGE = MAX_TOTAL_MESSAGE + 512 * 1024;   // corps multipart lu au plus (champs et en-têtes compris)
+const MAX_CORPS_JSON = 64 * 1024;                 // corps JSON lu au plus (toutes les actions JSON tiennent dedans)
+const MAX_CORPS_WEBHOOK = 256 * 1024;             // événement Resend (métadonnées seulement) lu au plus
+const MAX_MESSAGES_ESPACE_JOUR = 30;              // messages écrits dans l'espace client, par dossier et par 24 h
+// Un seul envoi du client à la fois par dossier (table envois_client) : bail repris au-delà de 3 minutes, plus qu'une
+// exécution de la fonction (coupée à 150 s).
+const BAIL_ENVOI = 3 * 60 * 1000;
+const PAGE_LISTE = 1000;                          // entrées par page de la liste du stockage (listerTout)
+// Avis « Message du client » à l'agence : au plus un par dossier et par quart d'heure (offre gratuite de Resend : 100
+// e-mails par jour, codes de connexion et e-mails légaux compris).
+const AVIS_REGROUPES = 15 * 60 * 1000;
+const MAX_JOINTES_MESSAGE = 15 * 1024 * 1024;     // pièces d'un message de l'agence jointes à l'e-mail (sinon : à télécharger)
+const DELAI_RENVOI = 10 * 60 * 1000;              // e-mail d'un message de l'agence « en cours » depuis plus longtemps : à renvoyer
+const CLE_ENVOI = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;   // clé anti-doublon tirée par la page (uuid)
 
 // Textes juridiques (cahier des charges § 7), à reprendre mot pour mot ; renvoyés tels quels à la page d'action
 // (source unique). À faire valider par l'Ordre des architectes.
@@ -108,12 +131,21 @@ const DEJA_PAYE = "Ce dossier est déjà payé : le devis ne peut plus être rem
 const PAS_DE_CONTRAT = "Aucun devis signé n'est en cours sur ce dossier : il n'y a pas de contrat auquel renoncer.";
 const CONTRAT_PRECEDENT = "Ce lien concerne un contrat précédent : utilisez le lien « Renoncer au contrat ici » du dernier e-mail reçu, ou écrivez-nous à contact@atomes.studio.";
 const STOCKAGE_INDISPONIBLE = "Documents momentanément indisponibles : réessayez dans quelques minutes";
+// Discussion : refus affichés tels quels par les pages (pièces jointes : mêmes textes que le formulaire de devis).
+const MESSAGE_VIDE = "Écrivez un message ou joignez un fichier.";
+const MESSAGE_LONG = "Message trop long : 5 000 caractères au plus.";
+const TROP_DE_PIECES = "10 pièces jointes maximum.";
+const FORMAT_REFUSE = "Format non pris en charge (JPG, PNG, GIF, WEBP, HEIC et PDF uniquement).";
+const PIECES_LOURDES = "Pièces jointes trop lourdes — 10 Mo max au total.";
+const ENVOI_IMPOSSIBLE = "Envoi impossible : rechargez la page.";
+const PIECE_INTROUVABLE = "Pièce jointe introuvable : déposez-la de nouveau.";
+const ENVOI_EN_COURS = "L'e-mail de ce message est en cours d'envoi : réessayez dans quelques minutes.";
+const ENVOI_SIMULTANE = "Un envoi est déjà en cours : réessayez dans quelques secondes.";
 
 type Etape = {
   cle: string; ordre: number; libelle: string; statut: string; optionnelle: boolean; action: string | null;
   fait_le: string | null; debut_le: string | null;
 };
-type Question = { id: number; question: string; choix: string[] | null; reponse: string | null; posee_le: string; repondue_le: string | null };
 type Projet = {
   id: string; client_id: string | null; profil: string; prenom: string; nom: string; email: string; type: string; commune: string;
   precisions: Record<string, string> | null; etape: string; suivi_administratif: boolean;
@@ -124,7 +156,7 @@ type Projet = {
   retracte_le: string | null; retracte_nom: string | null; retracte_email: string | null; retracte_ip: string | null; retracte_agent: string | null;
   paye_le: string | null; paiement_ref: string | null; documents_valides_le: string | null;
   envois_echoues: Echec[] | null;
-  etapes: Etape[]; questions: Question[];
+  etapes: Etape[];
 };
 // E-mail légal au client qui n'a pas pu partir pendant une action par lien (confirmation du contrat, accusé de
 // rétractation) : noté dans projets.envois_echoues, signalé dans l'espace agence avec un bouton « Renvoyer ».
@@ -138,22 +170,26 @@ type Message = {
   id: number; projet_id: string; recu_le: string; expediteur: string; sujet: string | null; texte: string | null;
   texte_complet: string | null; pieces: (Piece | PieceAnnoncee)[]; verifie: boolean; etape: string | null; resend_id: string | null;
   traite?: boolean; traitement_le?: string | null;
+  // Discussion (migration 0006) : auteur (client ou agence), origine (email ou espace) ; e-mail qui accompagne le
+  // message (message de l'agence : e-mail au client ; message écrit dans l'espace client : avis à l'agence), nul si aucun.
+  auteur?: string; origine?: string; mail_etat?: string | null; mail_le?: string | null;
 };
 type Charge = { a: string; p: string; e: number; d?: string };   // charge utile d'un jeton de lien d'action
 type Doc = { nom: string; chemin: string; taille: number; date: string | null; url?: string };
 type PieceJointe = { filename: string; content: string };      // pièce jointe d'un e-mail envoyé (base64)
 // Bilan du traitement d'un message vérifié : pièces rangées (nouvelles : par cette tentative), écartées (format,
-// taille, limite), ignorées (images intégrées : logo, signature, image de l'e-mail cité), questions répondues,
-// demande de modification, pièces que Resend ne conserve plus.
+// taille, limite), ignorées (images intégrées : logo, signature, image de l'e-mail cité), pièces que Resend ne conserve
+// plus.
 type Bilan = {
-  pieces: Piece[]; nouvelles: Piece[]; ecartees: string[]; ignorees: string[]; questions: number; modification: boolean; indisponibles: boolean;
+  pieces: Piece[]; nouvelles: Piece[]; ecartees: string[]; ignorees: string[]; indisponibles: boolean;
 };
 // deno-lint-ignore no-explicit-any
 type Sb = any;
 // deno-lint-ignore no-explicit-any
 type Json = any;
-type Contexte = { sb: Sb; projet: Projet; corps: Record<string, unknown>; req: Request; base: string };
-type ContexteLien = Contexte & { jeton: Charge };
+type Utilisateur = { id: string };                // compte connecté (session Supabase)
+type Contexte = { sb: Sb; projet: Projet; corps: Record<string, unknown>; req: Request; base: string; user: Utilisateur };
+type ContexteLien = Omit<Contexte, "user"> & { jeton: Charge };
 type Action = (c: Contexte) => Promise<Record<string, unknown>>;
 type ActionLien = (c: ContexteLien) => Promise<Record<string, unknown>>;
 
@@ -174,22 +210,24 @@ Deno.serve(async (req) => {
   if (["svix-id", "svix-timestamp", "svix-signature"].some((h) => req.headers.has(h))) return webhookResend(sb, req);
 
   try {
-    let corps: Record<string, unknown>;
-    try { corps = await req.json(); } catch { throw new Refus("Requête illisible"); }
-    if (!corps || typeof corps !== "object" || Array.isArray(corps)) throw new Refus("Requête illisible");
-    const action = String(corps.action ?? "");
     // Base des liens renvoyés à la page qui appelle (lien de rétractation affiché après la signature ou dans l'espace
     // client) : son origine si elle est autorisée, sinon le site. Les liens des e-mails mènent toujours à SITE_URL.
     const base = ORIGINES.includes(origine) ? origine : SITE_URL;
-
-    // Lien d'action reçu par e-mail : le jeton signé tient lieu de session.
-    if (Object.hasOwn(corps, "jeton")) return json({ ok: true, ...(await actionParLien(sb, action, corps, req, base)) }, 200, cors);
-
-    const session = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-    if (!session) throw new Refus("Session expirée : reconnectez-vous", 401);
-    const { data: auth, error: errAuth } = await sb.auth.getUser(session);
-    const user = auth?.user;
-    if (errAuth || !user) throw new Refus("Session expirée : reconnectez-vous", 401);
+    let corps: Record<string, unknown>;
+    let user: Utilisateur;
+    if (/^\s*multipart\/form-data/i.test(req.headers.get("content-type") ?? "")) {
+      // Message du client avec pièces jointes : le nom de l'action est dans le corps, la session est donc vérifiée avant
+      // toute lecture ; corps borné à 10,5 Mo (taille annoncée, puis octets lus : un envoi « chunked » n'annonce rien).
+      user = await utilisateur(sb, req);
+      corps = await lireMultipart(req);
+    } else {
+      corps = await lireJson(req);
+      if (corps.action === "message_client") throw new Refus("Requête illisible");   // pièces jointes : multipart seulement
+      // Lien d'action reçu par e-mail : le jeton signé tient lieu de session.
+      if (Object.hasOwn(corps, "jeton")) return json({ ok: true, ...(await actionParLien(sb, String(corps.action ?? ""), corps, req, base)) }, 200, cors);
+      user = await utilisateur(sb, req);
+    }
+    const action = String(corps.action ?? "");
     const estClient = Object.hasOwn(ACTIONS_CLIENT, action), estAgence = Object.hasOwn(ACTIONS_AGENCE, action);
     if (!estClient && !estAgence) throw new Refus("Action inconnue");
     if (estAgence && !(await estAdmin(sb, user.id))) throw new Refus("Action réservée à l'agence", 403);
@@ -203,7 +241,7 @@ Deno.serve(async (req) => {
       }
       throw new Refus("Dossier introuvable", 404);
     }
-    const c: Contexte = { sb, projet, corps, req, base };
+    const c: Contexte = { sb, projet, corps, req, base, user };
     return json({ ok: true, ...(await (estClient ? ACTIONS_CLIENT : ACTIONS_AGENCE)[action](c)) }, 200, cors);
   } catch (e) {
     if (e instanceof Refus) return json({ ok: false, erreur: e.message }, e.statut, cors);
@@ -211,6 +249,66 @@ Deno.serve(async (req) => {
     return json({ ok: false, erreur: "Erreur du serveur, réessayez dans quelques minutes" }, 500, cors);
   }
 });
+
+// Compte connecté (Authorization: Bearer <session Supabase>), sinon 401.
+async function utilisateur(sb: Sb, req: Request): Promise<Utilisateur> {
+  const session = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  if (!session) throw new Refus("Session expirée : reconnectez-vous", 401);
+  const { data: auth, error: errAuth } = await sb.auth.getUser(session);
+  const user = auth?.user;
+  if (errAuth || !user) throw new Refus("Session expirée : reconnectez-vous", 401);
+  return user;
+}
+
+// Corps JSON (un objet), 64 Ko au plus : toutes les actions JSON tiennent largement dedans.
+async function lireJson(req: Request): Promise<Record<string, unknown>> {
+  const octets = Number(req.headers.get("content-length") ?? 0) > MAX_CORPS_JSON ? null : await lireCorps(req, MAX_CORPS_JSON);
+  if (!octets) throw new Refus("Requête trop lourde", 413);
+  let corps: unknown;
+  try { corps = JSON.parse(new TextDecoder().decode(octets)); } catch { throw new Refus("Requête illisible"); }
+  if (!corps || typeof corps !== "object" || Array.isArray(corps)) throw new Refus("Requête illisible");
+  return corps as Record<string, unknown>;
+}
+
+// Message du client (multipart, session déjà vérifiée) : taille annoncée, puis octets lus, 10,5 Mo au plus ; formulaire
+// analysé ; seule l'action message_client passe par ce chemin. Champs gardés : action, projet, cle, texte, fichiers.
+async function lireMultipart(req: Request): Promise<Record<string, unknown>> {
+  const octets = Number(req.headers.get("content-length") ?? 0) > MAX_CORPS_MESSAGE ? null : await lireCorps(req, MAX_CORPS_MESSAGE);
+  if (!octets) throw new Refus(PIECES_LOURDES, 413);
+  let form: FormData;
+  try {
+    form = await new Response(octets, { headers: { "content-type": req.headers.get("content-type") ?? "" } }).formData();
+  } catch { throw new Refus("Requête illisible"); }
+  if (form.get("action") !== "message_client") throw new Refus("Requête illisible");
+  return { action: "message_client", projet: form.get("projet"), cle: form.get("cle"), texte: form.get("texte"), fichiers: form.getAll("fichiers") };
+}
+
+// Corps de la requête lu par morceaux, `max` octets au plus ; au-delà, lecture abandonnée et null (la taille annoncée ne
+// suffit pas : un envoi « chunked » ne l'annonce pas, et Supabase ne fixe aucune taille maximale).
+async function lireCorps(req: Request, max: number): Promise<ArrayBuffer | null> {
+  if (!req.body) return new ArrayBuffer(0);
+  const lecteur = req.body.getReader();
+  const morceaux: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await lecteur.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > max) {
+        await lecteur.cancel().catch(() => {});
+        return null;
+      }
+      morceaux.push(value);
+    }
+  } catch {
+    throw new Refus("Requête illisible");
+  }
+  const octets = new Uint8Array(total);
+  let i = 0;
+  for (const m of morceaux) { octets.set(m, i); i += m.byteLength; }
+  return octets.buffer as ArrayBuffer;
+}
 
 // ---------- Actions par lien (page d'action, jeton reçu par e-mail) ----------------------------
 
@@ -418,11 +516,11 @@ const ACTIONS_LIEN: Record<string, ActionLien> = {
   },
 };
 
-// ---------- Action du client (session Supabase, lecture seule) -----------------------------------
+// ---------- Actions du client (session Supabase) ---------------------------------------------------
 
 const ACTIONS_CLIENT: Record<string, Action> = {
   // Coordonnées de virement (dossier en attente de paiement ou payé) et lien de rétractation (particulier signé,
-  // dans le délai) : l'espace client n'a aucune action, il renvoie vers la page d'action.
+  // dans le délai), en lecture seule : signer, valider et renoncer se font sur la page d'action.
   async infos_espace({ projet, base }) {
     const virement = !!projet.montant_cents && !projet.retracte_le && (projet.etape === "paiement" || !!projet.paye_le);
     return {
@@ -432,33 +530,144 @@ const ACTIONS_CLIENT: Record<string, Action> = {
       renoncer: await lienRenoncer(projet, base),
     };
   },
+
+  // Message du client dans la discussion de son dossier, à toute étape (multipart : texte et pièces jointes, limites du
+  // formulaire de devis). Clé anti-doublon tirée par la page : un nouvel essai après une réponse perdue renvoie la ligne
+  // déjà enregistrée, avant tout dépôt. Un seul envoi à la fois par dossier (bail dans envois_client, 409 sinon) : les
+  // limites du jour et du dossier et la règle de l'avis tiennent même sous des envois simultanés. Pièces rangées dans
+  // <id>/client/ sans rien écraser, puis message enregistré (vérifié) ; si un dépôt ou l'enregistrement échoue, seuls les
+  // fichiers déposés par cette requête sont retirés. Puis avis à l'agence (au plus un par dossier et par quart d'heure) :
+  // le message étant enregistré, un échec de l'avis est seulement journalisé. Bail rendu à la fin, même après une erreur.
+  // Réponse { message } : les 7 colonnes que l'espace client affiche.
+  async message_client({ sb, projet, corps, user }) {
+    const cle = cleEnvoi(corps.cle);
+    const texte = texteEnvoye(corps.texte);
+    const fichiers = (Array.isArray(corps.fichiers) ? corps.fichiers : []).filter((f): f is File => f instanceof File && f.size > 0);
+    if (!texte && !fichiers.length) throw new Refus(MESSAGE_VIDE);
+    if (fichiers.length > MAX_FICHIERS_MESSAGE) throw new Refus(TROP_DE_PIECES);
+    // Format d'après l'extension du nom (sans extension : d'après le type annoncé), comme les pièces des e-mails ; type
+    // enregistré déduit de l'extension, jamais du navigateur.
+    const recus = fichiers.map((f) => { const nom = propre(f.name, 200) || "piece"; return { f, nom, ext: extensionPiece(nom, f.type) }; });
+    if (recus.some((x) => !x.ext)) throw new Refus(FORMAT_REFUSE, 415);
+    const total = fichiers.reduce((s, f) => s + f.size, 0);
+    if (total > MAX_TOTAL_MESSAGE) throw new Refus(PIECES_LOURDES, 413);
+    const deja = await dejaEnvoye(sb, projet, cle, "client");
+    if (deja) return { deja: true, message: colonnesMessage(deja) };
+    const bail = await prendreBail(sb, projet.id);
+    try {
+      const { count, error: errCompte } = await sb.from("messages").select("id", { count: "exact", head: true })
+        .eq("projet_id", projet.id).eq("auteur", "client").eq("origine", "espace").gte("recu_le", new Date(Date.now() - 86400000).toISOString());
+      if (errCompte) echecDiscussion("compte des messages du jour", projet.id, {}, errCompte);
+      if ((count ?? 0) >= MAX_MESSAGES_ESPACE_JOUR) throw new Refus("Trop de messages aujourd'hui : réessayez demain, ou écrivez-nous à contact@atomes.studio.", 429);
+      const infos = { pieces: fichiers.length, octets: total };
+      let contenu = { noms: new Set<string>(), volume: 0 };
+      if (fichiers.length) {
+        try { contenu = await contenuClient(sb, projet.id); } catch (e) { echecDiscussion("lecture des pièces du dossier", projet.id, infos, e); }
+        if (contenu.volume + total > MAX_VOLUME_DOSSIER) {
+          throw new Refus("Espace du dossier plein : écrivez-nous à contact@atomes.studio, nous vous dirons comment nous transmettre vos fichiers.", 413);
+        }
+      }
+      // Préfixe des homonymes : heure de l'envoi et rang du fichier (« 261020094200-03- ») : dix « image.jpg » d'un
+      // téléphone ne s'écrasent pas et n'épuisent pas les noms proposés par deposerPiece.
+      const heure = idParis(new Date());
+      const deposees: Piece[] = [];
+      try {
+        for (const [i, x] of recus.entries()) {
+          const octets = await x.f.arrayBuffer();
+          const nom = await deposerPiece(sb, projet.id, nomSur(x.nom, x.ext), octets, TYPES_PIECES[x.ext], contenu.noms, `${heure}-${String(i + 1).padStart(2, "0")}`);
+          deposees.push({ nom, chemin: `${projet.id}/client/${nom}`, taille: octets.byteLength });
+        }
+      } catch (e) {
+        await retirerFichiers(sb, deposees);
+        echecDiscussion("dépôt des pièces jointes", projet.id, { ...infos, deposees: deposees.length }, e);
+      }
+      const { data: ligne, error } = await sb.from("messages").insert({
+        projet_id: projet.id, recu_le: new Date().toISOString(), expediteur: projet.email, sujet: null, texte: texte || null, texte_complet: null,
+        pieces: deposees, verifie: true, etape: projet.etape, resend_id: null, auth: { controle: "session" }, traite: true, traitement_le: null,
+        auteur: "client", origine: "espace", auteur_id: user.id, cle, mail_etat: null,
+      }).select(COLONNES_CLIENT).single();
+      if (error || !ligne) {
+        await retirerFichiers(sb, deposees);
+        // Même clé enregistrée au même moment (double envoi) : la ligne de cet envoi, ou 409 si la clé est à un autre message.
+        const autre = error?.code === "23505" ? await dejaEnvoye(sb, projet, cle, "client") : null;
+        if (autre) return { deja: true, message: colonnesMessage(autre) };
+        echecDiscussion("enregistrement du message", projet.id, infos, error);
+      }
+      await avisMessageClient(sb, projet, ligne.id, texte, deposees);
+      return { message: colonnesMessage(ligne) };
+    } finally {
+      await rendreBail(sb, projet.id, bail);
+    }
+  },
 };
 
 // ---------- Actions de l'agence ----------------------------------------------
 
 const ACTIONS_AGENCE: Record<string, Action> = {
-  // Questions au client (réponse libre, ou propositions données en exemple) : un seul e-mail ; le client répond
-  // à l'e-mail (adresse de réponse contact@) et le moteur de l'agence ajoute sa réponse au dossier.
-  async questions({ sb, projet, corps }) {
-    const liste = (Array.isArray(corps.questions) ? corps.questions : []) as Record<string, unknown>[];
-    const lignes = liste.map((x) => ({
-      question: propre(String(x?.question ?? ""), 2000),
-      choix: (Array.isArray(x?.choix) ? x.choix : []).map((c: unknown) => propre(String(c), 200)).filter(Boolean).slice(0, 10),
-    })).filter((x) => x.question.length >= 2);
-    if (!lignes.length) throw new Refus("Saisissez au moins une question");
-    if (lignes.some((x) => x.choix.length === 1)) throw new Refus("Proposez au moins deux réponses, ou aucune pour une réponse libre");
-    const { error } = await sb.from("questions").insert(lignes.map((x) => ({ projet_id: projet.id, question: x.question, choix: x.choix.length ? x.choix : null })));
-    if (error) throw error;
-    const plusieurs = lignes.length > 1;
-    const mail = await mailClient(projet, `${plusieurs ? "Quelques questions" : "Une question"} sur votre dossier ${projet.id}`, plusieurs ? "Nos questions" : "Notre question", [
-      `<h1 style="${H1}">Bonjour ${esc(projet.prenom)},</h1>`,
-      p(`Pour affiner votre demande, nous avons ${plusieurs ? "quelques questions" : "une question"}&nbsp;:`),
-      `<ul style="margin:0 0 18px;padding-left:18px;font-size:15px;line-height:24px">${lignes.map((x) =>
-        `<li style="margin:0 0 8px">${esc(x.question)}${x.choix.length ? `<br><span style="color:#7a7368">Par exemple&nbsp;: ${esc(x.choix.join(" · "))}</span>` : ""}</li>`).join("")}</ul>`,
-      p("Répondez simplement à cet e-mail&nbsp;: votre réponse s'ajoute à votre dossier."),
-      p("Vous pouvez y joindre des photos ou des documents PDF."),
-    ].join(""));
-    return { posees: lignes.length, mail };
+  // Message de l'agence dans la discussion, à toute étape : enregistré d'abord (le client le lit dans son espace), puis
+  // envoyé en entier au client par e-mail (objet « … — dossier <id> » : le moteur range sa réponse dans ce dossier), sauf
+  // sans_mail (« Déjà envoyé depuis ma messagerie »). Pièces déposées par la page dans <id>/agence/discussion/ : chemins
+  // de ce dossier seulement, taille lue dans la liste du stockage (jamais par un téléchargement), jointes à l'e-mail si
+  // elles tiennent en 15 Mo. Clé anti-doublon comme pour le client. mail_etat « en_cours » pendant l'envoi (mail_le :
+  // début de la tentative), puis « envoye » ou « echec » (« Renvoyer l'e-mail ») ; nul sans e-mail. Réponse { id, mail,
+  // mail_etat } (mail faux si l'e-mail n'est pas parti) ; envoi déjà enregistré : { deja, mail, mail_etat }.
+  async message_agence({ sb, projet, corps, user }) {
+    const cle = cleEnvoi(corps.cle);
+    const texte = texteEnvoye(corps.texte);
+    if (corps.pieces !== undefined && corps.pieces !== null && !Array.isArray(corps.pieces)) throw new Refus("Requête illisible");
+    const demandees = (Array.isArray(corps.pieces) ? corps.pieces : []) as unknown[];
+    if (!texte && !demandees.length) throw new Refus(MESSAGE_VIDE);
+    if (demandees.length > MAX_FICHIERS_MESSAGE) throw new Refus(TROP_DE_PIECES);
+    const chemins = cheminsAgence(projet, demandees);
+    const deja = await dejaEnvoye(sb, projet, cle, "agence");
+    if (deja) return { deja: true, mail: deja.mail_etat === "envoye", mail_etat: deja.mail_etat ?? null };
+    const pieces = await piecesAgence(sb, projet, chemins);
+    const sansMail = corps.sans_mail === true;
+    const maintenant = new Date().toISOString();
+    const { data: ligne, error } = await sb.from("messages").insert({
+      projet_id: projet.id, recu_le: maintenant, expediteur: MAIL_AGENCE, sujet: sansMail ? null : sujetMessage(projet), texte: texte || null,
+      pieces, verifie: true, traite: true, etape: projet.etape, auteur: "agence", origine: "espace", auteur_id: user.id,
+      lu_agence_le: maintenant, cle, mail_etat: sansMail ? null : "en_cours", mail_le: sansMail ? null : maintenant,
+    }).select("id, sujet, texte, pieces").single();
+    if (error || !ligne) {
+      const autre = error?.code === "23505" ? await dejaEnvoye(sb, projet, cle, "agence") : null;
+      if (autre) return { deja: true, mail: autre.mail_etat === "envoye", mail_etat: autre.mail_etat ?? null };
+      echecDiscussion("enregistrement du message de l'agence", projet.id, { pieces: pieces.length }, error);
+    }
+    if (sansMail) return { id: ligne.id, mail: false, mail_etat: null };
+    const mail = await mailMessage(sb, projet, { id: ligne.id, sujet: ligne.sujet, texte: ligne.texte, pieces });
+    return { id: ligne.id, mail, mail_etat: await noterEnvoi(sb, projet.id, ligne.id, mail) };
+  },
+
+  // « Renvoyer l'e-mail » d'un message de l'agence qui n'est pas parti (« echec »), ou resté « en cours » plus de 10
+  // minutes (fonction interrompue) : renvoi réservé par une écriture conditionnelle sur l'état lu (deux clics, deux
+  // onglets : un seul e-mail), puis e-mail et nouvel état. Déjà parti : { mail: true, deja: true }. Réponse { mail }.
+  async renvoyer_message({ sb, projet, corps }) {
+    const message = await lireMessage(sb, projet, corps.message);
+    if (message.auteur !== "agence" || !message.mail_etat) throw new Refus("Ce message n'a pas d'e-mail à renvoyer.", 409);
+    if (message.mail_etat === "envoye") return { mail: true, deja: true };
+    const perime = message.mail_etat === "en_cours" && Date.parse(message.mail_le ?? message.recu_le) < Date.now() - DELAI_RENVOI;
+    if (message.mail_etat !== "echec" && !perime) throw new Refus(ENVOI_EN_COURS, 409);
+    const q = sb.from("messages").update({ mail_etat: "en_cours", mail_le: new Date().toISOString() })
+      .eq("id", message.id).eq("projet_id", projet.id).eq("auteur", "agence").eq("mail_etat", message.mail_etat);
+    const { data, error } = await (message.mail_le ? q.eq("mail_le", message.mail_le) : q.is("mail_le", null)).select("id");
+    if (error) echecDiscussion("renvoi de l'e-mail d'un message", projet.id, { message: message.id }, error);
+    if (!data?.length) throw new Refus(ENVOI_EN_COURS, 409);
+    const pieces = message.pieces.filter((x): x is Piece => !!x && typeof x.chemin === "string" && !!x.chemin);
+    const mail = await mailMessage(sb, projet, { id: message.id, sujet: message.sujet, texte: message.texte, pieces });
+    await noterEnvoi(sb, projet.id, message.id, mail);
+    return { mail };
+  },
+
+  // Messages du client affichés dans l'espace agence (ids envoyés par la page, 100 au plus) marqués lus : seulement ceux
+  // du client, de ce dossier, encore non lus (un message arrivé depuis l'affichage reste « Nouveau »). Réponse { lus }.
+  async messages_lus({ sb, projet, corps }) {
+    const ids = corps.ids;
+    if (!Array.isArray(ids) || !ids.length || ids.length > 100 || !ids.every((x) => Number.isSafeInteger(x) && x > 0)) throw new Refus("Requête illisible");
+    const { data, error } = await sb.from("messages").update({ lu_agence_le: new Date().toISOString() })
+      .eq("projet_id", projet.id).eq("auteur", "client").is("lu_agence_le", null).in("id", ids).select("id");
+    if (error) echecDiscussion("messages marqués lus", projet.id, { ids: ids.length }, error);
+    return { lus: data?.length ?? 0 };
   },
 
   // Envoi du devis : PDF déposé dans <id>/agence/ (un fichier par version, jamais écrasé), montant à régler par
@@ -619,13 +828,13 @@ const ACTIONS_AGENCE: Record<string, Action> = {
   },
 
   // Message à vérifier reconnu par l'agence : rattaché au dossier comme un message vérifié (pièces jointes relues
-  // chez Resend et rangées, questions répondues, demande de modification). Aucun e-mail au client. Sur un message
-  // vérifié dont le traitement s'est interrompu (« Traitement incomplet ») : traitement repris là où il s'est arrêté.
+  // chez Resend et rangées). Aucun e-mail au client. Sur un message vérifié dont le traitement s'est interrompu
+  // (« Traitement incomplet ») : traitement repris là où il s'est arrêté.
   async rattacher({ sb, projet, corps }) {
     const message = await lireMessage(sb, projet, corps.message);
     // Message lu par le moteur de l'agence (contact@ ou simon@) : ses pièces jointes ne sont pas chez Resend mais
-    // dans la copie gardée par le moteur. Il est marqué vérifié et à traiter : le moteur range ses pièces, répond
-    // aux questions et note la demande de modification à son passage suivant (toutes les 5 minutes).
+    // dans la copie gardée par le moteur. Il est marqué vérifié et à traiter : le moteur range ses pièces jointes à son
+    // passage suivant (toutes les 5 minutes).
     if (duMoteur(message)) {
       if (message.verifie) return message.traite === false ? { moteur: true, reprise: true } : { deja: true };
       const { data, error } = await sb.from("messages").update({ verifie: true, traite: false, traitement_le: null })
@@ -690,8 +899,8 @@ const MAILS_ETAPE: Record<string, { sujet: string; texte: string; bouton: string
 };
 
 // E-mail « Vos documents sont prêts » (passage à l'étape « Validation de vos documents ») : liste des documents
-// de l'agence, lien de validation (90 jours) ; une modification se demande en répondant à l'e-mail. Faux si l'e-mail
-// n'est pas parti.
+// de l'agence, lien de validation (90 jours) ; une modification se demande en répondant à l'e-mail ou dans la
+// discussion de l'espace client. Faux si l'e-mail n'est pas parti.
 async function mailDocumentsPrets(projet: Projet, docs: Doc[]): Promise<boolean> {
   const lien = JETON_SECRET ? await lienAction(SITE_URL, "valider", projet.id, Math.floor(Date.now() / 1000) + DUREE_VALIDER) : "";
   return await mailClient(projet, `Vos documents sont prêts — dossier ${projet.id}`, "Vos documents sont prêts", [
@@ -702,9 +911,205 @@ async function mailDocumentsPrets(projet: Projet, docs: Doc[]): Promise<boolean>
       : p("Vos documents sont disponibles dans votre espace client."),
     lien ? p("Vérifiez-les, puis validez-les&nbsp;:") + bouton("Voir et valider mes documents", lien) : "",
     p(lien
-      ? "Pour demander une modification, répondez simplement à cet e-mail en précisant ce que vous souhaitez changer."
-      : "Pour les valider ou demander une modification, répondez simplement à cet e-mail."),
+      ? "Pour demander une modification, répondez simplement à cet e-mail ou écrivez-nous depuis votre espace client, en précisant ce que vous souhaitez changer."
+      : "Pour les valider ou demander une modification, répondez simplement à cet e-mail ou écrivez-nous depuis votre espace client."),
   ].join(""));
+}
+
+// ---------- Discussion : clé d'envoi, texte, pièces de l'agence, e-mails, journal ----------------
+
+const COLONNES_CLIENT = "id, recu_le, auteur, origine, texte, pieces, verifie";   // message renvoyé à l'espace client
+
+// Clé anti-doublon d'un envoi (uuid tiré par la page à la première tentative, renouvelé dès que le contenu change), sinon
+// 400.
+function cleEnvoi(v: unknown): string {
+  const cle = typeof v === "string" ? v.toLowerCase() : "";
+  if (!CLE_ENVOI.test(cle)) throw new Refus("Requête illisible");
+  return cle;
+}
+
+// Texte d'un message : retours à la ligne ramenés à \n (un envoi multipart les transmet en \r\n), caractères de contrôle
+// retirés, 5 000 caractères au plus : refusé au-delà, jamais coupé. Absent : vide ; autre chose qu'un texte : 400.
+function texteEnvoye(v: unknown): string {
+  if (v === undefined || v === null) return "";
+  if (typeof v !== "string") throw new Refus("Requête illisible");
+  const texte = propre(v.replace(/\r\n?/g, "\n"), MAX_TEXTE_MESSAGE + 1);
+  if (texte.length > MAX_TEXTE_MESSAGE) throw new Refus(MESSAGE_LONG);
+  return texte;
+}
+
+// Les 7 colonnes d'un message que l'espace client affiche (réponse de message_client, envoi neuf ou déjà enregistré).
+function colonnesMessage(l: Json): Record<string, unknown> {
+  return {
+    id: l.id, recu_le: l.recu_le, auteur: l.auteur, origine: l.origine, texte: l.texte ?? null,
+    pieces: Array.isArray(l.pieces) ? l.pieces : [], verifie: l.verifie,
+  };
+}
+
+// Envoi déjà enregistré sous cette clé (nouvel essai après une réponse perdue, double envoi) : sa ligne si elle est de ce
+// dossier, de cet auteur et écrite dans l'espace ; null si la clé est libre ; 409 si elle est à un autre message (la clé
+// est unique dans toute la table).
+async function dejaEnvoye(sb: Sb, projet: Projet, cle: string, auteur: string): Promise<Json | null> {
+  const { data, error } = await sb.from("messages").select(`${COLONNES_CLIENT}, projet_id, mail_etat`).eq("cle", cle).maybeSingle();
+  if (error) echecDiscussion("lecture de la clé d'envoi", projet.id, {}, error);
+  if (!data) return null;
+  if (data.projet_id !== projet.id || data.auteur !== auteur || data.origine !== "espace") throw new Refus(ENVOI_IMPOSSIBLE, 409);
+  return data;
+}
+
+// Bail d'un envoi du client (table envois_client, une ligne par dossier, clé primaire) : un bail de plus de 3 minutes
+// (exécution interrompue) est d'abord repris ; un bail en cours fait refuser l'envoi (409 : la page garde brouillon et
+// clé, un nouvel essai après la fin de l'autre envoi reçoit « deja » si c'était le même). Renvoie l'heure du bail.
+async function prendreBail(sb: Sb, dossier: string): Promise<string> {
+  const pris = new Date();
+  const { error: errPerime } = await sb.from("envois_client").delete().eq("projet_id", dossier).lt("pris_le", new Date(pris.getTime() - BAIL_ENVOI).toISOString());
+  if (errPerime) echecDiscussion("bail de l'envoi", dossier, {}, errPerime);
+  const le = pris.toISOString();
+  const { error } = await sb.from("envois_client").insert({ projet_id: dossier, pris_le: le });
+  if (error?.code === "23505") throw new Refus(ENVOI_SIMULTANE, 409);
+  if (error) echecDiscussion("bail de l'envoi", dossier, {}, error);
+  return le;
+}
+
+// Bail rendu à la fin de l'envoi (le sien seulement : un bail repris entre-temps par un autre envoi reste) ; une erreur
+// est seulement journalisée (le bail expire au bout de 3 minutes).
+async function rendreBail(sb: Sb, dossier: string, le: string): Promise<void> {
+  try {
+    const { error } = await sb.from("envois_client").delete().eq("projet_id", dossier).eq("pris_le", le);
+    if (error) throw error;
+  } catch (e) {
+    journaliser("discussion : bail de l'envoi non rendu", dossier, {}, e);
+  }
+}
+
+// Chemins des pièces d'un message de l'agence, déposées par la page : dans <id>/agence/discussion/ de CE dossier (la
+// fonction lit tout le stockage : jamais la pièce d'un autre dossier), 4 segments, sans « .. », nom non vide qui ne
+// commence pas par « . », extension acceptée (PDF ou image : un autre format ferait refuser l'e-mail) ; sinon 400.
+// Doublons retirés.
+function cheminsAgence(projet: Projet, v: unknown[]): string[] {
+  const dossier = `${projet.id}/agence/discussion/`;
+  for (const c of v) {
+    const valable = typeof c === "string" && c.startsWith(dossier) && c.split("/").length === 4 && !c.includes("..");
+    const nom = valable ? c.slice(dossier.length) : "";
+    const ext = (/\.([a-z0-9]{1,5})$/i.exec(nom)?.[1] ?? "").toLowerCase();
+    if (!nom || nom.startsWith(".") || !Object.hasOwn(TYPES_PIECES, ext)) throw new Refus(PIECE_INTROUVABLE);
+  }
+  return [...new Set(v as string[])];
+}
+
+// Pièces d'un message de l'agence : existence et taille lues dans la liste du stockage (toutes ses pages ; métadonnées,
+// jamais par un téléchargement : dix pièces de 50 Mo dépasseraient la mémoire de la fonction) ; pièce absente : 400 ;
+// stockage en panne : 503. Nom montré au client (fil, liste de l'e-mail, nom de la pièce jointe) : dernier segment du
+// chemin sans le préfixe d'heure posé par la page (« AAMMJJHHMMSS- », ou « AAMMJJHHMMSS-2- » à « -9- » pour un nom
+// déjà pris), qui ne sert qu'à rendre le chemin unique ; chemin inchangé.
+async function piecesAgence(sb: Sb, projet: Projet, chemins: string[]): Promise<Piece[]> {
+  if (!chemins.length) return [];
+  let liste: Json[];
+  try {
+    liste = await listerTout(sb, `${projet.id}/agence/discussion`);
+  } catch (e) {
+    journaliser("discussion : liste des pièces de l'agence", projet.id, { pieces: chemins.length }, e);
+    throw new Refus(STOCKAGE_INDISPONIBLE, 503);
+  }
+  const tailles = new Map(liste.filter((f) => f?.id && f.name).map((f) => [String(f.name), Number(f.metadata?.size) || 0]));
+  return chemins.map((chemin) => {
+    const segment = chemin.split("/").pop() ?? "";
+    const taille = tailles.get(segment);
+    if (taille === undefined) throw new Refus(PIECE_INTROUVABLE);
+    return { nom: segment.replace(/^\d{12}(-[2-9])?-/, "") || segment, chemin, taille };
+  });
+}
+
+// Avis « Message du client » à l'agence pour un message écrit dans l'espace client : texte entier, pièces, lien vers
+// l'espace agence ; réponse à contact@ (une réponse depuis la messagerie ne parviendrait pas au client : l'avis le dit en
+// tête). Pas d'avis si un autre est parti, ou part, pour ce dossier depuis moins d'un quart d'heure : les messages
+// suivants s'affichent dans l'espace agence. Avis envoyé : mail_etat « en_cours », puis « envoye » ou « echec », avec
+// mail_le ; sans avis, mail_etat reste nul. Le message est déjà enregistré : une erreur est journalisée, jamais renvoyée.
+async function avisMessageClient(sb: Sb, projet: Projet, id: number, texte: string, pieces: Piece[]): Promise<void> {
+  try {
+    const { count, error } = await sb.from("messages").select("id", { count: "exact", head: true })
+      .eq("projet_id", projet.id).eq("auteur", "client").eq("origine", "espace").in("mail_etat", ["en_cours", "envoye"])
+      .gte("mail_le", new Date(Date.now() - AVIS_REGROUPES).toISOString());
+    if (error) throw error;
+    if (count) return;
+    const { error: errDebut } = await sb.from("messages").update({ mail_etat: "en_cours", mail_le: new Date().toISOString() }).eq("id", id);
+    if (errDebut) throw errDebut;
+    const mail = await mailAgence(projet, `Message du client — dossier ${projet.id} (${projet.nom})`, "Message du client", [
+      alerte("Ne répondez pas à cet e-mail&nbsp;: votre réponse ne parviendrait pas au client. Répondez depuis l'espace agence (lien en bas de ce message)."),
+      p(`${esc(projet.prenom)} ${esc(projet.nom)} a écrit depuis son espace client&nbsp;:`),
+      texteCite(texte || "(message sans texte)"),
+      pieces.length ? p("Pièces jointes, rangées dans le dossier&nbsp;:") + listePieces(pieces) : "",
+      p("D'autres messages de ce client peuvent suivre dans le quart d'heure&nbsp;: ils s'affichent dans l'espace agence, sans nouvel e-mail."),
+    ].join(""), MAIL_AGENCE);
+    await noterEnvoi(sb, projet.id, id, mail);
+  } catch (e) {
+    journaliser("discussion : avis à l'agence", projet.id, { message: id, pieces: pieces.length }, e);
+  }
+}
+
+// Objet de l'e-mail d'un message de l'agence : « dossier <id> » permet au moteur de ranger la réponse dans ce dossier.
+const sujetMessage = (projet: Projet) => `Message d'Atomes studio — dossier ${projet.id}`;
+
+// E-mail d'un message de l'agence au client : texte entier (jamais coupé), pièces listées, jointes si elles tiennent en
+// 15 Mo (téléchargées une à une, taille réelle recontrôlée : au-delà, aucune n'est jointe et le client les télécharge
+// depuis la discussion de son espace ; rien n'est téléchargé si les tailles enregistrées dépassent déjà), invitation à
+// répondre ; timeline et lien vers l'espace client (mailClient). Faux si l'e-mail n'est pas parti, ou si une pièce n'a
+// pas pu être lue (l'agence le renvoie).
+async function mailMessage(sb: Sb, projet: Projet, m: { id: number; sujet: string | null; texte: string | null; pieces: Piece[] }): Promise<boolean> {
+  const pieces = m.pieces;
+  let jointes: PieceJointe[] = [];
+  if (pieces.length && pieces.reduce((s, x) => s + (Number(x.taille) || 0), 0) <= MAX_JOINTES_MESSAGE) {
+    try {
+      let total = 0;
+      for (const x of pieces) {
+        const { data, error } = await sb.storage.from("dossiers").download(x.chemin);
+        if (!data) throw error ?? new Error("pièce absente");
+        const octets = new Uint8Array(await data.arrayBuffer());
+        total += octets.byteLength;
+        if (total > MAX_JOINTES_MESSAGE) { jointes = []; break; }
+        jointes.push({ filename: x.nom, content: base64(octets) });
+      }
+    } catch (e) {
+      journaliser("discussion : pièce de l'agence illisible, e-mail non envoyé", projet.id, { message: m.id, pieces: pieces.length }, e);
+      return false;
+    }
+  }
+  const joint = pieces.length > 0 && jointes.length === pieces.length;
+  return await mailClient(projet, m.sujet || sujetMessage(projet), "Message d'Atomes studio", [
+    m.texte ? `<div style="word-break:break-word">${paragraphes(m.texte)}</div>` : "",
+    pieces.length
+      ? titreBloc("Pièces jointes") + listePieces(pieces)
+        + p(joint ? "Jointes à cet e-mail." : "Trop lourdes pour être jointes&nbsp;: téléchargez-les depuis la discussion de votre espace client.")
+      : "",
+    p("Répondez simplement à cet e-mail, ou écrivez-nous depuis votre espace client&nbsp;: votre message s'ajoute à la discussion de votre dossier (une réponse par e-mail peut mettre quelques heures à y apparaître)."),
+  ].join(""), joint ? jointes : []);
+}
+
+// Résultat de l'envoi noté sur la ligne du message (mail_etat, mail_le : fin de l'envoi). Renvoie l'état enregistré :
+// « en_cours » si l'écriture échoue (journalisée ; l'e-mail d'un message de l'agence se renvoie alors après 10 minutes).
+async function noterEnvoi(sb: Sb, dossier: string, id: number, mail: boolean): Promise<string> {
+  const etat = mail ? "envoye" : "echec";
+  const { error } = await sb.from("messages").update({ mail_etat: etat, mail_le: new Date().toISOString() }).eq("id", id)
+    .then((x: { error: unknown }) => x, (err: unknown) => ({ error: err }));
+  if (!error) return etat;
+  journaliser("discussion : état de l'e-mail non enregistré", dossier, { message: id, mail }, error);
+  return "en_cours";
+}
+
+// Journal sans donnée personnelle : dossier, message, nombre et taille des pièces, code et statut d'erreur. Jamais le
+// texte d'un message, une adresse e-mail, un nom de fichier ni un chemin de pièce : ni error.details ou error.hint (ils
+// recopient la ligne refusée), ni le message d'une erreur (celui du stockage peut citer le chemin).
+function journaliser(quoi: string, dossier: string, infos: Record<string, unknown>, e?: unknown): void {
+  const x = (e ?? {}) as Json;
+  const erreur = e === undefined ? {} : { code: x.code ?? null, statut: x.status ?? x.statusCode ?? null };
+  console.error(quoi, dossier, JSON.stringify({ ...infos, ...erreur }));
+}
+
+// Erreur de la base ou du stockage dans une action de la discussion : journalisée sans donnée, puis relancée sans son
+// contenu (le journal général de la fonction ne recopie donc pas la ligne refusée) ; la page reçoit un 500.
+function echecDiscussion(quoi: string, dossier: string, infos: Record<string, unknown>, e: unknown): never {
+  journaliser(`discussion : ${quoi}`, dossier, infos, e);
+  throw new Error(`discussion : ${quoi}`);
 }
 
 // ---------- Webhook Resend : e-mail reçu --------------------------------------
@@ -714,8 +1119,18 @@ async function mailDocumentsPrets(projet: Projet, docs: Doc[]): Promise<boolean>
 // tard (Svix n'attend une réponse que quelques secondes).
 
 async function webhookResend(sb: Sb, req: Request): Promise<Response> {
-  const brut = await req.text();
-  if (!RESEND_WEBHOOK_SECRET || !(await signatureSvixValide(req.headers, brut))) return reponseWebhook({ erreur: "signature invalide" }, 400);
+  // Sans secret (réception retirée le 20 octobre 2026) : refus avant toute lecture du corps.
+  if (!RESEND_WEBHOOK_SECRET) return reponseWebhook({ erreur: "signature invalide" }, 400);
+  // L'événement ne porte que des métadonnées : 256 Ko au plus (taille annoncée, puis octets lus), avant la signature.
+  let octets: ArrayBuffer | null;
+  try {
+    octets = Number(req.headers.get("content-length") ?? 0) > MAX_CORPS_WEBHOOK ? null : await lireCorps(req, MAX_CORPS_WEBHOOK);
+  } catch {
+    return reponseWebhook({ erreur: "corps illisible" }, 400);
+  }
+  if (!octets) return reponseWebhook({ erreur: "corps trop lourd" }, 413);
+  const brut = new TextDecoder().decode(octets);
+  if (!(await signatureSvixValide(req.headers, brut))) return reponseWebhook({ erreur: "signature invalide" }, 400);
   let evt: Json;
   try { evt = JSON.parse(brut); } catch { return reponseWebhook({ erreur: "corps illisible" }, 400); }
   const type = String(evt?.type ?? "");
@@ -753,8 +1168,8 @@ async function signatureSvixValide(entetes: Headers, corps: string): Promise<boo
 
 // Réponse du client : dossier retrouvé par l'adresse de réponse, e-mail lu chez Resend, message enregistré
 // (resend_id unique : un événement relivré n'est traité qu'une fois), puis, s'il est vérifié, pièces jointes
-// rangées, questions répondues et demande de modification, et e-mail « Réponse du client » à l'agence. Message à
-// vérifier : e-mail à l'agence au plus une fois par heure et par dossier, aucun si SPF, DKIM et DMARC échouent tous.
+// rangées et e-mail « Réponse du client » à l'agence. Message à vérifier : e-mail à l'agence au plus une fois par
+// heure et par dossier, aucun si SPF, DKIM et DMARC échouent tous.
 // Un message vérifié est enregistré « en cours de traitement » (bail de 10 minutes), puis marqué traité : une erreur
 // passagère (Resend, base, stockage) répond 500 et la nouvelle tentative de Resend reprend là où le traitement s'est
 // arrêté (pièces déjà rangées gardées) ; une relivraison pendant le traitement reçoit 503 (Resend réessaiera), jamais
@@ -843,7 +1258,7 @@ async function reprendre(sb: Sb, projet: Projet, message: Message, tardif: boole
   return await traiterEtMarquer(sb, projet, { ...message, traitement_le: le }, tardif);
 }
 
-// Traitement d'un message vérifié (étapes 6 à 8), puis message marqué traité. En cas d'erreur, le bail est rendu (la
+// Traitement d'un message vérifié (pièces jointes), puis message marqué traité. En cas d'erreur, le bail est rendu (la
 // nouvelle tentative reprend aussitôt) ; les pièces déjà rangées restent notées dans le message. html non fourni : relu
 // chez Resend (repérage des images de l'e-mail cité).
 async function traiterEtMarquer(sb: Sb, projet: Projet, message: Message, tardif: boolean, html?: string | null): Promise<Bilan> {
@@ -861,12 +1276,13 @@ async function traiterEtMarquer(sb: Sb, projet: Projet, message: Message, tardif
   return bilan;
 }
 
-// Étapes 6 à 8 d'un message vérifié. `bilan` est rempli au fur et à mesure ; chaque pièce rangée est aussitôt notée
-// dans le message (une reprise ne la range pas une seconde fois). `tardif` (rattachement ou reprise par l'agence) : un
-// e-mail que Resend ne conserve plus est rattaché sans ses pièces ; à la réception (webhook), une liste de pièces
-// introuvable est une erreur passagère (Resend réessaiera). `html` : HTML reçu (images de l'e-mail cité).
+// Traitement d'un message vérifié : ses pièces jointes (les questions et les demandes de modification ont laissé la
+// place à la discussion : le texte reste dans le message). `bilan` est rempli au fur et à mesure ; chaque pièce rangée
+// est aussitôt notée dans le message (une reprise ne la range pas une seconde fois). `tardif` (rattachement ou reprise
+// par l'agence) : un e-mail que Resend ne conserve plus est rattaché sans ses pièces ; à la réception (webhook), une
+// liste de pièces introuvable est une erreur passagère (Resend réessaiera). `html` : HTML reçu (images de l'e-mail cité).
 async function traiterMessageVerifie(sb: Sb, projet: Projet, message: Message, bilan: Bilan, tardif: boolean, html: string | null): Promise<void> {
-  // 6. Pièces jointes (images et PDF, 25 Mo au plus) rangées dans <id>/client/, nom unique.
+  // Pièces jointes (images et PDF, 25 Mo au plus) rangées dans <id>/client/, nom unique.
   const rangees = message.pieces.filter((x): x is Piece => !!x && typeof x.chemin === "string" && !!x.chemin);
   bilan.pieces.push(...rangees);
   if (message.resend_id) {
@@ -924,28 +1340,9 @@ async function traiterMessageVerifie(sb: Sb, projet: Projet, message: Message, b
     const { error } = await sb.from("messages").update({ pieces: bilan.pieces }).eq("id", message.id);
     if (error) throw error;
   }
-  // 7. Questions sans réponse, posées avant la réception : la réponse est le texte du message.
-  const reponse = (message.texte || (bilan.pieces.length ? `Pièces jointes : ${bilan.pieces.map((x) => x.nom).join(", ")}` : "")).slice(0, 5000);
-  if (reponse) {
-    const { data, error } = await sb.from("questions").update({ reponse, repondue_le: message.recu_le })
-      .eq("projet_id", projet.id).is("repondue_le", null).lte("posee_le", message.recu_le).select("id");
-    if (error) throw error;
-    bilan.questions = data?.length ?? 0;
-  }
-  // 8. Étape « Validation de vos documents » : le message est une demande de modification (l'agence décide), notée
-  // une seule fois même si le traitement est repris.
-  if (message.etape === "validation" && projet.etape === "validation") {
-    const { data: deja, error: errDeja } = await sb.from("modifications").select("id").eq("projet_id", projet.id).eq("demandee_le", message.recu_le).limit(1);
-    if (errDeja) throw errDeja;
-    if (!deja?.length) {
-      const { error } = await sb.from("modifications").insert({ projet_id: projet.id, message: reponse || "Message sans texte", demandee_le: message.recu_le });
-      if (error) throw error;
-    }
-    bilan.modification = true;
-  }
 }
 
-// E-mail à l'agence pour un message vérifié : texte, pièces rangées, écartées, images ignorées, questions, modification.
+// E-mail à l'agence pour un message vérifié : texte, pièces rangées, écartées, images ignorées.
 async function mailReponse(projet: Projet, message: Message, bilan: Bilan): Promise<void> {
   await mailAgence(projet, `Réponse du client — dossier ${projet.id} (${projet.nom})`, "Réponse du client", [
     p(`${esc(projet.prenom)} ${esc(projet.nom)} a répondu par e-mail${message.sujet ? ` («&nbsp;${esc(message.sujet)}&nbsp;»)` : ""}.`),
@@ -953,8 +1350,6 @@ async function mailReponse(projet: Projet, message: Message, bilan: Bilan): Prom
     bilan.pieces.length ? p(`Pièces jointes rangées dans le dossier&nbsp;: ${esc(bilan.pieces.map((x) => x.nom).join(", "))}.`) : "",
     bilan.ecartees.length ? alerte(`Pièces jointes non rangées&nbsp;: ${esc(bilan.ecartees.join(", "))}.`) : "",
     bilan.ignorees.length ? p(`Images intégrées au texte, non rangées&nbsp;: ${esc(bilan.ignorees.join(", "))}.`) : "",
-    bilan.questions ? p(bilan.questions > 1 ? `${bilan.questions} questions sont marquées comme répondues.` : "1 question est marquée comme répondue.") : "",
-    bilan.modification ? p("Le dossier est à l'étape «&nbsp;Validation de vos documents&nbsp;»&nbsp;: ce message est enregistré comme une demande de modification.") : "",
   ].join(""));
 }
 
@@ -973,21 +1368,24 @@ async function mailAVerifier(projet: Projet, message: Message, memeAdresse: bool
   ].join(""));
 }
 
-// Messages du dossier reçus depuis `duree` millisecondes (vérifiés ou à vérifier) : limites et regroupement des avis.
+// E-mails du dossier reçus depuis `duree` millisecondes (vérifiés ou à vérifier ; ni les messages écrits dans l'espace
+// client ni ceux de l'agence) : limites et regroupement des avis.
 async function compterMessages(sb: Sb, projetId: string, verifie: boolean, duree: number): Promise<number> {
   const { count, error } = await sb.from("messages").select("id", { count: "exact", head: true })
-    .eq("projet_id", projetId).eq("verifie", verifie).gte("recu_le", new Date(Date.now() - duree).toISOString());
+    .eq("projet_id", projetId).eq("origine", "email").eq("verifie", verifie).gte("recu_le", new Date(Date.now() - duree).toISOString());
   if (error) throw error;
   return count ?? 0;
 }
 
+// Fichiers déposés par une tentative qui a échoué, retirés. Une erreur est journalisée sans les chemins (un nom de
+// fichier peut contenir un nom de personne).
 async function retirerFichiers(sb: Sb, pieces: Piece[]): Promise<void> {
   if (!pieces.length) return;
   try {
     const { error } = await sb.storage.from("dossiers").remove(pieces.map((x) => x.chemin));
     if (error) throw error;
   } catch (e) {
-    console.error("pièces jointes non retirées", pieces.map((x) => x.chemin).join(", "), e);
+    journaliser("pièces jointes non retirées", pieces[0].chemin.split("/")[0], { pieces: pieces.length }, e);
   }
 }
 
@@ -1010,16 +1408,13 @@ function versMessage(ligne: Json): Message {
 }
 
 function nouveauBilan(): Bilan {
-  return { pieces: [], nouvelles: [], ecartees: [], ignorees: [], questions: 0, modification: false, indisponibles: false };
+  return { pieces: [], nouvelles: [], ecartees: [], ignorees: [], indisponibles: false };
 }
 
 // Bilan renvoyé à l'espace agence (rattachement, reprise) ; non_rangees : pièces écartées (format, taille, limite) et
 // images intégrées ignorées, avec la raison.
 function resumeBilan(bilan: Bilan): Record<string, unknown> {
-  return {
-    pieces: bilan.pieces, non_rangees: [...bilan.ecartees, ...bilan.ignorees], questions: bilan.questions,
-    modification: bilan.modification, pieces_indisponibles: bilan.indisponibles,
-  };
+  return { pieces: bilan.pieces, non_rangees: [...bilan.ecartees, ...bilan.ignorees], pieces_indisponibles: bilan.indisponibles };
 }
 
 // API Resend des e-mails reçus (lecture) ; null si la ressource n'existe pas (404), exception sinon (erreur passagère).
@@ -1040,12 +1435,25 @@ async function htmlRecu(resendId: string | null): Promise<string | null> {
   return typeof email?.html === "string" ? email.html : null;
 }
 
-// Pièces déjà rangées dans <id>/client/ : noms (dépôt sans écraser) et volume total (limite du dossier).
+// Pièces déjà rangées dans <id>/client/ (toutes les pages de la liste) : noms (dépôt sans écraser) et volume total
+// (limite du dossier).
 async function contenuClient(sb: Sb, id: string): Promise<{ noms: Set<string>; volume: number }> {
-  const { data, error } = await sb.storage.from("dossiers").list(`${id}/client`, { limit: 1000 });
-  if (error) throw error;
-  const liste = (data ?? []) as Json[];
+  const liste = await listerTout(sb, `${id}/client`);
   return { noms: new Set(liste.map((f) => String(f?.name ?? ""))), volume: liste.reduce((s, f) => s + (Number(f?.metadata?.size) || 0), 0) };
+}
+
+// Liste entière d'un dossier du stockage : pages de 1 000 entrées (au-delà, une seule page en oublierait), triées par
+// nom, jusqu'à une page incomplète ; erreur relancée. Au-delà de 200 pages, erreur plutôt qu'une liste incomplète.
+async function listerTout(sb: Sb, dossier: string): Promise<Json[]> {
+  const tous: Json[] = [];
+  for (let page = 0; page < 200; page++) {
+    const { data, error } = await sb.storage.from("dossiers").list(dossier, { limit: PAGE_LISTE, offset: tous.length, sortBy: { column: "name", order: "asc" } });
+    if (error) throw error;
+    const lus = (data ?? []) as Json[];
+    tous.push(...lus);
+    if (lus.length < PAGE_LISTE) return tous;
+  }
+  throw new Error("liste du stockage trop longue");
 }
 
 // Dépôt sans écraser : nom reçu, sinon préfixé « AAMMJJHHMMSS- » (heure de réception), puis numéroté.
@@ -1464,11 +1872,10 @@ function idParis(d: Date): string {
 
 async function chargerProjet(sb: Sb, id: string): Promise<Projet | null> {
   if (!/^[0-9]{12}$/.test(id)) return null;
-  const { data, error } = await sb.from("projets").select("*, etapes(*), questions(*)").eq("id", id).maybeSingle();
+  const { data, error } = await sb.from("projets").select("*, etapes(*)").eq("id", id).maybeSingle();
   if (error) throw error;
   if (!data) return null;
   data.etapes = (data.etapes ?? []).sort((a: Etape, b: Etape) => a.ordre - b.ordre);
-  data.questions = data.questions ?? [];
   data.envois_echoues = Array.isArray(data.envois_echoues) ? data.envois_echoues : [];
   return data as Projet;
 }
@@ -1720,8 +2127,10 @@ async function mailClient(projet: Projet, sujet: string, titre: string, corps: s
   });
 }
 
-const mailAgence = (projet: Projet, sujet: string, titre: string, corps: string) =>
-  envoyerMail({ to: [MAIL_AGENCE], replyTo: projet.email, subject: sujet, html: gabarit(`${titre} — dossier ${projet.id}`, corps + p(`<a href="${ESPACE_AGENCE}#${projet.id}" style="color:#171512">Ouvrir le dossier dans l'espace agence</a>`)) });
+// E-mail à l'agence (contact@) : réponse à l'adresse du client, sauf repondreA (avis « Message du client » : contact@, la
+// réponse se fait depuis l'espace agence) ; lien vers le dossier dans l'espace agence en pied.
+const mailAgence = (projet: Projet, sujet: string, titre: string, corps: string, repondreA = projet.email) =>
+  envoyerMail({ to: [MAIL_AGENCE], replyTo: repondreA, subject: sujet, html: gabarit(`${titre} — dossier ${projet.id}`, corps + p(`<a href="${ESPACE_AGENCE}#${projet.id}" style="color:#171512">Ouvrir le dossier dans l'espace agence</a>`)) });
 
 // Timeline : étapes visibles, marque (✓ faite, ● en cours, ○ à venir), numéro, libellé, date ; étape courante en gras.
 function timelineHtml(projet: Projet): string {
@@ -1869,6 +2278,21 @@ const p = (s: string) => `<p style="margin:0 0 14px;font-size:15px;line-height:2
 const titreBloc = (s: string) => `<div style="${KICKER};margin:24px 0 6px">${esc(s)}</div>`;
 const alerte = (s: string) => `<p style="margin:0 0 14px;padding:12px 14px;border:1px solid #d8896b;font-size:14px;line-height:21px;color:#8a4a2c">${s}</p>`;
 const citation = (s: string) => `<div style="margin:0 0 18px;padding:10px 14px;border-left:3px solid #e3ded4;font-size:14px;line-height:21px;color:#3a3a3a;word-break:break-word">${esc(s.slice(0, 5000)).replace(/\n/g, "<br>")}</div>`;
+// Texte entier d'un message de la discussion (jamais coupé, contrairement à citation()) : échappé, une ligne vide sépare
+// deux paragraphes, un retour à la ligne devient <br>. Découpage ligne par ligne, en temps linéaire.
+function paragraphes(texte: string): string {
+  const blocs: string[][] = [[]];
+  for (const ligne of texte.split("\n")) {
+    if (ligne.trim()) blocs[blocs.length - 1].push(esc(ligne));
+    else if (blocs[blocs.length - 1].length) blocs.push([]);
+  }
+  return blocs.filter((b) => b.length).map((b) => p(b.join("<br>"))).join("");
+}
+// Message du client cité en entier dans un avis à l'agence (filet à gauche, comme citation()).
+const texteCite = (s: string) => `<div style="margin:0 0 18px;padding:10px 14px 1px;border-left:3px solid #e3ded4;color:#3a3a3a;word-break:break-word">${paragraphes(s)}</div>`;
+// Pièces d'un message : « nom · taille ».
+const listePieces = (pieces: Piece[]) =>
+  `<ul style="margin:0 0 14px;padding-left:18px;font-size:14px;line-height:24px">${pieces.map((x) => `<li>${esc(x.nom)} · ${ko(Number(x.taille) || 0)}</li>`).join("")}</ul>`;
 const bouton = (texte: string, url: string) =>
   `<p style="margin:8px 0 26px"><a href="${esc(url)}" style="display:inline-block;background:#171512;color:#ffffff;text-decoration:none;font-size:12px;line-height:16px;letter-spacing:2px;text-transform:uppercase;padding:14px 24px">${esc(texte)}</a></p>`;
 

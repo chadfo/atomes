@@ -1,14 +1,19 @@
-// Espace client (parcours v3) : consultation seule. Connexion sans mot de passe (code reçu par e-mail), liste des
-// dossiers, timeline numérotée et datée avec, sous l'étape en cours, une information en lecture seule (questions posées
-// par e-mail, devis envoyé, virement attendu, documents à valider, rétractation), échanges (questions et réponses,
-// messages du client reçus par e-mail, demandes de modification), documents de l'agence et du client (bucket privé
-// « dossiers »), récapitulatif de la demande.
-// Le client n'agit plus ici : il répond aux e-mails, signe le devis et valide ses documents depuis les liens reçus
-// (page action/), paie par virement. Seule exception, imposée par la loi : le lien « Renoncer au contrat ici »
-// (particulier, devis signé, dans le délai), qui mène à la page action/. Ce lien et les coordonnées bancaires viennent
-// de l'action « infos_espace » de la fonction « espace » (lecture seule, config.js : espaceUrl).
+// Espace client (parcours v3, discussion du 20 octobre 2026). Connexion sans mot de passe (code reçu par e-mail), liste
+// des dossiers, timeline numérotée et datée avec, sous l'étape en cours, une information en lecture seule (devis envoyé,
+// virement attendu, documents à valider, rétractation), discussion avec l'agence, documents de l'agence et du client
+// (bucket privé « dossiers »), récapitulatif de la demande.
+// Discussion : messages des deux côtés (e-mails du client rangés par le moteur de l'agence, messages écrits ici,
+// messages de l'agence) et étapes clés du dossier (table evenements), du plus ancien au plus récent ; dossier ouvert
+// relu toutes les 30 s (onglet visible) et au retour sur l'onglet. Le client y écrit, avec photos et PDF aux limites du
+// formulaire de devis : envoi multipart à l'action « message_client » de la fonction « espace », qui range les pièces
+// dans <id>/client/ (jamais d'écriture directe en base ni dans Storage). Brouillon par dossier, en mémoire seulement.
+// Le reste se fait hors d'ici : le client signe le devis et valide ses documents depuis les liens reçus par e-mail
+// (page action/), paie par virement. Le lien légal « Renoncer au contrat ici » (particulier, devis signé, dans le
+// délai) mène à la page action/ ; ce lien et les coordonnées bancaires viennent de l'action « infos_espace » de la
+// fonction « espace » (config.js : espaceUrl).
 // Mode démo sans backend : dossier/?demo, ou ?demo=signature, paiement, production, validation, suivi, clos (étape de
-// départ), ou ?demo=retracte (rétractation reçue pendant le paiement).
+// départ), ou ?demo=retracte (rétractation reçue pendant le paiement) ; la discussion s'y écrit dans les données de la
+// démo.
 (() => {
   const cfg = window.ATOMES_CONFIG || {};
   const params = new URLSearchParams(location.search);
@@ -27,22 +32,47 @@
     return true;
   };
   let ancienLien = retirerAncienLien();   // message sous l'adresse au premier affichage de la connexion
+  // Jeton dans le fragment (#access_token=…, #refresh_token=…, type=magiclink|recovery|invite|signup : ancien lien de
+  // connexion ou lien forgé) : il n'ouvre aucune session (detectSessionInUrl: false) et quitte aussitôt la barre
+  // d'adresse et l'historique, avant la création du client Supabase, sans message. #<numéro> et #error… restent.
+  const retirerJetonAcces = () => {
+    const h = location.hash.replace(/^#/, '');
+    if (!/(^|&)(access_token|refresh_token)=|(^|&)type=(magiclink|recovery|invite|signup)(&|$)/.test(h)) return false;
+    history.replaceState(null, '', location.pathname + location.search);
+    return true;
+  };
+  retirerJetonAcces();
 
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
   const vues = {};
   $$('[data-vue]').forEach((v) => { vues[v.dataset.vue] = v; });
-  const montrer = (nom) => { Object.keys(vues).forEach((k) => { vues[k].hidden = k !== nom; }); };
+  // Connexion par code réussie : focus sur le titre de la première vue affichée ensuite (liste, dossier ou refus),
+  // jamais à un SIGNED_IN sans code saisi (supabase-js en réémet un à chaque retour sur l'onglet).
+  let focusTitre = false;
+  const montrer = (nom) => {
+    Object.keys(vues).forEach((k) => { vues[k].hidden = k !== nom; });
+    if (!focusTitre || nom === 'chargement') return;
+    focusTitre = false;
+    const titre = vues[nom] && $('h1', vues[nom]);
+    if (titre) { titre.setAttribute('tabindex', '-1'); titre.focus({ preventScroll: true }); }
+  };
   const compte = $('[data-compte]');
   const erreur = (msg) => { const e = $('[data-erreur]'); e.textContent = msg || ''; e.hidden = !msg; };
 
   const el = (tag, cls, texte) => { const n = document.createElement(tag); if (cls) n.className = cls; if (texte !== undefined) n.textContent = texte; return n; };
-  const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
+  // Dates à l'heure de Paris (comme les numéros de dossier, les e-mails et la page d'action) ; « 1er » comme dans les
+  // e-mails (règle premier() de la fonction « espace ») : « 1er octobre 2026 »
+  const premier = (s) => s.replace(/(^|\s)1(\s)/, '$11er$2');
+  const dateValide = (iso) => !!iso && !isNaN(new Date(iso).getTime());
+  const fmtDate = (iso) => (dateValide(iso) ? premier(new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' })) : '');
+  // « 20 octobre 2026 à 09:42 »
+  const fmtHeure = (iso) => (dateValide(iso) ? premier(new Date(iso).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Paris' })) : '');
   // Date limite « AAAA-MM-JJ » (dernier jour du délai de rétractation) : « mercredi 28 octobre 2026 ».
   const fmtLimite = (jour) => {
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(jour || ''));
-    return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12)).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    return m ? premier(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12)).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })) : '';
   };
   const fmtTaille = (o) => (o >= 1048576 ? (o / 1048576).toFixed(1).replace('.', ',') + ' Mo' : Math.max(1, Math.round((o || 0) / 1024)) + ' Ko');
   const euros = (c) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format((c || 0) / 100);
@@ -56,25 +86,41 @@
 
   // ---------- Accès aux données : Supabase, ou démo ----------
   const apiSupabase = () => {
-    const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+    // detectSessionInUrl désactivé : aucune session ne s'ouvre depuis un #access_token placé dans l'adresse (connexion
+    // par code seulement).
+    const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, { auth: { detectSessionInUrl: false } });
     const ok = (r) => { if (r.error) throw r.error; return r.data; };
     const urlEspace = cfg.espaceUrl || cfg.supabaseUrl.replace(/\/$/, '') + '/functions/v1/espace';
-    const lire = (messages) => sb.from('projets').select('*, etapes(*), questions(*), modifications(*)' + (messages ? ', messages(*)' : ''))
-      .order('cree_le', { ascending: false }).then(ok);
+    // Colonnes des messages lues par la page : jamais texte_complet (lu à la demande, « Message complet »), ni
+    // l'expéditeur, l'authentification ou les colonnes internes.
+    const MESSAGES = 'id, recu_le, auteur, origine, texte, pieces, verifie';
+    const SELECTION = '*, etapes(*), messages(' + MESSAGES + '), evenements(type, le, details)';
+    // Avant la migration 0006 (table evenements absente : PGRST200 ; colonne inconnue : 42703) : ancienne lecture, sans
+    // étapes clés ; chaque message est alors un e-mail du client (auteur et origine absents).
+    const SELECTION_ANCIENNE = '*, etapes(*), messages(*)';
+    let ancienne = false;
+    const lire = (sel) => sb.from('projets').select(sel).order('cree_le', { ascending: false }).then(ok);
+    // Jeton de la session lu au moment de l'appel
+    const jeton = async () => { const { data } = await sb.auth.getSession(); return data && data.session ? data.session.access_token : ''; };
     return {
       surChangement: (fn) => sb.auth.onAuthStateChange((evt, session) => fn(session, evt)),
-      // Code de connexion envoyé par e-mail (modèle « Magic link ») ; emailRedirectTo ne sert qu'à un ancien modèle à lien
-      // (#access_token=…, traité par supabase-js), le temps de la transition.
-      connexion: (email) => sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname.replace(/index\.html$/, ''), shouldCreateUser: false } }).then(ok),
+      // Code de connexion envoyé par e-mail (modèle « Magic link » à code, sans lien de connexion).
+      connexion: (email) => sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } }).then(ok),
       // Code saisi (POST /auth/v1/verify) : session enregistrée par supabase-js, puis événement SIGNED_IN.
       verifierCode: (email, code) => sb.auth.verifyOtp({ email, token: code, type: 'email' }).then(ok)
         .then((d) => { if (!d || !d.session) throw new Error('session absente'); return d; }),
       deconnexion: () => sb.auth.signOut(),
-      // Messages du client (migration 0005) ; table absente, avant la migration : dossiers lus sans eux.
-      dossiers: () => lire(true).catch((e) => {
-        if (e && (e.code === 'PGRST200' || /messages/.test(String(e.message || '')))) return lire(false);
+      dossiers: () => lire(SELECTION).then((l) => { ancienne = false; return l; }, (e) => {
+        if (e && (e.code === 'PGRST200' || e.code === '42703')) return lire(SELECTION_ANCIENNE).then((l) => { ancienne = true; return l; });
         throw e;
       }),
+      // Relecture du dossier ouvert (rafraîchissement) : ses messages (mêmes colonnes) et ses étapes clés.
+      relire: (id) => Promise.all([
+        sb.from('messages').select(ancienne ? 'id, recu_le, texte, pieces, verifie' : MESSAGES).eq('projet_id', id).then(ok),
+        ancienne ? null : sb.from('evenements').select('type, le, details').eq('projet_id', id).then(ok)
+      ]).then(([messages, evenements]) => ({ messages, evenements })),
+      // Texte intégral d'un e-mail du client (citation comprise), lu à l'ouverture de « Message complet » seulement.
+      texteComplet: (id) => sb.from('messages').select('texte_complet').eq('id', id).then(ok).then((l) => (l && l[0] && l[0].texte_complet) || ''),
       lister: (id, dossier) => sb.storage.from('dossiers').list(id + '/' + dossier, { limit: 200, sortBy: { column: 'created_at', order: 'desc' } }).then(ok)
         .then((objets) => objets.filter((o) => o.name && !o.name.startsWith('.') && o.id)
           .map((o) => ({ nom: o.name, chemin: id + '/' + dossier + '/' + o.name, taille: (o.metadata && o.metadata.size) || 0, date: o.created_at }))),
@@ -82,21 +128,36 @@
       lien: (chemin, nom) => sb.storage.from('dossiers').createSignedUrl(chemin, 600, { download: nom }).then(ok).then((d) => d.signedUrl),
       // Coordonnées de virement et lien de rétractation : action « infos_espace » (lecture seule).
       infosEspace: async (projet) => {
-        const { data } = await sb.auth.getSession();
-        const jeton = data && data.session ? data.session.access_token : '';
         const r = await fetch(urlEspace, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jeton, 'apikey': cfg.supabaseAnonKey },
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + await jeton(), 'apikey': cfg.supabaseAnonKey },
           body: JSON.stringify({ action: 'infos_espace', projet })
         });
         const j = await r.json().catch(() => ({}));
         if (!r.ok || !j.ok) { const e = new Error(j.erreur || 'infos_espace'); e.statut = r.status; throw e; }
         return j;
+      },
+      // Message du client (action « message_client ») : multipart, sans Content-Type (le navigateur pose
+      // multipart/form-data et sa limite) ; 120 s au plus, lecture de la réponse comprise. Réponse { message } ou
+      // { deja, message } (cle déjà enregistrée) ; échec : erreur avec le statut et le texte de la fonction.
+      envoyerMessage: async (projet, cle, texte, fichiers) => {
+        const fd = new FormData();
+        fd.append('action', 'message_client'); fd.append('projet', projet); fd.append('cle', cle); fd.append('texte', texte);
+        fichiers.forEach((f) => fd.append('fichiers', f, f.name));
+        const delai = new AbortController();
+        const minuterie = setTimeout(() => delai.abort(), 120000);
+        try {
+          const r = await fetch(urlEspace, { method: 'POST', headers: { 'Authorization': 'Bearer ' + await jeton(), 'apikey': cfg.supabaseAnonKey }, body: fd, signal: delai.signal });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok || !j || !j.message || typeof j.message !== 'object') { const e = new Error('message_client'); e.statut = r.status; e.erreur = j && typeof j.erreur === 'string' ? j.erreur : ''; throw e; }
+          return j;
+        } finally { clearTimeout(minuterie); }
       }
     };
   };
 
-  // Démo : même modèle d'étapes que la base (migrations 0004 et 0005), données en lecture seule.
+  // Démo : même modèle d'étapes que la base (migrations 0004 et 0005) ; la discussion s'écrit dans les données de la
+  // démo (celles de la fermeture, relues par le rafraîchissement), jamais ailleurs.
   const MODELE = [
     ['demande', 'Demande reçue', 'Votre demande nous est bien parvenue.', false, true, null],
     ['traitement', 'Traitement de votre demande', 'Nous étudions votre projet et pouvons vous poser quelques questions pour affiner votre demande.', false, false, 'questions'],
@@ -124,7 +185,7 @@
   };
 
   const apiDemo = (scenario) => {
-    const now = Date.now(), j = 86400000;
+    const now = Date.now(), j = 86400000, h = 3600000;
     const iso = (t) => new Date(t).toISOString();
     const ID = '261003091422';
     const DEVIS = ID + '/agence/devis-' + ID + '-261008101500.pdf';
@@ -136,26 +197,44 @@
       etape: 'traitement', suivi_administratif: false, devis_chemin: null, devis_envoye_le: null, montant_cents: null, montant_libelle: null,
       signe_le: null, signe_nom: null, demarrage_anticipe_le: null, paye_le: null, documents_valides_le: null, retracte_le: null,
       etapes: MODELE.map((m, i) => ({ cle: m[0], ordre: i + 1, libelle: m[1], description: m[2], optionnelle: m[3], instantanee: m[4], action: m[5], statut: 'a_venir', fait_le: null, debut_le: null, note: null })),
-      questions: [
-        { id: 1, question: 'Souhaitez-vous vous occuper vous-même du dépôt de la déclaration préalable, ou que nous nous en chargions (supplément) ?', choix: ['Je m’en occupe', 'Vous vous en chargez'], reponse: null, commentaire: null, posee_le: iso(now - 10 * j), repondue_le: null },
-        { id: 2, question: 'Disposez-vous des plans de la maison existante (papier ou PDF) ?', choix: null, reponse: null, commentaire: null, posee_le: iso(now - 10 * j), repondue_le: null }
-      ],
-      modifications: [],
-      // Réponses du client par e-mail (vérifiées), pièces jointes rangées dans <id>/client/
-      messages: [
-        { id: 1, projet_id: ID, recu_le: iso(now - 11 * j), expediteur: 'jean.dupont@exemple.fr', sujet: 'Re: Votre demande — dossier ' + ID,
-          texte: 'Bonjour,\nJe vous envoie une photo du jardin, côté sud, là où se ferait l’extension.\nJean Dupont',
-          pieces: [{ nom: '03-jardin-sud.jpg', chemin: 'demo', taille: 1887436 }], verifie: true, etape: 'traitement' }
-      ]
+      messages: [],
+      evenements: []
     };
     const docs = {
       agence: [],
       client: [
-        { nom: '03-jardin-sud.jpg', chemin: 'demo', taille: 1887436, date: iso(now - 11 * j) },
         { nom: '01-photos-facade.jpg', chemin: 'demo', taille: 2411520, date: projet.cree_le },
         { nom: '02-plan-existant.pdf', chemin: 'demo', taille: 655360, date: projet.cree_le }
       ]
     };
+    // Discussion : messages (colonnes lues par la page), texte intégral des e-mails du client (lu à la demande) et
+    // étapes clés datées, comme les écrivent la fonction « espace », le moteur de l'agence et le déclencheur de la base.
+    // Pièces du client rangées aussi dans « Vos documents » ; celles de l'agence (agence/discussion/) n'y sont pas.
+    const complets = new Map();
+    let dernierId = 0;
+    const message = (t, auteur, origine, texte, pieces, complet) => {
+      const m = { id: ++dernierId, recu_le: iso(t), auteur, origine, texte, pieces: pieces || [], verifie: true };
+      projet.messages.push(m);
+      if (complet) complets.set(m.id, complet);
+      if (auteur === 'client') m.pieces.forEach((pc) => docs.client.unshift({ nom: pc.nom, chemin: pc.chemin, taille: pc.taille, date: m.recu_le }));
+      return m;
+    };
+    const etapeCle = (type, t, details) => projet.evenements.push({ type, le: iso(t), details: details || {} });
+    const QUESTIONS = 'Bonjour Monsieur Dupont,\n\nMerci pour votre demande et pour la photo. Deux questions pour préparer votre devis :\n\n'
+      + '1. Souhaitez-vous vous occuper vous-même du dépôt de la déclaration préalable, ou que nous nous en chargions (supplément) ?\n'
+      + '2. Disposez-vous des plans de la maison existante (papier ou PDF) ?\n\nSimon Charles\nAtomes studio';
+    const cite = (texte) => texte.split('\n').map((l) => '> ' + l).join('\n');
+    const PHOTO = 'Bonjour,\nJe vous envoie une photo du jardin, côté sud, là où se ferait l’extension.\nJean Dupont';
+    const REPONSE = 'Bonjour,\nVous vous en chargez, merci.\nOui, j’ai les plans de la maison en PDF : je vous les joins.\nJean Dupont';
+    etapeCle('demande_recue', now - 12 * j);
+    message(now - 11 * j, 'client', 'email', PHOTO, [{ nom: '03-jardin-sud.jpg', chemin: 'demo', taille: 1887436 }],
+      PHOTO + '\n\nAtomes studio <contact@atomes.studio> a écrit :\n' + cite('Votre demande nous est bien parvenue. Une question ? Répondez simplement à cet e-mail.'));
+    message(now - 10 * j, 'agence', 'espace', QUESTIONS);
+    message(now - 9 * j, 'client', 'email', REPONSE, [{ nom: '04-plans-maison.pdf', chemin: 'demo', taille: 1258291 }],
+      REPONSE + '\n\nAtomes studio <contact@atomes.studio> a écrit :\n' + cite(QUESTIONS));
+    message(now - 9 * j + 2 * h, 'client', 'espace', 'J’ajoute deux photos de la façade côté rue, prises ce matin.',
+      [{ nom: '05-facade-rue-1.jpg', chemin: 'demo', taille: 2202009 }, { nom: '05-facade-rue-2.jpg', chemin: 'demo', taille: 1992294 }]);
+
     const ordre = ['traitement', 'devis', 'signature', 'paiement', 'production', 'validation', 'suivi', 'clos'];
     const retracte = scenario === 'retracte';
     const jusqua = retracte ? 'paiement' : ordre.includes(scenario) ? scenario : 'traitement';
@@ -163,45 +242,56 @@
     recalculer(projet, iso(now - 12 * j));
     const etapesDemo = ordre.slice(0, ordre.indexOf(jusqua) + 1);
     if (etapesDemo.includes('devis')) {
-      const texte = 'Bonjour,\nVous vous en chargez, merci.\nOui, j’ai les plans de la maison en PDF : je vous les joins.\nJean Dupont';
-      projet.messages.push({ id: 2, projet_id: ID, recu_le: iso(now - 9 * j), expediteur: 'jean.dupont@exemple.fr', sujet: 'Re: Quelques questions sur votre dossier ' + ID,
-        texte, pieces: [{ nom: '04-plans-maison.pdf', chemin: 'demo', taille: 1258291 }], verifie: true, etape: 'traitement' });
-      docs.client.unshift({ nom: '04-plans-maison.pdf', chemin: 'demo', taille: 1258291, date: iso(now - 9 * j) });
-      projet.questions.forEach((q) => { q.reponse = texte; q.repondue_le = iso(now - 9 * j); });
+      message(now - 8 * j - 2 * h, 'agence', 'espace', 'Merci pour ces éléments, c’est noté. Nous préparons votre devis : vous le recevrez par e-mail dans quelques jours.');
       avance('devis', now - 8 * j);
     }
     if (etapesDemo.includes('signature')) {
       Object.assign(projet, { devis_chemin: DEVIS, devis_envoye_le: iso(now - 6 * j), montant_cents: 72000, montant_libelle: 'Acompte de 40 %' });
       docs.agence.push({ nom: DEVIS.split('/').pop(), chemin: DEVIS, taille: 184320, date: iso(now - 6 * j) });
+      etapeCle('devis_envoye', now - 6 * j, { montant_cents: 72000, montant_libelle: 'Acompte de 40 %' });
       avance('signature', now - 6 * j);
     }
     if (etapesDemo.includes('paiement')) {
       Object.assign(projet, { signe_le: iso(now - 5 * j), signe_nom: 'Jean Dupont', demarrage_anticipe_le: iso(now - 5 * j) });
+      etapeCle('devis_signe', now - 5 * j);
       avance('paiement', now - 5 * j);
     }
-    if (retracte) projet.retracte_le = iso(now - j);
-    if (etapesDemo.includes('production')) { projet.paye_le = iso(now - 4 * j); avance('production', now - 4 * j); }
+    if (retracte) { projet.retracte_le = iso(now - j); etapeCle('retractation', now - j); }
+    if (etapesDemo.includes('production')) { projet.paye_le = iso(now - 4 * j); etapeCle('paiement_recu', now - 4 * j); avance('production', now - 4 * j); }
     if (etapesDemo.includes('validation')) {
       docs.agence.unshift({ nom: 'Plans-et-perspective-' + ID + '.pdf', chemin: 'demo', taille: 3145728, date: iso(now - j) });
+      etapeCle('documents_prets', now - j);
       avance('validation', now - j);
+      message(now - j + 600000, 'agence', 'espace', 'Vos documents sont prêts. Je joins ici la notice de la déclaration préalable, à garder avec votre dossier.',
+        [{ nom: 'notice-declaration-prealable.pdf', chemin: 'demo', taille: 412672 }]);
     }
     if (jusqua === 'suivi') {
-      projet.suivi_administratif = true; projet.documents_valides_le = iso(now - 20 * 3600000);
-      avance('depot', now - 20 * 3600000); avance('instruction', now - 3600000);
+      projet.suivi_administratif = true; projet.documents_valides_le = iso(now - 20 * h);
+      etapeCle('documents_valides', now - 20 * h);
+      avance('depot', now - 20 * h); avance('instruction', now - h);
     }
-    if (jusqua === 'clos') { projet.documents_valides_le = iso(now - 20 * 3600000); avance('clos', now - 20 * 3600000); }
+    if (jusqua === 'clos') {
+      projet.documents_valides_le = iso(now - 20 * h);
+      etapeCle('documents_valides', now - 20 * h); etapeCle('dossier_clos', now - 20 * h);
+      avance('clos', now - 20 * h);
+      message(now - 19 * h, 'client', 'espace', 'Merci pour votre travail, et à bientôt.');
+    }
 
     let session = { user: { email: projet.email } };
     let ecouteur = null;
     // Délai de démonstration : 14 jours après la signature (le calcul réel, jours fériés compris, est fait par la fonction).
     const limite = () => new Date(new Date(projet.signe_le).getTime() + 14 * j).toISOString().slice(0, 10);
+    const copie = (x) => JSON.parse(JSON.stringify(x));
+    const envois = new Map();   // cle d'envoi → id du message (même cle rejouée : réponse « deja »)
     return {
       surChangement: (fn) => { ecouteur = fn; setTimeout(() => fn(session), 0); },
       connexion: () => Promise.resolve(),
       // Après « Se déconnecter » : tout code bien formé rouvre la session de démo, comme une vraie connexion.
       verifierCode: () => new Promise((res) => setTimeout(() => { session = { user: { email: projet.email } }; ecouteur(session, 'SIGNED_IN'); res({ session }); }, 300)),
       deconnexion: () => { session = null; ecouteur(null); return Promise.resolve(); },
-      dossiers: () => Promise.resolve([JSON.parse(JSON.stringify(projet))]),
+      dossiers: () => Promise.resolve([copie(projet)]),
+      relire: () => Promise.resolve({ messages: copie(projet.messages), evenements: copie(projet.evenements) }),
+      texteComplet: (id) => new Promise((res) => setTimeout(() => res(complets.get(id) || (projet.messages.find((m) => m.id === id) || {}).texte || ''), 200)),
       lister: (_id, dossier) => Promise.resolve(docs[dossier].slice()),
       lien: () => Promise.resolve('#'),
       infosEspace: () => new Promise((res) => setTimeout(() => res({
@@ -209,7 +299,13 @@
         virement: projet.etape === 'paiement' && projet.montant_cents && !projet.paye_le
           ? { titulaire: 'Atomes studio (démo)', iban: 'FR76 XXXX XXXX XXXX XXXX XXXX XXX', bic: 'XXXXXXXXXXX', reference: ID } : null,
         renoncer: projet.signe_le && !projet.retracte_le ? { url: '../action/?demo=renoncer', date_limite: limite() } : null
-      }), 150))
+      }), 150)),
+      envoyerMessage: (_projet, cle, texte, fichiers) => new Promise((res) => setTimeout(() => {
+        if (envois.has(cle)) { res({ deja: true, message: copie(projet.messages.find((m) => m.id === envois.get(cle))) }); return; }
+        const m = message(Date.now(), 'client', 'espace', texte || null, fichiers.map((f) => ({ nom: f.name, chemin: 'demo', taille: f.size })));
+        envois.set(cle, m.id);
+        res({ message: copie(m) });
+      }, 700))
     };
   };
 
@@ -427,8 +523,11 @@
     if (!/^\d{6,10}$/.test(code)) { erreurCode(ERR_CODE.format, true); return; }
     erreurCode('');
     const t = tour, fin = boutonOccupe($('[data-btn-code]'), 'Vérification…');
+    focusTitre = true;   // posé avant la vérification, consommé au premier affichage de vue (montrer)
     api.verifierCode(emailCode, code).then(() => null, classerEchec(true)).then((k) => {
-      if (!k || t !== tour) return;   // connecté : l'événement SIGNED_IN prend le relais
+      if (!k) return;   // connecté : l'événement SIGNED_IN prend le relais
+      focusTitre = false;
+      if (t !== tour) return;
       erreurCode(k === 'limite' || k === 'frequence' ? ERR_CODE.limite : k === 'autre' ? ERR_CODE.autre : ERR_CODE.code, true);
     }).finally(fin);
   });
@@ -470,20 +569,22 @@
   // Oubli des données affichées (déconnexion)
   const oublier = () => {
     dossiers = []; courant = null; infos = {};
-    ['[data-dossiers]', '[data-timeline]', '[data-echanges]', '[data-recap]', '[data-docs-agence]', '[data-docs-client]', '[data-d-num]', '[data-d-titre]', '[data-d-sous]', '[data-renoncer]']
+    ['[data-dossiers]', '[data-timeline]', '[data-discussion]', '[data-recap]', '[data-docs-agence]', '[data-docs-client]', '[data-d-num]', '[data-d-titre]', '[data-d-sous]', '[data-renoncer]']
       .forEach((sel) => { const n = $(sel); if (n) n.textContent = ''; });
     $('[data-renoncer]').hidden = true;
+    oublierDiscussion();
     erreur('');
   };
 
   const etapeCourante = (d) => (d.etapes || []).find((e) => e.cle === d.etape);
-  const enAttente = (d) => (d.questions || []).filter((q) => !q.repondue_le).sort((a, b) => new Date(a.posee_le) - new Date(b.posee_le));
   const particulier = (d) => d.profil !== 'Professionnel';
-  // Le client a quelque chose à faire (par e-mail, depuis un lien reçu ou par virement) : questions sans réponse, devis
-  // à signer, virement, documents à valider (à cette étape, une validation précédente ne compte plus : nouvelle demande).
+  // Compte agence ouvert sur l'espace client (même navigateur) : ni infos_espace ni message (la fonction réserve ces
+  // actions au client du dossier).
+  const compteAgence = (d) => !demo && d.client_id !== utilisateurCharge;
+  // Le client a quelque chose à faire (depuis un lien reçu ou par virement) : devis à signer, virement, documents à
+  // valider (à cette étape, une validation précédente ne compte plus : nouvelle demande).
   const actionAttendue = (d) => {
     if (d.retracte_le) return false;
-    if (enAttente(d).length) return true;
     const e = etapeCourante(d);
     if (!e || e.statut !== 'en_cours') return false;
     return (e.cle === 'signature' && !!d.devis_chemin && !d.signe_le) || (e.cle === 'paiement' && !!d.montant_cents && !d.paye_le) || e.cle === 'validation';
@@ -521,7 +622,10 @@
     montrer('liste');
   };
 
+  // Fiche d'un dossier. Même dossier déjà affiché : le fil est mis à jour sans être redessiné (fenêtre, « Message
+  // complet » ouverts et focus gardés) ; autre dossier : fil et composeur repris de zéro (brouillon de ce dossier).
   const ouvrir = (d) => {
+    const meme = !!courant && courant.id === d.id && !vues.dossier.hidden;
     courant = d;
     $('[data-retour]').hidden = dossiers.length < 2;
     $('[data-d-num]').textContent = 'DOSSIER N° ' + d.id;
@@ -529,7 +633,7 @@
     $('[data-d-sous]').textContent = 'Demande du ' + fmtDate(d.cree_le) + (d.documents && d.documents.length ? ' · ' + d.documents.join(', ') : '');
     rendreTimeline(d);
     rendreRenoncer(d, null);
-    rendreEchanges(d);
+    rendreDiscussion(d, meme);
     rendreRecap(d);
     montrer('dossier');
     rafraichirDocs();
@@ -538,7 +642,8 @@
 
   $('[data-retour]').addEventListener('click', (e) => { e.preventDefault(); history.pushState(null, '', location.pathname + location.search); rendreListe(); });
   window.addEventListener('hashchange', () => {
-    // Ancien lien direct ouvert dans cet onglet, page déjà chargée : même traitement qu'au chargement
+    // Jeton ou ancien lien direct ouvert dans cet onglet, page déjà chargée : même traitement qu'au chargement
+    retirerJetonAcces();
     if (retirerAncienLien() && !utilisateurCharge) {
       if (!sessionLue) ancienLien = true;
       else if (!vues.connexion.hidden && !formConnexion.hidden) erreurAdresse(ANCIEN_LIEN);
@@ -595,23 +700,12 @@
     return n;
   };
 
-  // Information en lecture seule sous l'étape en cours (et questions sans réponse, quelle que soit l'étape)
+  // Information en lecture seule sous l'étape en cours
   const infoEtape = (d, e) => {
     const box = el('div', 'info-etape');
     if (d.retracte_le) {
       box.appendChild(el('p', '', 'Vous avez renoncé au contrat le ' + fmtDate(d.retracte_le) + '.'));
       return box;
-    }
-    const questions = enAttente(d);
-    if (questions.length) {
-      box.appendChild(el('p', '', 'Nous vous avons posé ' + (questions.length > 1 ? questions.length + ' questions' : 'une question') + ' par e-mail : répondez directement à cet e-mail.'));
-      const ul = el('ul', 'info-questions');
-      questions.forEach((q) => {
-        const li = el('li', '', q.question);
-        if (q.choix && q.choix.length) li.appendChild(el('span', 'doc-meta', 'Exemples de réponse : ' + q.choix.join(' · ')));
-        ul.appendChild(li);
-      });
-      box.appendChild(ul);
     }
     if (e.statut === 'en_cours') {
       if (e.cle === 'signature') infoSignature(box, d);
@@ -658,9 +752,9 @@
   };
 
   // Étape en cours : les documents attendent la validation (une validation précédente, avant une nouvelle demande,
-  // ne compte plus ; elle reste rappelée sous l'étape une fois faite).
+  // ne compte plus ; elle reste rappelée sous l'étape une fois faite). Demande de modification : par la discussion.
   const infoValidation = (box, d, e) => {
-    box.appendChild(el('p', '', 'Vos documents vous ont été envoyés par e-mail' + (e.debut_le ? ' le ' + fmtDate(e.debut_le) : '') + ' : validez-les depuis le lien reçu, ou répondez à l’e-mail pour demander une modification.'));
+    box.appendChild(el('p', '', 'Vos documents vous ont été envoyés par e-mail' + (e.debut_le ? ' le ' + fmtDate(e.debut_le) : '') + ' : validez-les depuis le lien reçu, ou écrivez-nous dans la discussion pour demander une modification.'));
   };
 
   // ---------- Lien légal « Renoncer au contrat ici » (particulier, devis signé, dans le délai, non rétracté) ----------
@@ -695,28 +789,47 @@
   };
   const completer = (d) => {
     if (!besoinInfos(d)) return;
-    if (!demo && d.client_id !== utilisateurCharge) { appliquer(d, { agence: true }); return; }
+    if (compteAgence(d)) { appliquer(d, { agence: true }); return; }
     const id = d.id;
     if (!infos[id]) infos[id] = api.infosEspace(id).catch(() => ({ echec: true }));
     infos[id].then((r) => { if (utilisateurCharge && courant && courant.id === id) appliquer(courant, r); });
   };
 
-  // ---------- Échanges : questions et réponses, messages du client, demandes de modification ----------
-  // Une réponse par e-mail est enregistrée comme message et comme réponse aux questions en attente (ou comme demande
-  // de modification à la validation) : ces questions et demandes s'affichent avec le message, pas une seconde fois.
-  const normal = (s) => String(s || '').replace(/\s+/g, ' ').trim();
-  const memeTexte = (a, b) => {
-    const x = normal(a), y = normal(b);
-    return !!x && !!y && (x === y || (Math.min(x.length, y.length) >= 4000 && (x.startsWith(y) || y.startsWith(x))));
+  // ---------- Discussion : fil (messages et étapes clés) ----------
+  // Fil chronologique : messages vérifiés (le compte agence voit aussi les autres : filtrés) et étapes clés ; à date
+  // égale, l'étape clé avant le message, puis par id. Fenêtre des 40 derniers éléments, « Afficher les messages
+  // précédents » montre tout ; tant que la fiche est affichée, la fenêtre ne se réduit jamais. Mise à jour par id
+  // (data-id) : seuls les éléments nouveaux ou changés sont dessinés, un élément qui contient le focus n'est remplacé
+  // qu'au tour suivant, les « Message complet » ouverts restent ouverts. Aucune zone live dans le fil.
+  const listeFil = $('[data-discussion]');
+  const boutonPlus = $('[data-discussion-plus]');
+  const videDiscussion = $('[data-discussion-vide]');
+  const VIDE_CLIENT = videDiscussion.textContent;
+  const VIDE_AGENCE = 'Aucun message pour le moment.';
+  const FENETRE = 40;
+  const JALONS = {
+    demande_recue: 'Demande reçue', devis_envoye: 'Devis envoyé', devis_signe: 'Devis signé', paiement_recu: 'Paiement reçu',
+    documents_prets: 'Documents prêts', documents_valides: 'Documents validés', retractation: 'Rétractation reçue', dossier_clos: 'Dossier clos'
   };
+  const ORDRE_JALONS = Object.keys(JALONS);
+  const fil = { debut: undefined, ouverts: new Set() };   // fenêtre (premier élément montré ; null : tout) et détails ouverts
+  const signatures = new WeakMap();                         // élément dessiné → contenu qu'il montre
+  const complets = new Map();                               // id de message → texte intégral (promesse), lu une fois
+  const ajouts = new Map();                                 // id de dossier → lignes renvoyées par l'envoi, jusqu'à la relecture qui les contient
+  // Ancrage de défilement natif (Chromium, Firefox) ; sinon (Safari) la page compense elle-même.
+  const ancrageNatif = !!(window.CSS && CSS.supports && CSS.supports('overflow-anchor', 'auto'));
+
   const telecharger = (chemin, nom) => api.lien(chemin, nom).then((url) => { if (url && url !== '#') location.assign(url); }).catch(() => erreur('Téléchargement impossible pour le moment.'));
+  // Pièces d'un message : « Télécharger » une fois rangées ; sans chemin (message que le moteur de l'agence n'a pas
+  // encore traité) : en cours de rangement.
   const listePieces = (pieces) => {
     const ul = el('ul', 'pieces');
     ul.setAttribute('role', 'list');
     ul.setAttribute('aria-label', 'Pièces jointes');
     pieces.forEach((pc) => {
       const li = el('li');
-      li.appendChild(el('span', '', pc.nom + (pc.taille ? ' · ' + fmtTaille(pc.taille) : '')));
+      const taille = Number(pc.taille) > 0 ? ' · ' + fmtTaille(Number(pc.taille)) : '';
+      li.appendChild(el('span', '', pc.nom + taille + (pc.chemin ? '' : ' · en cours de rangement')));
       if (pc.chemin) {
         const b = el('button', 'link-more', 'Télécharger'); b.type = 'button';
         b.setAttribute('aria-label', 'Télécharger ' + pc.nom);
@@ -727,40 +840,359 @@
     });
     return ul;
   };
-  const rendreEchanges = (d) => {
-    const ul = $('[data-echanges]');
-    ul.textContent = '';
-    const messages = (d.messages || []).filter((m) => m && m.verifie !== false).map((m) => ({ m, questions: [], modifs: [] }));
-    const lie = (t) => messages.find((x) => memeTexte(x.m.texte, t));
-    const items = messages.map((x) => ({ date: x.m.recu_le, x }));
-    (d.questions || []).filter((q) => q.repondue_le).forEach((q) => {
-      const x = !q.commentaire && lie(q.reponse);
-      if (x) x.questions.push(q); else items.push({ date: q.repondue_le, q });
+  // « Message complet » d'un e-mail du client (le moteur coupe le texte au premier repère de citation) : texte_complet
+  // lu à la première ouverture, gardé en mémoire.
+  const remplirComplet = (id, p, repli) => {
+    if (!complets.has(id)) complets.set(id, api.texteComplet(id).catch((ex) => { complets.delete(id); throw ex; }));
+    if (!p.textContent) p.textContent = 'Chargement…';
+    const pour = utilisateurCharge;
+    complets.get(id).then((t) => { if (utilisateurCharge === pour) p.textContent = String(t || '').trim() || repli || 'Message sans texte'; },
+      () => { if (utilisateurCharge === pour) p.textContent = 'Message complet indisponible pour le moment. Réessayez dans quelques minutes.'; });
+  };
+  const detailComplet = (m) => {
+    const det = el('details', 'msg-complet');
+    det.appendChild(el('summary', 'link-more', 'Message complet'));
+    const p = el('p', 'msg-texte');
+    det.appendChild(p);
+    const cle = String(m.id), lire = () => remplirComplet(m.id, p, String(m.texte || '').trim());
+    det.addEventListener('toggle', () => { if (det.open) { fil.ouverts.add(cle); lire(); } else fil.ouverts.delete(cle); });
+    if (fil.ouverts.has(cle)) { det.open = true; lire(); }
+    return det;
+  };
+  // En-tête d'une bulle : auteur, date et heure, canal ; chaque partie insécable (la ligne se coupe entre les parties,
+  // après « · » : espace insécable avant lui, une ligne ne commence jamais par « · »).
+  const enTete = (parties) => {
+    const p = el('p', 'msg-meta');
+    parties.filter(Boolean).forEach((x, i) => { if (i) p.appendChild(document.createTextNode('\u00a0· ')); p.appendChild(el('span', 'insecable', x)); });
+    return p;
+  };
+  // Bulle d'un message : le client (« Vous », à droite) ou l'agence (« Atomes studio », à gauche) ; auteur toujours écrit.
+  const ligneMessage = (m) => {
+    const agence = m.auteur === 'agence';
+    const li = el('li', 'msg ' + (agence ? 'msg--autre' : 'msg--moi'));
+    const canal = agence ? '' : m.origine === 'espace' ? 'depuis votre espace' : 'par e-mail';
+    li.appendChild(enTete([agence ? 'Atomes studio' : 'Vous', fmtHeure(m.recu_le), canal]));
+    const texte = String(m.texte || '').trim();
+    const pieces = (Array.isArray(m.pieces) ? m.pieces : []).filter((pc) => pc && pc.nom);
+    if (texte || !pieces.length) li.appendChild(el('p', 'msg-texte', texte || 'Message sans texte'));
+    if (!agence && m.origine !== 'espace') li.appendChild(detailComplet(m));
+    if (pieces.length) li.appendChild(listePieces(pieces));
+    return li;
+  };
+  const ligneJalon = (texte) => { const li = el('li', 'jalon'); li.appendChild(el('span', '', texte)); return li; };
+
+  const temps = (iso) => { const t = new Date(iso).getTime(); return isNaN(t) ? 0 : t; };
+  const comparer = (a, b) => a.t - b.t || a.rang - b.rang || a.n - b.n;
+  // Éléments du fil, triés : { cle (data-id), t, rang (0 : étape clé, 1 : message), n, message, sig, creer }
+  const elementsFil = (d) => {
+    const items = [];
+    (Array.isArray(d.evenements) ? d.evenements : []).forEach((ev) => {
+      if (!ev || !JALONS[ev.type] || !dateValide(ev.le)) return;
+      const texte = JALONS[ev.type] + '\u00a0· ' + fmtDate(ev.le);
+      items.push({ cle: 'jalon-' + ev.type + '-' + ev.le, t: temps(ev.le), rang: 0, n: ORDRE_JALONS.indexOf(ev.type), message: false, sig: texte, creer: () => ligneJalon(texte) });
     });
-    (d.modifications || []).forEach((mo) => { const x = lie(mo.message); if (x) x.modifs.push(mo); else items.push({ date: mo.demandee_le, mo }); });
-    items.sort((a, b) => new Date(b.date) - new Date(a.date));
-    $('[data-bloc-echanges]').hidden = !items.length;
-    items.forEach((it) => {
-      const li = el('li');
-      if (it.x) {
-        const { m, questions, modifs } = it.x;
-        const quoi = questions.length ? 'Votre réponse par e-mail' : modifs.length ? 'Votre demande de modification par e-mail' : 'Votre message par e-mail';
-        li.appendChild(el('span', 'doc-meta', quoi + ' · ' + fmtDate(m.recu_le)));
-        questions.sort((a, b) => new Date(a.posee_le) - new Date(b.posee_le)).forEach((q) => li.appendChild(el('p', 'echange-q', q.question)));
-        if (normal(m.texte)) li.appendChild(el('p', 'echange-r', String(m.texte).trim()));
-        const pieces = Array.isArray(m.pieces) ? m.pieces.filter((pc) => pc && pc.nom) : [];
-        if (pieces.length) li.appendChild(listePieces(pieces));
-      } else if (it.q) {
-        li.appendChild(el('span', 'doc-meta', 'Question · répondue le ' + fmtDate(it.q.repondue_le)));
-        li.appendChild(el('p', 'echange-q', it.q.question));
-        li.appendChild(el('p', 'echange-r', String(it.q.reponse || '') + (it.q.commentaire ? '\n' + it.q.commentaire : '')));
-      } else {
-        li.appendChild(el('span', 'doc-meta', 'Demande de modification · ' + fmtDate(it.mo.demandee_le)));
-        li.appendChild(el('p', 'echange-r', it.mo.message));
-      }
-      ul.appendChild(li);
+    (Array.isArray(d.messages) ? d.messages : []).forEach((m) => {
+      if (!m || m.verifie === false || m.id === null || m.id === undefined) return;
+      items.push({ cle: String(m.id), t: temps(m.recu_le), rang: 1, n: Number(m.id) || 0, message: true,
+        sig: JSON.stringify([m.auteur, m.origine, m.recu_le, m.texte, m.pieces]), creer: () => ligneMessage(m) });
+    });
+    return items.sort(comparer);
+  };
+  // Ancre de défilement (même règle que l'espace agence) : le champ qui a le focus s'il est à l'écran (l'ancrage natif le
+  // prend en priorité), sinon le premier élément visible parmi les éléments du fil gardés à ce rendu, le composeur et les
+  // blocs qui suivent la discussion
+  const aLEcran = (n) => { const r = n.getBoundingClientRect(); return r.height > 0 && r.bottom > 0 && r.top < window.innerHeight; };
+  const choisirAncre = (gardes) => {
+    const a = document.activeElement;
+    if (a && /^(TEXTAREA|INPUT)$/.test(a.tagName) && aLEcran(a)) return a;
+    return Array.from(listeFil.children).filter((li) => gardes.has(li)).concat($$('.composeur, .discussion-bloc ~ .bloc', vues.dossier)).find(aLEcran) || null;
+  };
+
+  // premier : premier dessin de la fiche (rien à compenser)
+  const majFil = (d, premier) => {
+    const items = elementsFil(d);
+    if (fil.debut === undefined) fil.debut = items.length > FENETRE ? items[items.length - FENETRE] : null;
+    const visibles = fil.debut ? items.filter((it) => comparer(it, fil.debut) >= 0) : items;
+    boutonPlus.hidden = visibles.length === items.length;
+    videDiscussion.hidden = items.some((it) => it.message);
+    const actif = document.activeElement;
+    const existants = new Map(Array.from(listeFil.children).map((li) => [li.dataset.id, li]));
+    const gardes = new Set();
+    const noeuds = visibles.map((it) => {
+      const li = existants.get(it.cle);
+      if (li && (signatures.get(li) === it.sig || li.contains(actif))) { gardes.add(li); return li; }
+      const n = it.creer();
+      n.dataset.id = it.cle;
+      signatures.set(n, it.sig);
+      return n;
+    });
+    // Sans ancrage natif, du contenu ajouté au-dessus de la zone visible ferait bouger la page : compensé.
+    const ancre = !premier && !ancrageNatif && window.scrollY > 0 ? choisirAncre(gardes) : null;
+    const haut = ancre ? ancre.getBoundingClientRect().top : 0;
+    existants.forEach((li) => { if (!gardes.has(li) && !li.contains(actif)) li.remove(); });
+    noeuds.forEach((n, i) => { if (listeFil.children[i] !== n) listeFil.insertBefore(n, listeFil.children[i] || null); });
+    if (ancre) { const dy = ancre.getBoundingClientRect().top - haut; if (Math.abs(dy) >= 1) window.scrollBy(0, dy); }
+  };
+
+  // « Afficher les messages précédents » : tout le fil ; focus sur le premier élément nouvellement montré
+  boutonPlus.addEventListener('click', () => {
+    if (!courant) return;
+    fil.debut = null;
+    majFil(courant, true);
+    const premierLi = listeFil.firstElementChild;
+    if (premierLi) { premierLi.setAttribute('tabindex', '-1'); premierLi.focus(); }
+  });
+
+  // Ligne renvoyée par l'envoi (ou déjà enregistrée) : ajoutée au dossier une seule fois, et gardée jusqu'à la
+  // relecture qui la contient (une relecture partie avant l'envoi ne la fait pas disparaître).
+  const ajouterLigne = (d, m) => {
+    if (!m || m.id === null || m.id === undefined) return;
+    d.messages = Array.isArray(d.messages) ? d.messages : [];
+    if (!d.messages.some((x) => x && String(x.id) === String(m.id))) d.messages.push(m);
+    if (!ajouts.has(d.id)) ajouts.set(d.id, new Map());
+    ajouts.get(d.id).set(String(m.id), m);
+  };
+  const fusionner = (d, r) => {
+    const lus = (Array.isArray(r.messages) ? r.messages : []).filter(Boolean);
+    const vus = new Set(lus.map((m) => String(m.id)));
+    const attente = ajouts.get(d.id);
+    if (attente) attente.forEach((m, cle) => { if (vus.has(cle)) attente.delete(cle); else lus.push(m); });
+    d.messages = lus;
+    if (Array.isArray(r.evenements)) d.evenements = r.evenements;
+  };
+  const cheminsPieces = (d) => (Array.isArray(d.messages) ? d.messages : []).flatMap((m) => (m && Array.isArray(m.pieces) ? m.pieces : []).map((pc) => (pc && pc.chemin) || '')).filter(Boolean);
+
+  // Rafraîchissement du dossier ouvert : toutes les 30 s (onglet visible, fiche affichée) et au retour sur l'onglet.
+  // Réponse ignorée si le dossier affiché ou le compte a changé ; échec silencieux (nouvel essai au tour suivant). Étape
+  // clé nouvelle (devis envoyé, paiement reçu…) : le dossier a changé (étape, montant, documents) ; il est relu en entier
+  // et la fiche redessinée (ouvrir sur le même dossier : fil, fenêtre, détails ouverts, brouillon et focus gardés ;
+  // coordonnées de virement et lien de rétractation relus). Sans étape clé nouvelle, projets n'est pas relu.
+  let relecture = false;
+  const clesJalons = (d) => new Set((Array.isArray(d.evenements) ? d.evenements : []).filter(Boolean).map((ev) => ev.type + '|' + ev.le));
+  const rafraichir = () => {
+    if (relecture || !courant || !utilisateurCharge || vues.dossier.hidden || document.visibilityState !== 'visible') return;
+    const d = courant, pour = utilisateurCharge;
+    relecture = true;
+    api.relire(d.id).then((r) => {
+      if (utilisateurCharge !== pour || courant !== d || vues.dossier.hidden || !r) return;
+      const avant = new Set(cheminsPieces(d)), jalonsAvant = clesJalons(d);
+      fusionner(d, r);
+      majFil(d, false);
+      if (cheminsPieces(d).some((c) => !avant.has(c))) rafraichirDocs();   // pièces nouvellement rangées
+      if (![...clesJalons(d)].some((k) => !jalonsAvant.has(k))) return;
+      return api.dossiers().then((liste) => {
+        if (utilisateurCharge !== pour || courant !== d || vues.dossier.hidden) return;
+        const d2 = (liste || []).find((x) => x.id === d.id);
+        if (!d2) return;
+        fusionner(d2, d2);   // lignes envoyées en attente de relecture gardées
+        dossiers = liste; infos = {};
+        ouvrir(d2);
+      });
+    }).catch(() => {}).then(() => { relecture = false; });
+  };
+  setInterval(rafraichir, 30000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') rafraichir(); });
+
+  // ---------- Discussion : composeur ----------
+  // Brouillon par dossier (texte, fichiers, cle d'envoi, erreurs), en mémoire seulement : jamais dans un stockage, une
+  // URL, un attribut ni un journal ; vidé après un envoi réussi et à la déconnexion. Limites du formulaire de devis :
+  // 10 fichiers, 10 Mo au total, JPG, PNG, GIF, WEBP, HEIC, PDF ; texte de 5 000 caractères au plus.
+  const formMessage = $('[data-form-message]');
+  const champMessage = $('#e-message');
+  const champFichiers = $('[data-message-fichiers]');
+  const zoneDepot = $('.dropzone', formMessage);
+  const listeFichiers = $('[data-message-liste]');
+  const compteur = $('[data-message-compte]');
+  const zoneErreur = $('#e-message-err');
+  const statutMessage = $('[data-message-statut]');
+  const btnMessage = $('[data-btn-message]');
+  const MAX_OCTETS = 10 * 1024 * 1024, MAX_FICHIERS = 10, MAX_TEXTE = 5000;
+  const EXT_OK = /\.(jpe?g|png|gif|webp|heic|heif|pdf)$/i;
+  const ERREURS_TEXTE = { vide: 'Écrivez un message ou joignez un fichier.', long: 'Message trop long : 5 000 caractères au plus.' };
+  const ECHEC_RESEAU = 'Envoi impossible pour le moment. Réessayez dans quelques minutes, ou répondez à l\'un de nos e-mails.';
+  const brouillons = new Map();
+  const brouillon = (id) => {
+    if (!brouillons.has(id)) brouillons.set(id, { texte: '', fichiers: [], cle: null, envoi: false, errTexte: '', refus: '', errEnvoi: '' });
+    return brouillons.get(id);
+  };
+  const brouillonCourant = () => (courant && !compteAgence(courant) && !vues.dossier.hidden ? brouillon(courant.id) : null);
+  // Clé anti-doublon d'un envoi : uuid v4 (crypto.randomUUID, absent hors contexte sécurisé et avant Safari 15.4)
+  const nouvelleCle = () => {
+    if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    const o = crypto.getRandomValues(new Uint8Array(16));
+    o[6] = (o[6] & 0x0f) | 0x40; o[8] = (o[8] & 0x3f) | 0x80;
+    const x = Array.from(o, (v) => v.toString(16).padStart(2, '0')).join('');
+    return x.slice(0, 8) + '-' + x.slice(8, 12) + '-' + x.slice(12, 16) + '-' + x.slice(16, 20) + '-' + x.slice(20);
+  };
+  const erreurTexte = (b) => { const t = b.texte.trim(); return !t && !b.fichiers.length ? 'vide' : t.length > MAX_TEXTE ? 'long' : ''; };
+  const limiteFichiers = (b) => (b.fichiers.length > MAX_FICHIERS ? MAX_FICHIERS + ' pièces jointes maximum.'
+    : b.fichiers.reduce((a, f) => a + f.size, 0) > MAX_OCTETS ? 'Pièces jointes trop lourdes — 10 Mo max au total.' : '');
+  const invalide = (champ, oui) => { if (oui) champ.setAttribute('aria-invalid', 'true'); else champ.removeAttribute('aria-invalid'); };
+
+  // Erreurs du composeur : texte (après un essai d'envoi, retirée dès la correction), fichiers (dès l'ajout), envoi.
+  const dessinerErreurs = (b) => {
+    if (b.errTexte && erreurTexte(b) !== b.errTexte) b.errTexte = '';
+    const fichiers = [b.refus, limiteFichiers(b)].filter(Boolean).join(' ');
+    const msg = [b.errTexte ? ERREURS_TEXTE[b.errTexte] : '', fichiers, b.errEnvoi].filter(Boolean).join(' ');
+    if (zoneErreur.textContent !== msg) zoneErreur.textContent = msg;
+    zoneErreur.hidden = !msg;
+    invalide(champMessage, !!b.errTexte);
+    invalide(champFichiers, !!fichiers);
+  };
+  // Compteur au-delà de 4 500 caractères (zone non live)
+  const dessinerCompteur = () => {
+    const n = champMessage.value.trim().length;
+    compteur.hidden = n <= 4500;
+    compteur.textContent = n > 4500 ? String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' / 5 000 caractères' : '';
+  };
+  // Puces des fichiers choisis, avec « × » (Retirer <nom>)
+  const dessinerFichiers = (b) => {
+    const n = b.fichiers.length;
+    $('[data-message-label]', formMessage).textContent = n ? n + ' fichier' + (n > 1 ? 's' : '') + ' sélectionné' + (n > 1 ? 's' : '') : 'Aucun fichier sélectionné';
+    listeFichiers.textContent = '';
+    listeFichiers.hidden = !n;
+    b.fichiers.forEach((f, i) => {
+      const puce = el('span', 'file-chip');
+      puce.appendChild(el('span', '', f.name + ' · ' + fmtTaille(f.size)));
+      const x = el('button', '', '×'); x.type = 'button';
+      x.setAttribute('aria-label', 'Retirer ' + f.name);
+      if (b.envoi) x.setAttribute('aria-disabled', 'true');
+      x.addEventListener('click', () => retirerFichier(i));
+      puce.appendChild(x);
+      listeFichiers.appendChild(puce);
     });
   };
+  // Pendant l'envoi : texte en lecture seule (le focus reste), fichiers figés, bouton en aria-disabled (il garde le
+  // focus ; le brouillon empêche le double envoi).
+  const etatEnvoi = (b) => {
+    champMessage.readOnly = b.envoi;
+    champFichiers.disabled = b.envoi;
+    if (b.envoi) btnMessage.setAttribute('aria-disabled', 'true'); else btnMessage.removeAttribute('aria-disabled');
+    btnMessage.textContent = b.envoi ? 'Envoi…' : 'Envoyer';
+    $$('button', listeFichiers).forEach((x) => { if (b.envoi) x.setAttribute('aria-disabled', 'true'); else x.removeAttribute('aria-disabled'); });
+  };
+  // Composeur du dossier affiché ; compte agence : remplacé par une phrase. nouveau : autre dossier (puces redessinées,
+  // annonce vidée).
+  const rendreComposeur = (d, nouveau) => {
+    const agence = compteAgence(d);
+    formMessage.hidden = agence;
+    $('[data-composeur-agence]').hidden = !agence;
+    videDiscussion.textContent = agence ? VIDE_AGENCE : VIDE_CLIENT;
+    if (nouveau) statutMessage.textContent = '';
+    if (agence) return;
+    const b = brouillon(d.id);
+    if (champMessage.value !== b.texte) champMessage.value = b.texte;
+    if (nouveau) dessinerFichiers(b);
+    dessinerCompteur(); etatEnvoi(b); dessinerErreurs(b);
+  };
+  const rendreDiscussion = (d, meme) => {
+    if (!meme) { fil.debut = undefined; fil.ouverts.clear(); listeFil.textContent = ''; }
+    majFil(d, !meme);
+    rendreComposeur(d, !meme);
+  };
+  // Déconnexion : fil, brouillons et fichiers choisis oubliés (ordinateur partagé)
+  const oublierDiscussion = () => {
+    brouillons.clear(); ajouts.clear(); complets.clear();
+    fil.debut = undefined; fil.ouverts.clear();
+    listeFil.textContent = ''; boutonPlus.hidden = true; videDiscussion.hidden = true;
+    champMessage.value = ''; champMessage.readOnly = false; invalide(champMessage, false);
+    champFichiers.value = ''; champFichiers.disabled = false; invalide(champFichiers, false);
+    dessinerFichiers({ fichiers: [], envoi: false });
+    compteur.textContent = ''; compteur.hidden = true;
+    zoneErreur.textContent = ''; zoneErreur.hidden = true;
+    statutMessage.textContent = '';
+    btnMessage.removeAttribute('aria-disabled'); btnMessage.textContent = 'Envoyer';
+  };
+
+  // Fichiers ajoutés (choix ou glisser-déposer) : formats contrôlés, doublons (nom et taille) ignorés, nombre et poids
+  // contrôlés dès l'ajout puis à l'envoi.
+  const ajouterFichiers = (liste) => {
+    const b = brouillonCourant();
+    if (!b || b.envoi) return;
+    const refuses = [];
+    const deja = new Set(b.fichiers.map((f) => f.name + '|' + f.size));
+    Array.from(liste || []).forEach((f) => {
+      if (!EXT_OK.test(f.name)) { refuses.push(f.name); return; }
+      if (deja.has(f.name + '|' + f.size)) return;
+      deja.add(f.name + '|' + f.size); b.fichiers.push(f);
+    });
+    b.refus = refuses.length ? 'Format non pris en charge (JPG, PNG, GIF, WEBP, HEIC et PDF uniquement) : ' + refuses.join(', ') : '';
+    b.cle = null; b.errEnvoi = '';
+    dessinerFichiers(b); dessinerErreurs(b);
+  };
+  // « Retirer » : focus sur le « × » suivant, sinon le précédent, sinon le champ de fichiers
+  const retirerFichier = (i) => {
+    const b = brouillonCourant();
+    if (!b || b.envoi) return;
+    b.fichiers.splice(i, 1);
+    b.refus = ''; b.cle = null; b.errEnvoi = '';
+    dessinerFichiers(b); dessinerErreurs(b);
+    const boutons = $$('button', listeFichiers);
+    (boutons[i] || boutons[i - 1] || champFichiers).focus();
+  };
+  champMessage.addEventListener('input', () => {
+    const b = brouillonCourant();
+    if (!b) return;
+    b.texte = champMessage.value; b.cle = null; b.errEnvoi = '';
+    dessinerCompteur(); dessinerErreurs(b);
+  });
+  champFichiers.addEventListener('change', () => { ajouterFichiers(champFichiers.files); champFichiers.value = ''; });
+  // Glisser-déposer sur tout le composeur ; ailleurs dans la page, un fichier lâché ne fait jamais quitter la page.
+  const avecFichiers = (e) => !!(e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files'));
+  formMessage.addEventListener('dragover', (e) => { if (!avecFichiers(e)) return; e.preventDefault(); zoneDepot.classList.add('is-over'); });
+  formMessage.addEventListener('dragleave', (e) => { if (!formMessage.contains(e.relatedTarget)) zoneDepot.classList.remove('is-over'); });
+  formMessage.addEventListener('drop', (e) => { if (!avecFichiers(e)) return; e.preventDefault(); zoneDepot.classList.remove('is-over'); ajouterFichiers(e.dataTransfer.files); });
+  ['dragover', 'drop'].forEach((type) => document.addEventListener(type, (e) => {
+    if (!avecFichiers(e) || (e.target && e.target.closest && e.target.closest('.composeur, .dropzone'))) return;
+    e.preventDefault();
+    if (type === 'dragover') e.dataTransfer.dropEffect = 'none';
+  }));
+
+  // Envoi : attaché au dossier et au compte du clic. Succès (ou message déjà enregistré) : la ligne entre dans le fil,
+  // brouillon de ce dossier vidé, « Message envoyé. », focus sur le champ, documents relus. Échec : brouillon gardé,
+  // erreur sous le composeur ; si un autre dossier est affiché entre-temps, rien ne change à l'écran sauf l'erreur
+  // en bas de page (« Dossier N° … : »).
+  const messageEchec = (ex) => {
+    if (ex && ex.statut === 401) return 'Session expirée : reconnectez-vous.';
+    if (ex && ex.statut && ex.erreur) return ex.erreur;
+    return ECHEC_RESEAU;
+  };
+  const affiche = (id) => !!courant && courant.id === id && !vues.dossier.hidden;
+  formMessage.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const d = courant;
+    const b = brouillonCourant();
+    if (!d || !b || b.envoi) return;
+    statutMessage.textContent = '';
+    b.texte = champMessage.value; b.refus = ''; b.errEnvoi = '';
+    b.errTexte = erreurTexte(b);
+    dessinerErreurs(b);
+    if (b.errTexte) { champMessage.focus(); return; }
+    if (limiteFichiers(b)) return;
+    if (!b.cle) b.cle = nouvelleCle();
+    b.envoi = true;
+    etatEnvoi(b);
+    const id = d.id, pour = utilisateurCharge;
+    api.envoyerMessage(id, b.cle, b.texte.trim(), b.fichiers.slice()).then((j) => {
+      if (utilisateurCharge !== pour) return;   // déconnecté entre-temps : brouillons déjà oubliés
+      const dossier = dossiers.find((x) => x.id === id) || d;
+      ajouterLigne(dossier, j.message);
+      brouillons.delete(id);
+      if (!affiche(id)) return;
+      rendreComposeur(courant, true);
+      statutMessage.textContent = 'Message envoyé.';
+      champMessage.focus();
+      majFil(courant, false);
+      rafraichirDocs();
+    }, (ex) => {
+      if (utilisateurCharge !== pour) return;
+      b.envoi = false;
+      const msg = messageEchec(ex);
+      if (!affiche(id)) { erreur('Dossier N° ' + id + ' : ' + msg); return; }
+      b.errEnvoi = msg;
+      etatEnvoi(b); dessinerErreurs(b);
+    });
+  });
 
   const rendreRecap = (d) => {
     const dl = $('[data-recap]');

@@ -11,11 +11,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/site.css?v=3">
+<link rel="stylesheet" href="../assets/css/site.css?v=4">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" defer></script>
 <script src="../assets/js/config.js" defer></script>
 <script src="../assets/js/atom-logo.js" defer></script>
-<script src="../assets/js/admin.js?v=6" defer></script>
+<script src="../assets/js/admin.js?v=7" defer></script>
 </head>
 <body>
 <div class="page">
@@ -128,24 +128,35 @@
           </form>
         </section>
 
-        <section class="bloc" aria-labelledby="lbl-messages">
-          <div class="lbl bloc-lbl" id="lbl-messages">Messages du client</div>
-          <p class="f-hint">Les réponses du client à nos e-mails s'ajoutent ici, avec leurs pièces jointes. Un message «&nbsp;À vérifier&nbsp;» vient d'une autre adresse que celle du dossier, ou n'a pas pu être authentifié&nbsp;: rattachez-le au dossier s'il vient bien du client, sinon supprimez-le.</p>
-          <ul class="echanges messages" role="list" data-messages></ul>
-          <p class="docs-vide" data-messages-vide>Aucun message reçu pour le moment.</p>
-        </section>
-
-        <section class="bloc" aria-labelledby="lbl-q">
-          <div class="lbl bloc-lbl" id="lbl-q">Questions au client</div>
-          <ul class="echanges" role="list" data-questions></ul>
-          <p class="docs-vide" data-questions-vide>Aucune question pour le moment.</p>
-          <form class="admin-form" data-form-questions novalidate>
-            <div class="admin-questions" data-nouvelles></div>
-            <div class="form-actions">
-              <button type="button" class="btn btn--ghost" data-ajouter-question>+ Ajouter une question</button>
-              <button type="submit" class="btn" data-btn-questions>Envoyer au client</button>
+        <!-- Discussion : messages des deux côtés (e-mails rangés par le moteur, messages écrits dans l'espace client,
+             messages de l'agence) et étapes clés, du plus ancien au plus récent ; message au client envoyé à la fonction
+             « espace » (pièces jointes déposées d'abord dans <id>/agence/discussion/). Champs sans name ni maxlength. -->
+        <section class="bloc discussion-bloc" aria-labelledby="lbl-discussion">
+          <div class="lbl bloc-lbl" id="lbl-discussion">Discussion</div>
+          <p class="f-hint">Messages échangés avec le client, du plus ancien au plus récent, et étapes clés du dossier. Un message «&nbsp;À vérifier&nbsp;» vient d'une autre adresse que celle du dossier, ou n'a pas pu être authentifié&nbsp;: rattachez-le au dossier s'il vient bien du client, sinon supprimez-le.</p>
+          <button type="button" class="link-more discussion-plus" data-discussion-plus hidden>Afficher les messages précédents</button>
+          <ol class="discussion" role="list" data-discussion></ol>
+          <p class="docs-vide" data-discussion-vide hidden>Aucun message pour le moment.</p>
+          <form class="composeur" data-form-message novalidate>
+            <div class="field">
+              <label class="lbl" for="a-message">Message au client</label>
+              <textarea class="input" id="a-message" rows="5" aria-describedby="a-message-aide a-message-err"></textarea>
+              <p class="f-hint composeur-compte" data-message-compte hidden></p>
             </div>
-            <div class="f-err" data-err-questions role="alert" hidden></div>
+            <div class="field">
+              <span class="lbl" id="lbl-a-fichiers">Pièces jointes <span class="lbl-opt">(facultatif — PDF ou images)</span></span>
+              <label class="dropzone" aria-labelledby="lbl-a-fichiers">
+                <span class="dropzone-cta">+ Ajouter des fichiers</span>
+                <input type="file" class="sr-only" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.pdf" data-message-fichiers aria-describedby="a-message-aide a-message-err">
+                <span class="dropzone-info" data-message-label>Aucun fichier sélectionné</span>
+              </label>
+              <div class="files" data-message-liste hidden></div>
+            </div>
+            <label class="case"><input type="checkbox" data-sans-mail> <span>Déjà envoyé depuis ma messagerie&nbsp;: ajouter à la discussion sans e-mail</span></label>
+            <p class="f-hint" id="a-message-aide">Le client reçoit ce message en entier par e-mail, pièces jointes comprises (15&nbsp;Mo au plus&nbsp;; au-delà, il les télécharge depuis la discussion de son espace), et peut répondre par e-mail ou depuis son espace.</p>
+            <div class="f-err" id="a-message-err" role="alert" hidden></div>
+            <div class="form-actions"><button type="submit" class="btn" data-btn-message>Envoyer au client</button></div>
+            <p class="f-hint composeur-statut" data-message-statut role="status"></p>
           </form>
         </section>
 
@@ -199,12 +210,6 @@
           <div class="lbl bloc-lbl" id="lbl-docs-client">Pièces du client</div>
           <ul class="docs" role="list" data-docs-client></ul>
           <p class="docs-vide" data-vide-client hidden>Aucune pièce déposée.</p>
-        </section>
-
-        <section class="bloc" aria-labelledby="lbl-modifs" data-bloc-modifs hidden>
-          <div class="lbl bloc-lbl" id="lbl-modifs">Modifications demandées</div>
-          <p class="f-hint" data-modifs-aide hidden>Le dossier reste à l'étape «&nbsp;Validation de vos documents&nbsp;». Pour envoyer les documents corrigés&nbsp;: repassez-le à «&nbsp;Production de vos documents&nbsp;», déposez-les, puis «&nbsp;Documents prêts&nbsp;: demander la validation&nbsp;».</p>
-          <ul class="echanges" role="list" data-modifs></ul>
         </section>
 
         <section class="bloc" aria-labelledby="lbl-demande">

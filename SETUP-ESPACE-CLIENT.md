@@ -11,7 +11,7 @@ ouvre un espace client et envoie les e-mails. Compter une heure, en suivant les 
 | Comptes clients | Supabase Auth, connexion par code reçu par e-mail | Pas de mot de passe à gérer, un client = une adresse e-mail |
 | Fichiers (pièces du client, documents de l'agence) | Supabase Storage, bucket privé `dossiers` | Un dossier par projet, liens de téléchargement temporaires, 1 Go gratuit puis 100 Go (offre Pro) |
 | Réception du formulaire | Supabase Edge Function `demande` | Code serveur sans serveur à maintenir |
-| Suivi du dossier (e-mails au client, signature, espace agence) | Supabase Edge Function `espace` | Même principe |
+| Suivi du dossier (e-mails au client, discussion, signature, espace agence) | Supabase Edge Function `espace` | Même principe |
 | Envoi des e-mails | Resend | 3 000 e-mails/mois gratuits, envoi depuis contact@atomes.studio |
 | Lecture des e-mails des clients (contact@, simon@) | Moteur de l'agence, sur ton ordinateur (§ 8) | Le client écrit à l'agence, pas à une adresse technique ; aucun service de plus |
 | Signature du devis | Page du site ouverte par un lien reçu par e-mail | Signature électronique simple, sans abonnement (pas de Yousign) |
@@ -29,16 +29,17 @@ de dossier.
 1. Créer un compte sur supabase.com, puis un projet : nom `atomes`, région **West EU (Paris)** ou
    **Central EU (Frankfurt)**, mot de passe de base de données à conserver.
 2. Menu **SQL Editor** → New query → coller tout le contenu de chaque fichier de `supabase/migrations/`, dans
-   l'ordre (`0001_…`, `0002_…`, `0003_…`, `0004_…`, puis `0005_…`), → Run à chaque fois. Le résultat doit être
-   « Success ».
+   l'ordre (`0001_…`, `0002_…`, `0003_…`, `0004_…`, `0005_…`, puis `0006_…`), → Run à chaque fois. Le résultat doit
+   être « Success ». Ceci vaut pour un projet neuf seulement : sur le projet en service, ne plus jamais rejouer
+   0001 à 0005 (voir « Mises à jour à appliquer », Discussion).
    Projet créé depuis le 30 mai 2026 (et tout projet à partir du 30 octobre 2026) : Supabase n'ouvre plus d'office
    à l'API les tables que créent ces fichiers. Vérifier ensuite, dans le SQL Editor :
    ```sql
    select has_table_privilege('authenticated', 'public.projets', 'select') as client,
           has_table_privilege('service_role', 'public.projets', 'insert') as fonction;
    ```
-   Les deux valeurs (`client`, `fonction`) doivent être `true`. Sinon, lancer (0005 le fait déjà pour `messages`,
-   `questions` et `modifications`) :
+   Les deux valeurs (`client`, `fonction`) doivent être `true`. Sinon, lancer (0005 et 0006 le font déjà pour
+   `messages`, `questions`, `modifications` et `evenements`) :
    ```sql
    grant select, insert, update, delete on public.projets, public.etapes, public.modele_etapes, public.admins
      to authenticated, service_role;
@@ -156,11 +157,126 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
 2. Vérifier : l'écran « Demande envoyée » affiche un numéro de dossier ; deux e-mails arrivent (accusé de
    réception au client, notification à l'agence) ; dans Supabase, **Table Editor → projets** contient la
    ligne et **Storage → dossiers → <numéro> → client** contient le fichier.
-3. Se connecter sur /dossier/ avec l'adresse du test : timeline et documents apparaissent.
-4. Le parcours complet (réponses par e-mail, signature, virement) se teste au § 7, point 5, une fois le moteur de
-   l'agence en route (§ 8).
+3. Se connecter sur /dossier/ avec l'adresse du test : timeline, discussion et documents apparaissent.
+4. Le parcours complet (discussion, réponses par e-mail, signature, virement) se teste au § 7, point 5, une fois le
+   moteur de l'agence en route (§ 8).
 
 ## Mises à jour à appliquer
+
+### Discussion (octobre 2026)
+
+Chaque dossier a désormais une **discussion**, la même dans l'espace agence et dans l'espace client, du plus ancien
+au plus récent : tes messages au client (il les reçoit en entier par e-mail, pièces jointes comprises), ses réponses
+par e-mail (rangées par le moteur de l'agence), les messages qu'il écrit depuis son espace, avec photos et PDF, et les
+étapes clés du dossier (demande reçue, devis envoyé, devis signé, paiement reçu, documents prêts, documents validés,
+rétractation, dossier clos). Elle remplace les « Questions au client » et les demandes de modification repérées dans
+les e-mails : les questions déjà posées, les réponses et les demandes déjà reçues y sont reprises. Mode d'emploi :
+« Au quotidien », Discussion.
+
+**Avant la séance** : Claude a intégré la discussion à `main` dans ce dépôt, sans la publier. Ne pas faire « Sync
+Changes » avant l'étape 3. Les étapes 1 à 3 se font d'affilée, dans la même séance et dans cet ordre.
+
+1. **SQL Editor** → New query → coller tout le contenu de `supabase/migrations/0006_discussion.sql` → Run. Si
+   l'éditeur demande de confirmer une opération « destructive » (le fichier contient des `drop … if exists`),
+   confirmer. Le résultat doit être « Success ». La migration s'exécute d'un seul bloc, en quelques secondes : pendant
+   ce temps, une connexion, une demande de devis ou un passage du moteur attend qu'elle finisse. Si elle échoue, rien
+   n'est appliqué :
+   - « lock timeout » (« canceling statement due to lock timeout ») : la base était occupée plus de 5 secondes (passage
+     du moteur, connexion d'un client) ; relancer une minute plus tard ;
+   - « Migration 0005 absente : rien n'a été modifié » : s'arrêter là et prévenir Claude ;
+   - « current transaction is aborted » : dans une nouvelle requête, exécuter `rollback;` seul, puis recoller le
+     fichier et relancer ;
+   - toute autre erreur : rien n'est appliqué ; s'arrêter, copier le message et prévenir Claude.
+
+   Contrôles, dans le SQL Editor, une requête à la fois :
+   ```sql
+   select column_name from information_schema.columns
+    where table_schema = 'public' and table_name = 'messages' order by ordinal_position;
+   ```
+   La liste doit contenir `auteur`, `origine`, `auteur_id`, `mail_etat`, `mail_le`, `cle`, `reprise` et
+   `lu_agence_le`.
+   ```sql
+   select type, count(*) from public.evenements group by type;
+   ```
+   Étapes clés reprises des dossiers existants : une ligne `demande_recue` dont le nombre est celui des dossiers, puis
+   les autres types selon l'avancement des dossiers. Pour comparer (la liste « En cours » de l'espace agence cache les
+   dossiers clos) :
+   ```sql
+   select (select count(*) from public.projets) as dossiers,
+          (select count(*) from public.evenements where type = 'demande_recue') as demandes;
+   ```
+   Les deux nombres doivent être égaux.
+   ```sql
+   select policyname from pg_policies where schemaname = 'storage' and tablename = 'objects' order by 1;
+   ```
+   Quatre lignes : `admin depose dans les dossiers`, `admin modifie le stockage`, `admin supprime du stockage`,
+   `client lit son dossier` (et surtout pas « client depose dans son dossier » : le client ne dépose jamais lui-même).
+   ```sql
+   select has_table_privilege('anon', 'public.evenements', 'select'),
+          has_table_privilege('authenticated', 'public.evenements', 'insert'),
+          has_table_privilege('authenticated', 'public.messages', 'insert'),
+          has_table_privilege('authenticated', 'public.envois_client', 'select');
+   ```
+   Quatre fois `false` (`envois_client` : table interne de la fonction, un seul envoi du client à la fois par dossier).
+   ```sql
+   select relrowsecurity from pg_class where oid = 'public.messages'::regclass;
+   ```
+   `true` (la lecture des messages reste filtrée dossier par dossier).
+   ```sql
+   select tablename, policyname from pg_policies
+    where schemaname = 'public' and tablename in ('messages', 'evenements') order by 1, 2;
+   ```
+   Exactement deux lignes : `evenements | client lit ses evenements` et `messages | client lit ses messages`.
+   ```sql
+   select public from storage.buckets where id = 'dossiers';
+   ```
+   `false` (le bucket reste privé).
+
+   Ne passer à l'étape 2 qu'après le « Success » et ces contrôles. Si l'un d'eux ne donne pas ce qui est attendu,
+   s'arrêter et prévenir Claude. 0006 peut être rejouée sans rien changer. **Ne plus jamais rejouer 0001 à 0005.** Si
+   0005 a été rejouée (elle rend à l'agence l'écriture directe dans messages), rejouer 0006 aussitôt. 0001 rejouée en
+   entier échoue d'elle-même sans rien changer. Si une partie d'une migration ancienne a été exécutée, s'arrêter et
+   prévenir Claude : 0006 ne répare pas la timeline.
+2. **Redéployer la fonction `espace`** (§ 7, point 1). Avant de remplacer le code : **Edge Functions → espace →
+   Code**, tout sélectionner, copier, et coller dans un fichier hors du dépôt (par exemple sur le Bureau) : c'est le
+   retour arrière (recoller ce code, **Deploy updates**). La migration resterait alors en place : l'ancienne fonction
+   et les pages en ligne fonctionnent avec elle ; seuls les envois de la discussion (messages de l'agence et du
+   client), « Renvoyer l'e-mail » et le marquage « lu » seraient refusés (« Action inconnue » ou « Requête
+   illisible ») : les messages du client resteraient « Nouveau » jusqu'au redéploiement. « Verify JWT » reste
+   désactivé. La fonction `demande` ne change pas.
+3. **Publier le site** (VS Code → Sync Changes), attendre le vert dans l'onglet Actions de GitHub, puis une dizaine
+   de minutes. Recharger ensuite les onglets de /admin/ et /dossier/ restés ouverts : un onglet ouvert avant la
+   publication garde l'ancien script.
+4. **Moteur de l'agence** : rien à faire pendant la séance. Claude le met à jour après l'étape 3 (site publié), juste
+   après l'un de ses passages (marche à suivre dans son `README.md`, « Mettre à jour le moteur en service »). Jusque-là,
+   l'ancien moteur tourne : il est compatible avec la migration, la nouvelle fonction et le nouveau site, et le test
+   de l'étape 5 passe avec lui. Une fois fait, `.\moteur etat` affiche « Version : 0.2.0 » et « Dernier passage : …
+   (version 0.2.0) » ; sans ligne « Version », c'est l'ancien moteur. Tant que l'ancien tourne, tes messages et ceux
+   que le client écrit dans son espace comptent dans sa limite de 30 messages par dossier et par 24 h.
+5. **Tester**, depuis https://atomes.studio, sur un dossier de test créé avec ton adresse personnelle (pas une
+   adresse en atomes.studio, que le moteur ignore) :
+   1. Espace agence, fiche du dossier, **Discussion** : écrire un message, « Envoyer au client ». La page annonce
+      « Message envoyé au client par e-mail. » et l'e-mail « Message d'Atomes studio — dossier … » arrive à ton
+      adresse personnelle, avec la timeline du dossier.
+   2. Y répondre par e-mail : au passage suivant du moteur (5 minutes, ordinateur allumé), la réponse s'affiche dans
+      la discussion avec le badge « Nouveau ».
+   3. Dans une fenêtre privée, se connecter sur https://atomes.studio/dossier/ avec ton adresse personnelle : la
+      discussion montre les deux messages et les étapes clés. Écrire un message avec environ 9,5 Mo de photos en
+      plusieurs fichiers, « Envoyer » : « Message envoyé. ». L'avis « Message du client — dossier … » arrive à
+      contact@ ; dans l'espace agence, le message s'affiche (« Nouveau ») avec ses photos, aussi sous « Pièces du
+      client ».
+   4. Espace agence : un message au client avec environ 14 Mo de pièces jointes (PDF ou photos) : l'e-mail arrive
+      avec ses pièces.
+   5. **Edge Functions → espace → Logs** : ni « CPU Time exceeded » ni « Memory limit exceeded ».
+
+   Si un essai échoue : ne rien défaire ; noter le message affiché et l'heure, regarder Edge Functions → espace →
+   Logs, puis prévenir Claude. La base reste telle quelle : l'ancienne fonction et l'ancien site fonctionnent avec
+   elle. Le retour arrière de la fonction (étape 2) ne se fait que si Claude le demande, car il bloque tous les envois
+   de la discussion. S'il faut revenir en arrière pour le site, Claude s'en charge (annulation du commit, puis
+   publication).
+
+Entre l'étape 1 et la fin de l'étape 3 (dix minutes comprises) : ne rien faire dans l'espace agence. L'ancien site
+montre les questions reprises comme des messages du client ; aucun vrai client à ce jour.
 
 ### Connexion par code (19 octobre 2026)
 
@@ -256,9 +372,9 @@ est reçu.
 agence lisent la table `messages` (migration 0005) et appellent la nouvelle fonction `espace`. Sans elles, elles
 afficheraient « Impossible de charger… ».
 
-1. **SQL Editor** : coller `supabase/migrations/0005_parcours_email.sql` → Run. Elle est rejouable : sans risque si
-   elle a déjà été faite. Dès ce moment, l'ancienne page de l'espace client, encore en ligne, ne peut plus déposer
-   de fichiers.
+1. **SQL Editor** : coller `supabase/migrations/0005_parcours_email.sql` → Run. Elle était rejouable jusqu'à la
+   discussion ; depuis la migration 0006, ne plus jamais la rejouer (sous-section Discussion, étape 1). Dès ce
+   moment, l'ancienne page de l'espace client, encore en ligne, ne pouvait plus déposer de fichiers.
 2. **Secrets** : `JETON_SECRET` et les trois `VIREMENT_…` (§ 7, point 2).
 3. **Redéployer la fonction `espace`** (§ 7, point 1). « Verify JWT » reste désactivé.
 4. **Publier le site** (VS Code → Sync Changes) et attendre le vert dans l'onglet Actions de GitHub, puis une
@@ -285,17 +401,17 @@ jour) :
   le devis, ne commence pas la mission avant la fin de son délai de rétractation (la confirmation de « Virement reçu »
   le rappelle) ;
 - documents à valider : « Passer ici » sur « Production de vos documents », puis « Documents prêts : demander la
-  validation » : le client reçoit le lien de validation ;
-- questions sans réponse : une fois le moteur en route (§ 8), les retirer et les poser de nouveau, pour que le
-  client puisse répondre à l'e-mail.
+  validation » : le client reçoit le lien de validation.
 
 ## 7. Réponses par e-mail et virement
 
 La fonction `espace` mène le dossier après la demande. Chaque étape importante est annoncée au client par e-mail,
 avec la timeline de son dossier. Le client répond simplement aux e-mails : sa réponse et ses pièces jointes
-s'ajoutent au dossier (par le moteur de l'agence, § 8). Il signe le devis et valide ses documents sur une page du
-site ouverte par un lien reçu par e-mail, sans se connecter, et paie par virement avec le numéro de dossier pour
-référence. L'espace client ne sert plus qu'à consulter. La fonction reçoit aussi les actions de l'espace agence.
+s'ajoutent à la discussion du dossier (par le moteur de l'agence, § 8). Il peut aussi t'écrire depuis son espace
+client, avec photos et PDF : ses messages passent par la fonction. Il signe le devis et valide ses documents sur une
+page du site ouverte par un lien reçu par e-mail, sans se connecter, et paie par virement avec le numéro de dossier
+pour référence : dans son espace, il consulte son dossier et écrit dans la discussion, rien d'autre. La fonction
+reçoit aussi les actions de l'espace agence, dont tes messages au client.
 
 1. **Déployer la fonction `espace`**. Première fois : **Edge Functions → Deploy a new function → Via editor**, nom
    `espace`, coller le contenu de `supabase/functions/espace/index.ts`, Deploy. Mise à jour : **Edge Functions →
@@ -338,10 +454,11 @@ référence. L'espace client ne sert plus qu'à consulter. La fonction reçoit a
    1. Envoyer une demande sur https://atomes.studio/devis.html, profil **Particulier**. L'accusé de réception
       montre la timeline ; « Répondre » propose contact@atomes.studio.
    2. Répondre à cet e-mail avec une photo jointe. La réponse arrive dans la boîte contact@ ; dans les 5 minutes, le
-      moteur la range : la fiche du dossier (espace agence) montre le message et la photo (aucun e-mail ne
-      l'annonce).
-   3. Espace agence : poser une question, puis y répondre depuis l'e-mail reçu. Dans les 5 minutes, la réponse
-      s'affiche sous la question.
+      moteur la range : la discussion du dossier (espace agence) montre le message, avec le badge « Nouveau », et la
+      photo (aucun e-mail ne l'annonce).
+   3. Espace agence, **Discussion** : écrire au client, « Envoyer au client ». L'e-mail « Message d'Atomes studio —
+      dossier … » arrive à l'adresse du test ; y répondre. Dans les 5 minutes, la réponse s'affiche dans la
+      discussion.
    4. Envoyer un devis (un PDF quelconque, 1 €). L'e-mail « Votre devis est prêt » contient le PDF, le bouton
       « Lire et signer mon devis », l'information sur la rétractation et le formulaire type. Sur la page qui s'ouvre
       (information et formulaire type au-dessus de la case), cliquer « Signer et commander avec obligation de
@@ -353,9 +470,9 @@ référence. L'espace client ne sert plus qu'à consulter. La fonction reçoit a
    5. Espace agence : le dossier est en « Virement attendu ». Cliquer « Virement reçu » : e-mail « Paiement
       reçu », et le dossier passe en production.
    6. Déposer un document, puis « Documents prêts : demander la validation ». Répondre à l'e-mail « Vos documents
-      sont prêts » : dans les 5 minutes, la fiche affiche « Modification demandée ». Ensuite seulement (une réponse
-      rangée après la validation ne compte plus comme demande de modification), dans le même e-mail, cliquer « Voir
-      et valider mes documents », et « Je valide mes documents ».
+      sont prêts » : dans les 5 minutes, la réponse s'affiche dans la discussion et le dossier passe « Message du
+      client » dans la liste. Puis, dans le même e-mail, cliquer « Voir et valider mes documents », et « Je valide mes
+      documents ».
    7. Dans l'e-mail « Devis signé », cliquer « Renoncer au contrat ici », remplir, « Confirmer la rétractation ».
       L'accusé de réception arrive à l'adresse du test, « Rétractation — dossier … » à contact@atomes.studio, et la
       fiche affiche la rétractation : le dossier, clos au point 6, s'affiche « Rétractation reçue » (reçue après la
@@ -365,7 +482,9 @@ référence. L'espace client ne sert plus qu'à consulter. La fonction reçoit a
       avec le badge « À vérifier » (aucun e-mail ne l'annonce). Le supprimer.
    9. Se connecter sur https://atomes.studio/dossier/ avec l'adresse du test, depuis le téléphone ou un autre
       navigateur (dans le même navigateur, la connexion du client remplacerait celle de l'agence) : timeline,
-      documents et échanges s'affichent, sans aucun bouton d'action.
+      discussion (messages et étapes clés) et documents s'affichent, sans bouton pour signer, payer ou valider.
+      Écrire un message avec une photo depuis la discussion : l'avis « Message du client — dossier … » arrive à
+      contact@, et la fiche du dossier montre le message avec le badge « Nouveau ».
 
    Si une réponse n'arrive pas dans le dossier : voir « En dépannage ». Le dossier de test se supprime ensuite
    comme indiqué dans « À savoir » (RGPD).
@@ -375,16 +494,20 @@ référence. L'espace client ne sert plus qu'à consulter. La fonction reçoit a
 Le moteur est un programme qui tourne sur ton ordinateur (dossier `atomes-moteur`, à côté de ce dépôt, jamais
 publié ; mode d'emploi complet dans son `README.md`). Toutes les 5 minutes, tant que ta session Windows est ouverte,
 il lit les nouveaux e-mails de contact@atomes.studio et de simon@atomes.studio, sans rien y changer (rien n'est
-marqué lu, déplacé ni supprimé), et range dans leur dossier ceux des clients, comme la fonction `espace` le faisait
-pour les réponses reçues par Resend (jusqu'au 20 octobre 2026, point 7) : texte sans la citation, pièces jointes
-(images et PDF, 25 Mo au plus) dans `<numéro>/client/`, réponse aux questions en attente, demande de modification à
-l'étape « Validation de vos documents ». Il n'envoie aucun e-mail : l'original est déjà dans ta boîte.
+marqué lu, déplacé ni supprimé), et range dans la discussion de leur dossier ceux des clients, comme la fonction
+`espace` le faisait pour les réponses reçues par Resend (jusqu'au 20 octobre 2026, point 7) : texte sans la
+citation, pièces jointes (images et PDF, 25 Mo au plus) dans `<numéro>/client/`. Depuis sa version 0.2.0 (la
+discussion), il ne répond plus aux questions et ne note plus de demande de modification : tu lis le message dans la
+discussion et tu y réponds depuis l'espace agence. Il n'envoie aucun e-mail : l'original est déjà dans ta boîte.
 
 Règles :
-- le numéro de dossier dans l'objet (« Re: Quelques questions sur votre dossier 261014093512 ») désigne le dossier ;
+- le numéro de dossier dans l'objet (« Re: Message d'Atomes studio — dossier 261014093512 ») désigne le dossier ;
   sans numéro, l'e-mail va au dernier dossier (le plus récent) de l'adresse de l'expéditeur ;
 - un expéditeur inconnu sans numéro de dossier est ignoré, rien n'est enregistré (prospects, fournisseurs,
-  publicités) ; les e-mails de l'agence (atomes.studio), les réponses automatiques et les indésirables aussi ;
+  publicités) ; les e-mails de l'agence (atomes.studio), les réponses automatiques et les indésirables aussi. Les
+  e-mails de l'agence comprennent les avis que le site envoie à contact@ (« Message du client — dossier … ») et tes
+  propres réponses écrites depuis ta messagerie : une telle réponse part au client mais n'entre pas dans la
+  discussion (voir « Au quotidien », Discussion, case « Déjà envoyé depuis ma messagerie ») ;
 - l'e-mail est rangé aussitôt s'il vient de l'adresse du dossier et porte une signature DKIM valable de son
   domaine, contrôlée par le moteur : c'est le cas des messageries courantes (Gmail, Outlook, Orange, Free,
   iCloud…). Sinon (autre adresse, signature absente ou fausse), il s'affiche « À vérifier » dans la fiche :
@@ -407,7 +530,8 @@ Règles :
 5. **Lancement automatique** : `.\moteur installer` (tâche planifiée « Atomes studio\Moteur courrier », toutes les
    5 minutes, session ouverte). Suivi : `.\moteur etat` ; arrêt : `.\moteur desinstaller`.
 6. **Tester**, depuis ton adresse personnelle, sur un dossier de test : répondre à un e-mail du dossier (son objet
-   contient le numéro) avec une photo jointe ; dans les 5 minutes, la fiche montre le message et la photo. Puis
+   contient le numéro) avec une photo jointe ; dans les 5 minutes, la discussion du dossier montre le message et la
+   photo. Puis
    écrire depuis une autre adresse, avec le numéro dans l'objet : badge « À vérifier » ; « Rattacher au dossier »,
    puis 5 minutes : la photo est rangée.
 7. **Réception par Resend retirée le 20 octobre 2026.** Elle devait rester un mois, pour les réponses aux anciennes
@@ -429,32 +553,61 @@ Règles :
 Connexion avec ton compte agence (§ 5), par code reçu par e-mail. Si la page ne propose plus de saisir le code reçu
 (rouverte ailleurs : autre onglet, autre appareil), entrer l'adresse puis « J'ai déjà un code » : en redemander un
 annulerait le premier (même bouton pour les clients, sur /dossier/). La liste montre les dossiers en cours ; le filtre
-« À traiter » ne garde que ceux où c'est à toi d'agir. Le client n'agit plus dans son espace : chaque étape
-importante lui est annoncée par e-mail, avec la timeline de son dossier, et il répond à l'e-mail. Dans la fiche
-d'un dossier :
+« À traiter » ne garde que ceux où c'est à toi d'agir, dont ceux qui ont un message du client non lu. Elle se met à
+jour seule toutes les minutes. Chaque étape importante est annoncée au client par e-mail, avec la timeline de son
+dossier ; il te répond par e-mail ou depuis la discussion de son espace, et signe ou valide depuis les liens reçus
+par e-mail. Dans la fiche d'un dossier, relue seule toutes les 30 secondes et quand tu reviens sur l'onglet :
 
-- **Questions au client** : une ou plusieurs questions, à réponse libre ou à choisir (une proposition par
-  ligne, au moins deux). Le client reçoit un e-mail qui les liste (les propositions y servent d'exemples de
-  réponse) et **répond simplement à l'e-mail**, avec des pièces jointes s'il le souhaite. Sa réponse est
-  enregistrée pour les questions en attente ; tu la reçois par e-mail et dans la fiche. Une question restée sans
-  réponse peut être retirée (« Retirer la question »). Dans la liste, un dossier dont une question attend le
-  client reste « À traiter » quand c'est à toi d'agir ; le nombre de questions sans réponse s'affiche à côté de
-  l'étape.
-- **Messages du client** : les e-mails des clients reçus sur contact@ et simon@ sont ajoutés au dossier par le moteur
-  de l'agence (§ 8), dans les 5 minutes, ordinateur allumé ; aucun e-mail ne te les annonce (l'original est dans ta
-  boîte). Chacun s'affiche dans la fiche (date, expéditeur, objet, texte, pièces jointes). Ses pièces jointes,
-  images et PDF de 25 Mo au plus, rejoignent ses documents ; lui demander les autres formats en PDF. Les images
-  intégrées au texte (logo de sa signature, images de notre e-mail cité, logo d'Atomes studio) ne sont pas rangées.
-  Un message n'est rattaché seul que s'il vient de l'adresse du dossier (adresse simple, seule dans l'en-tête From
-  du message) et porte une signature DKIM valable du domaine de cette adresse, contrôlée par le moteur ; c'est le
-  cas des messageries courantes (Gmail, Outlook, Orange, Free, iCloud…). Sinon il attend, avec le badge
-  « À vérifier » (ses pièces jointes y sont listées, « non rangée ») et la raison : adresse différente, ou résultat
-  de la signature DKIM (« Signature DKIM : absente », « échec »…). Si c'est bien le client (par exemple depuis une
-  autre adresse, ou depuis une messagerie sans DKIM), « Rattacher au dossier » : le message devient visible dans son
-  espace (il n'est pas prévenu) et passe « En attente du moteur » ; ses pièces sont rangées et sa réponse
-  enregistrée au passage suivant du moteur (5 minutes, ordinateur allumé). Sinon « Supprimer ». Le faire sans
-  attendre : le moteur ne garde sa copie d'un message à vérifier que 45 jours (au-delà, il relit l'e-mail dans ta
-  boîte de réception, s'il y est encore). Un message qui reste « En attente du moteur » : voir « En dépannage ».
+- **Discussion** : tous les échanges avec le client, du plus ancien au plus récent, entre les étapes clés du dossier
+  (demande reçue, devis envoyé, devis signé, paiement reçu, documents prêts, documents validés, rétractation,
+  dossier clos). Tes messages sont à droite (« Vous »), ceux du client à gauche, avec son adresse s'il a écrit par
+  e-mail, son nom s'il a écrit depuis son espace. Les 40 derniers éléments s'affichent (davantage s'il le faut pour
+  montrer tout ce qui reste à traiter : message non lu, à vérifier ou dont l'e-mail n'est pas parti) ; « Afficher les
+  messages précédents » montre le reste. Le client voit la même discussion dans son espace, sauf les messages « À
+  vérifier ».
+  Un message arrivé pendant que tu regardes la fiche s'ajoute au fil sans toucher à ce que tu es en train d'écrire.
+  - **Écrire au client** : sous le fil, « Message au client » (5 000 caractères au plus), pièces jointes facultatives
+    (PDF ou images, 10 au plus, 50 Mo par fichier), puis « Envoyer au client ». Le message s'ajoute à la discussion
+    et part en entier au client par e-mail (« Message d'Atomes studio — dossier … », avec la timeline), pièces
+    jointes comprises si elles tiennent en 15 Mo (au-delà, il les télécharge depuis son espace). Il te répond par
+    e-mail (le moteur range sa réponse dans la discussion) ou depuis son espace. Tu peux écrire à toute étape,
+    dossier clos ou rétractation reçue compris.
+  - **E-mail non parti** : si l'e-mail n'a pas pu partir (quota de Resend atteint, panne), la page le dit, le message
+    porte le badge « E-mail non parti » et le dossier s'affiche ainsi dans la liste : « Renvoyer l'e-mail » sous le
+    message (aussi pour un envoi resté « Envoi en cours » plus de 10 minutes). Le message, lui, est déjà dans la
+    discussion : le client le voit dans son espace.
+  - **Déjà envoyé depuis ma messagerie** : une réponse écrite depuis ta messagerie part au client mais n'entre pas
+    dans la discussion (le moteur ignore les e-mails de l'agence). Pour l'y ajouter, la recopier dans « Message au
+    client » et cocher « Déjà envoyé depuis ma messagerie : ajouter à la discussion sans e-mail » : aucun e-mail ne
+    part, et le message porte la mention « sans e-mail ».
+  - **Messages écrits par le client dans son espace** (texte, photos et PDF ; 10 fichiers et 10 Mo par message,
+    30 messages par jour) : ses pièces rejoignent ses documents (« Pièces du client »). Tu reçois à contact@ un avis
+    « Message du client — dossier … » avec son texte, au plus un par dossier et par quart d'heure : les messages
+    suivants de ce quart d'heure s'affichent dans l'espace agence, sans nouvel e-mail. **Ne réponds pas à cet
+    avis** : ta réponse ne parviendrait pas au client. Réponds depuis la fiche.
+  - **E-mails du client** : reçus sur contact@ et simon@, ils sont ajoutés à la discussion par le moteur de l'agence
+    (§ 8), dans les 5 minutes, ordinateur allumé ; aucun e-mail ne te les annonce (l'original est dans ta boîte).
+    Chacun s'affiche avec sa date, son expéditeur, son objet, sa réponse sans la citation de notre e-mail
+    (« Message complet » : tout le texte) et ses pièces jointes. Ses pièces jointes, images et PDF de 25 Mo au plus,
+    rejoignent ses documents ; lui demander les autres formats en PDF. Les images intégrées au texte (logo de sa
+    signature, images de notre e-mail cité, logo d'Atomes studio) ne sont pas rangées. Un message n'est rattaché
+    seul que s'il vient de l'adresse du dossier (adresse simple, seule dans l'en-tête From du message) et porte une
+    signature DKIM valable du domaine de cette adresse, contrôlée par le moteur ; c'est le cas des messageries
+    courantes (Gmail, Outlook, Orange, Free, iCloud…). Sinon il attend, avec le badge « À vérifier » (ses pièces
+    jointes y sont listées, « non rangée ») et la raison : adresse différente, ou résultat de la signature DKIM
+    (« Signature DKIM : absente », « échec »…). Si c'est bien le client (par exemple depuis une autre adresse, ou
+    depuis une messagerie sans DKIM), « Rattacher au dossier » : le message devient visible dans son espace (il
+    pourra lire tout l'e-mail, citation comprise, et l'adresse de l'expéditeur ; il n'est pas prévenu) et passe
+    « En attente du moteur » ; ses pièces sont rangées au passage suivant du moteur (5 minutes, ordinateur allumé).
+    Sinon « Supprimer ». Le faire sans attendre : le moteur ne garde sa copie d'un message à vérifier que 45 jours
+    (au-delà, il relit l'e-mail dans ta boîte de réception, s'il y est encore). Un message qui reste « En attente du
+    moteur » : voir « En dépannage ».
+  - **Nouveau** : un message du client non lu porte le badge « Nouveau », et le dossier s'affiche « Nouveau
+    message » (ou « 2 nouveaux messages »…) dans la liste. Un message est marqué lu dès que la fiche l'affiche,
+    onglet visible et fenêtre active ; son badge reste jusqu'à ce que tu quittes la fiche.
+  - Si l'étape, la signature, le paiement, la rétractation ou l'envoi du devis changent pendant une saisie en cours
+    (note pour le client, montant, libellé ou PDF du devis), la fiche ne se redessine pas : un bandeau dit « Le
+    dossier a changé : rouvrez la fiche pour le voir à jour. ».
 - **E-mail à renvoyer** : si la confirmation du contrat (« Devis signé ») ou l'accusé de réception d'une
   rétractation n'a pas pu partir (quota d'e-mails atteint, panne de Resend), le dossier s'affiche « E-mail à
   renvoyer » et un bandeau en tête de la fiche propose « Renvoyer ». Ces deux e-mails sont des obligations
@@ -483,11 +636,12 @@ d'un dossier :
 - **Documents** : déposer les documents produits, puis « Documents prêts : demander la validation » (bouton
   indisponible tant qu'aucun document, hors devis, n'est déposé). Le client
   reçoit la liste des documents et un bouton « Voir et valider mes documents », valable 90 jours. Il valide sur le
-  site (dossier clos, ou dépôt avec l'option de suivi), ou répond à l'e-mail pour demander une modification : à
-  cette étape, toute réponse est enregistrée comme demande de modification, et la fiche affiche « Modification
-  demandée ». Lire sa demande, repasser le dossier en production avec « Passer ici » si besoin, puis redemander la
-  validation une fois les documents corrigés : c'est une nouvelle demande, une validation précédente ne compte
-  plus (pareil après une demande du service instructeur, avec l'option de suivi).
+  site (dossier clos, ou dépôt avec l'option de suivi), ou demande une modification en répondant à l'e-mail ou
+  depuis la discussion de son espace : sa demande s'affiche dans la discussion, et le dossier s'affiche « Message du
+  client » dans la liste jusqu'à ta réponse dans la discussion. Lire sa demande, repasser le dossier en production
+  avec « Passer ici » si besoin, puis redemander la validation une fois les documents corrigés : c'est une nouvelle
+  demande, une validation précédente ne compte plus (pareil après une demande du service instructeur, avec l'option
+  de suivi).
 - **Rétractation** (client particulier) : pendant 14 jours après la signature, prolongés jusqu'au premier jour
   ouvrable si le dernier tombe un samedi, un dimanche ou un jour férié, le client peut renoncer au contrat avec le
   lien « Renoncer au contrat ici » (e-mail de confirmation, page de signature, espace client). Il reçoit un accusé
@@ -496,7 +650,8 @@ d'un dossier :
   mission ; si un virement a été reçu, rembourser le client dans les 14 jours, déduction faite du travail déjà
   réalisé. Le dossier peut ensuite être classé (« Passer ici » sur « Dossier clos » ; déjà clos : « Passer ici » sur
   l'étape précédente, puis sur « Dossier clos ») : plus aucun e-mail de mission ne part à un client qui a renoncé.
-  Une rétractation reçue par lettre ou par simple e-mail vaut autant : voir « En dépannage ».
+  Une rétractation reçue par lettre, par e-mail ou dans la discussion vaut autant : voir « À savoir » et « En
+  dépannage ».
 - **Suivi administratif** : cocher la case pour faire apparaître les étapes 8 à 10 chez le client, puis faire
   avancer le dossier avec « Passer ici ». Un e-mail part au client quand le dossier avance vers les documents à
   valider, le dossier déposé, la démarche validée ou le dossier clos. Sur un dossier clos qui n'est pas passé
@@ -519,8 +674,9 @@ d'un dossier :
   montant, et envoie le lien de signature. Il apparaît aussitôt dans l'espace du client sous « Documents de
   l'agence ». Les dossiers `<numéro>/client` et `<numéro>/agence` sont créés par la fonction à la réception ;
   s'ils manquent (dossier créé à la main), Create folder en respectant exactement ces noms en minuscules.
-- **Voir les pièces envoyées par le client** (avec sa demande ou en réponse aux e-mails) : même endroit,
-  sous-dossier `client`, ou dans l'espace client avec ton compte agence.
+- **Voir les pièces envoyées par le client** (avec sa demande, en réponse aux e-mails ou depuis la discussion de son
+  espace) : même endroit, sous-dossier `client`, ou dans l'espace client avec ton compte agence. Les pièces jointes
+  de tes messages sont dans `agence/discussion`, à part des documents à valider.
 - **Un e-mail d'un client, reçu sur contact@ ou simon@, n'apparaît pas dans le dossier** : `.\moteur etat` (dans
   le dossier `atomes-moteur`) montre le dernier passage et ses erreurs ; `.\moteur courrier --depuis AAAA-MM-JJ`
   (essai, avec la date de l'e-mail : sans `--depuis`, l'essai ne reprend pas les e-mails déjà relevés) dit ce que
@@ -528,10 +684,11 @@ d'un dossier :
   a écrit d'une autre adresse sans numéro de dossier dans l'objet ; transférer alors son e-mail n'aide pas, déposer
   ses pièces depuis l'espace agence). Autres causes : ordinateur éteint (le moteur rattrape au démarrage), e-mail
   déplacé hors de la boîte de réception par une règle de ta messagerie avant le passage du moteur. Au-delà de
-  30 messages du client (ou 20 messages à vérifier) pour un même dossier en 24 heures, le moteur n'enregistre plus
-  rien (journal : « limite de messages sur 24 h atteinte ») : l'e-mail reste dans ta boîte. Un message qui reste
-  « En attente du moteur » : ordinateur éteint, ou erreur (voir `.\moteur etat` et le journal) ; après 10 essais
-  ratés, le moteur le laisse de côté et ses pièces sont à ranger à la main. Journal :
+  30 e-mails du client rangés par le moteur (ou 20 « à vérifier ») pour un même dossier en 24 heures, le moteur
+  n'enregistre plus rien (journal : « limite de messages sur 24 h atteinte ») : l'e-mail reste dans ta boîte. Depuis
+  sa version 0.2.0, tes messages et ceux que le client écrit dans son espace n'entrent pas dans ce compte. Un
+  message qui reste « En attente du moteur » : ordinateur éteint, ou erreur (voir `.\moteur etat` et le journal) ;
+  après 10 essais ratés, le moteur le laisse de côté et ses pièces sont à ranger à la main. Journal :
   `%LOCALAPPDATA%\AtomesMoteur\journal\moteur.log`.
 - **Un e-mail légal n'est pas parti** (fiche « E-mail à renvoyer ») : « Renvoyer » dans le bandeau de la fiche. Si
   l'envoi échoue encore (quota de Resend atteint pour la journée), réessayer le lendemain, ou écrire au client
@@ -540,13 +697,20 @@ d'un dossier :
   l'e-mail « Devis signé ») ; accusé de rétractation = nom, numéro de dossier, date de signature du devis, date et
   heure de réception de la rétractation (fiche, « Devis, signature et paiement »). La mention reste dans la fiche
   jusqu'à un renvoi réussi par « Renvoyer ».
+- **L'e-mail d'un message au client n'est pas parti** (badge « E-mail non parti » sous le message, dossier « E-mail
+  non parti » dans la liste) : « Renvoyer l'e-mail » sous le message. S'il échoue encore (quota de Resend atteint pour
+  la journée), réessayer le lendemain : le message est déjà dans la discussion, seul l'e-mail manque. Un envoi resté
+  « Envoi en cours » plus de 10 minutes (fonction interrompue) se renvoie de la même façon.
 - **Un client demande un nouveau lien** (« Ce lien a expiré ») : pour signer, renvoyer le devis depuis l'espace
   agence (même PDF, même montant) ; pour valider, « Passer ici » sur « Production de vos documents », puis
   « Documents prêts : demander la validation ». Un nouvel e-mail part avec un nouveau lien. Le lien de
   rétractation, lui, expire avec le délai.
-- **Rétractation reçue par lettre ou par simple e-mail** : elle vaut autant que le lien. En accuser réception au
-  client par e-mail, puis l'enregistrer : Table Editor → `projets` → le dossier → `retracte_le` (date et heure de
-  réception) et `retracte_nom`. La fiche et l'espace client l'affichent alors.
+- **Rétractation reçue par lettre, par e-mail ou dans la discussion** : elle vaut autant que le lien, si elle est
+  claire. En accuser réception au client depuis l'espace agence, tout de suite (un message de la discussion, qui
+  part par e-mail ; pas la case « Déjà envoyé depuis ma messagerie »), en reprenant la date et l'heure de son envoi ;
+  arrêter la mission ; puis l'enregistrer : Table Editor → `projets` → le dossier → `retracte_le` (date et heure de
+  réception) et `retracte_nom`. La fiche et l'espace client l'affichent alors. Le texte de cet accusé est à faire
+  valider par l'Ordre (« À savoir »).
 - **Modifier les étapes ou leurs textes** : Table Editor → `modele_etapes` (pour les nouveaux dossiers) et
   `etapes` (pour un dossier existant, colonne `note` pour une précision visible par le client). Les étapes des
   dossiers créés avant le parcours v2 sont archivées dans `etapes_v1`.
@@ -583,23 +747,36 @@ d'un dossier :
     la rétractation doit être donnée avant la signature avec le formulaire type : l'e-mail « Votre devis est prêt »
     et la page de signature d'un particulier les montrent ; les mettre aussi dans le devis ou les CGV ;
   - le devis signé chez le client, en ta présence : c'est un contrat « hors établissement », avec d'autres règles
-    (notamment aucun paiement pendant 7 jours) : à vérifier avant de faire signer lors d'un rendez-vous chez lui.
+    (notamment aucun paiement pendant 7 jours) : à vérifier avant de faire signer lors d'un rendez-vous chez lui ;
+  - le texte de l'accusé de réception d'une rétractation reçue par lettre, par e-mail ou dans la discussion (point
+    suivant).
+- Une rétractation peut aussi arriver dans la discussion ou par e-mail : elle vaut si elle est claire. Accuses-en
+  réception tout de suite depuis l'espace agence (un message de la discussion part par e-mail), en reprenant la date
+  et l'heure de son envoi. Arrête la mission, puis enregistre-la (« En dépannage »).
+- Une réponse écrite depuis ta messagerie part au client mais n'entre pas dans la discussion : recopie-la dans
+  l'espace agence avec la case « Déjà envoyé depuis ma messagerie » (aucun e-mail ne repart).
 - Offre gratuite Supabase : un projet inactif pendant 7 jours est mis en pause (l'espace client ne répond
   plus jusqu'à réactivation manuelle). Prévoir l'offre Pro (25 $/mois) quand le site reçoit des demandes,
   ou accepter ce risque au début.
 - Offre gratuite Resend : 3 000 e-mails par mois et 100 par jour (des envois seulement : depuis le 20 octobre 2026,
   Resend ne reçoit plus rien). Au-delà, offre Pro (20 $/mois). Une fois le quota du jour atteint, plus rien ne part
-  ce jour-là, pas même les codes de connexion à l'espace client. Surveiller l'usage dans Resend (**Usage**), et
-  regarder la fiche des dossiers « E-mail à renvoyer ».
+  ce jour-là, pas même les codes de connexion à l'espace client. Chacun de tes messages au client consomme un e-mail
+  du quota, comme chaque avis « Message du client » (au plus un par dossier et par quart d'heure : c'est la raison de
+  ce regroupement). Surveiller l'usage dans Resend (**Usage**), et regarder la fiche des dossiers « E-mail à
+  renvoyer » et « E-mail non parti ».
 - Protections anti-abus de la fonction : champ piège, validation de tous les champs, 10 fichiers et 10 Mo
   maximum, images et PDF uniquement, 3 demandes par adresse e-mail et par jour, 30 demandes par heure au
   total (au-delà, FormSubmit prend le relais). Si des demandes automatisées arrivent malgré tout, l'étape
   suivante est Cloudflare Turnstile (vérification invisible). Pour les e-mails reçus, le moteur de l'agence ne
   range que ceux qui concernent un dossier (son numéro dans l'objet, ou l'adresse d'un client) ; un message d'un
   autre expéditeur, ou sans signature DKIM valable, attend ta vérification. Par dossier et par 24 heures :
-  30 messages du client et 20 messages à vérifier au plus ; 200 Mo de pièces jointes du client par dossier en tout
-  (au-delà, elles ne sont plus rangées : elles restent dans l'e-mail, dans ta boîte). Ces limites évitent qu'un
-  afflux d'e-mails remplisse la base et le stockage.
+  30 e-mails du client et 20 à vérifier au plus ; 200 Mo de pièces jointes du client par dossier en tout
+  (au-delà, elles ne sont plus rangées : elles restent dans l'e-mail, dans ta boîte). Messages écrits par le client
+  dans son espace : 5 000 caractères, 10 fichiers et 10 Mo par message (images et PDF), 30 messages par dossier et
+  par 24 heures, et les mêmes 200 Mo par dossier (au-delà, la page lui demande de t'écrire à contact@) ; un seul envoi
+  à la fois par dossier (un second envoi simultané, depuis un autre onglet par exemple, reçoit « Un envoi est déjà en
+  cours : réessayez dans quelques secondes. »), pour que ces limites tiennent. Elles évitent qu'un afflux de messages
+  remplisse la base et le stockage.
 - Ne jamais activer le CAPTCHA de Supabase (Authentication → Attack Protection) sans la modification du site qui va
   avec : la demande de code serait refusée et plus personne ne pourrait se connecter, toi compris.
 - Un e-mail « Votre code de connexion » reçu à contact@ sans l'avoir demandé veut dire que quelqu'un a tapé cette
@@ -611,14 +788,17 @@ d'un dossier :
   mentions légales (traitement des e-mails reçus).
 - Données : Supabase les héberge en Europe (région choisie à l'étape 1). Resend envoie depuis l'Irlande
   (eu-west-1), mais garde ses journaux et les métadonnées des e-mails aux États-Unis, et conserve les e-mails
-  envoyés 30 jours (les réponses des clients n'y passent plus depuis le 20 octobre 2026 : elles arrivent dans ta
-  messagerie, chez LWS). Pour le RGPD : mentionner dans les mentions légales l'espace client, les e-mails envoyés
-  (Resend), la durée de conservation et, pour la signature du devis et la rétractation, la conservation de
-  l'adresse IP et du navigateur (preuve) ; supprimer les dossiers à la demande (Table Editor, la
-  suppression du projet supprime sa timeline, ses questions, ses messages, ses demandes de modification et son
-  archive ; les fichiers sont à supprimer dans Storage, et le compte dans Authentication → Users).
+  envoyés 30 jours (les e-mails des clients n'y passent plus depuis le 20 octobre 2026 : ils arrivent dans ta
+  messagerie, chez LWS. En revanche, les messages écrits par un client dans son espace y passent en entier, dans
+  l'avis envoyé à contact@, ainsi que tes messages au client, pièces jointes comprises). Pour le RGPD : mentionner
+  dans les mentions légales l'espace client, la discussion (messages, photos et PDF envoyés depuis l'espace client,
+  conservés avec le dossier), les e-mails envoyés (Resend), la durée de conservation et, pour la signature du devis
+  et la rétractation, la conservation de l'adresse IP et du navigateur (preuve) ; supprimer les dossiers à la
+  demande (Table Editor, la suppression du projet supprime sa timeline, ses étapes clés, sa discussion, ses
+  questions, ses demandes de modification et son archive ; les fichiers sont à supprimer dans Storage, sous-dossiers
+  `client` et `agence` avec `agence/discussion`, et le compte dans Authentication → Users).
 - Les sauvegardes quotidiennes de la base sont incluses dans l'offre Pro. En gratuit, exporter de temps en
-  temps : Table Editor → `projets` → Export (CSV), idem pour `etapes`, `questions`, `messages` et
+  temps : Table Editor → `projets` → Export (CSV), idem pour `etapes`, `evenements`, `messages`, `questions` et
   `modifications` ; les fichiers se téléchargent depuis Storage.
 - Paiement : uniquement par virement, sans frais ni intermédiaire. La référence demandée au client est le numéro
   de dossier (12 chiffres, par exemple 261014093512) : elle relie chaque virement à son dossier, en comptabilité

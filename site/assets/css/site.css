@@ -323,8 +323,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 }
 
 /* ==========================================================================
-   Espace client (dossier/index.html) : consultation seule depuis le parcours v3 (timeline, échanges, documents,
-   récapitulatif) ; le client agit par e-mail et sur la page d'action (action/index.html, plus bas).
+   Espace client (dossier/index.html) : timeline, discussion (bloc commun aux deux espaces, plus bas), documents,
+   récapitulatif ; le client signe, valide et renonce sur la page d'action (action/index.html, plus bas).
    ========================================================================== */
 .espace{width:100%;max-width:760px;margin:0 auto;padding:clamp(40px,6vw,72px) var(--pad-x);box-sizing:border-box;display:flex;flex-direction:column;gap:40px}
 .espace > [data-vue="dossier"]{display:flex;flex-direction:column;gap:40px}
@@ -375,16 +375,6 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .notice:focus{outline:none}
 .dossier-etat{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .dossier-etat .tl-statut{margin-top:0}
-/* Échanges (questions et réponses, messages du client, demandes de modification) et messages du client (espace
-   agence) : enfants directs seulement, une liste de pièces jointes peut s'y imbriquer */
-.echanges,.messages{list-style:none;margin:0;padding:0}
-.echanges > li,.messages > li{display:flex;flex-direction:column;gap:6px;padding:14px 0;border-top:1px solid rgba(var(--ink-rgb),.16)}
-.echanges > li:last-child,.messages > li:last-child{border-bottom:1px solid rgba(var(--ink-rgb),.16)}
-.echanges .doc-meta,.messages .doc-meta{margin:0}
-.messages .badge{align-self:flex-start}
-.messages button.link-more{align-self:flex-start;background:transparent;border:0;padding:0;cursor:pointer}
-.echange-q{margin:0;font:500 14px/1.5 var(--font)}
-.echange-r{margin:0;font:400 14px/1.6 var(--font);color:rgba(var(--ink-rgb),.75);white-space:pre-line;overflow-wrap:anywhere}
 /* Documents */
 .docs{list-style:none;margin:0;padding:0}
 .docs li{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 0;border-top:1px solid rgba(var(--ink-rgb),.16)}
@@ -400,20 +390,18 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .recap-liste dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
 .espace-pied{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding-top:24px;border-top:1px solid var(--line)}
 /* ==========================================================================
-   Parcours v3 : espace client en lecture seule, page d'action (action/index.html) et éléments partagés avec
-   l'espace agence (virement, messages du client, rétractation)
+   Parcours v3 : information sous l'étape en cours (espace client), page d'action (action/index.html) et éléments
+   partagés avec l'espace agence (virement, pièces jointes, rétractation)
    ========================================================================== */
 /* Bouton indisponible (aria-disabled) : il reste focalisable et son clic explique ce qui manque */
 .btn[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
 .btn[aria-disabled="true"]:hover{background:var(--ink)}
 .btn--ghost[aria-disabled="true"]:hover{background:transparent;border-color:rgba(var(--ink-rgb),.35)}
 .espace .link-more:focus-visible{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:3px}
-/* Information en lecture seule sous l'étape en cours (espace client) : questions posées par e-mail, devis envoyé,
-   virement attendu, documents à valider, rétractation */
+/* Information en lecture seule sous l'étape en cours (espace client) : devis envoyé, virement attendu, documents à
+   valider, rétractation */
 .info-etape{grid-column:2 / -1;margin-top:16px;display:flex;flex-direction:column;gap:14px;padding:18px 20px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),.16);font:400 14px/1.6 var(--font);color:rgba(var(--ink-rgb),.8)}
 .info-etape p{margin:0;text-wrap:pretty}
-.info-etape .doc-meta{margin-top:2px}
-.info-questions{margin:0;padding:0 0 0 18px;display:flex;flex-direction:column;gap:10px;color:var(--ink)}
 .info-virement{display:flex;flex-direction:column;gap:10px}
 /* Coordonnées de virement : liste à deux colonnes (une seule sous 640 px) */
 .virement{margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 24px;font:400 14px/1.5 var(--font)}
@@ -459,6 +447,50 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   .action-ok{padding:18px}
 }
 /* ==========================================================================
+   Discussion (espace client et espace agence) : messages des deux côtés et étapes clés du dossier, du plus ancien
+   au plus récent, puis le composeur. Ses propres messages à droite sur la surface, ceux de l'autre à gauche ;
+   l'auteur est toujours écrit dans la bulle (.msg-meta) : la position et le fond ne font que le doubler (contraste
+   forcé). Textes secondaires d'une bulle en .msg-meta (.6), jamais en .doc-meta (.5 : contraste insuffisant sur la
+   surface).
+   ========================================================================== */
+.discussion-bloc .f-hint{margin:0}
+.discussion{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.discussion > li[tabindex]:focus{outline:none} /* focus programmatique (« Afficher les messages précédents ») */
+.msg{align-self:flex-start;box-sizing:border-box;max-width:min(560px,85%);min-width:0;display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid rgba(var(--ink-rgb),.25);overflow-wrap:anywhere}
+.msg--moi{align-self:flex-end;background:var(--surface);border-color:rgba(var(--ink-rgb),.16)}
+.msg--autre{align-self:flex-start}
+.msg--verifier{border-style:dashed} /* message à vérifier (espace agence) */
+.msg p{margin:0}
+.msg-meta{margin:0;font:400 11.5px/1.5 var(--mono);color:rgba(var(--ink-rgb),.6);overflow-wrap:anywhere}
+/* En-tête d'une bulle : chaque partie (date et heure, canal ; auteur aussi dans l'espace client) est un span
+   .insecable, jamais coupé : la ligne se coupe entre les parties. L'adresse d'un expéditeur (espace agence), hors
+   span, peut se couper. */
+.msg-meta .insecable{white-space:nowrap}
+.msg-sujet{margin:0;font:500 14px/1.5 var(--font);color:var(--ink)}
+.msg-texte{margin:0;font:400 14px/1.6 var(--font);color:var(--ink);white-space:pre-line;overflow-wrap:anywhere}
+.msg .pieces{margin:2px 0 0}
+.msg .badge{align-self:flex-start}
+.msg button.link-more{background:transparent;border:0;padding:0;cursor:pointer;text-align:left}
+.msg .form-actions{padding-top:6px}
+.msg-complet summary{cursor:pointer}
+.msg-complet .msg-texte{margin-top:8px}
+/* Étape clé : ligne centrée entre deux filets */
+.jalon{display:flex;align-items:center;gap:12px;font:500 11px/1.5 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:rgba(var(--ink-rgb),.6)}
+.jalon > span{min-width:0;text-align:center;overflow-wrap:anywhere;text-wrap:balance}
+.jalon::before,.jalon::after{content:'';flex:1 1 12px;min-width:12px;height:1px;background:var(--line)}
+.discussion-plus{align-self:flex-start;background:transparent;border:0;padding:0;cursor:pointer;text-align:left}
+/* Composeur : sous le fil, séparé par un filet */
+.composeur{display:flex;flex-direction:column;gap:16px;margin-top:6px;padding-top:22px;border-top:1px solid var(--line)}
+.composeur-compte{margin:0}
+/* Zone d'annonce (role=status) toujours rendue, jamais display:none : vide, elle ne prend pas de place (marge
+   négative qui annule l'écart du composeur) */
+.composeur-statut{margin:0}
+.composeur-statut:empty{margin-top:-16px}
+.espace h1:focus{outline:none} /* focus programmatique sur le titre de la vue, après une connexion par code */
+@media (max-width:640px){
+  .msg{max-width:92%}
+}
+/* ==========================================================================
    Espace agence (admin/index.html) : liste des dossiers, fiche, actions de l'agence
    ========================================================================== */
 .espace.agence{max-width:1040px}
@@ -490,9 +522,6 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .admin-etapes .is-option .tl-title,.admin-etapes .is-option .tl-num{color:rgba(var(--ink-rgb),.3)}
 .admin-etapes .tl-statut{margin-top:0;padding-top:3px}
 .admin-note,.admin-form{display:flex;flex-direction:column;gap:16px}
-.admin-questions{display:flex;flex-direction:column;gap:16px}
-.admin-question{display:flex;flex-direction:column;gap:12px;padding:16px 18px;border:1px solid rgba(var(--ink-rgb),.16)}
-.admin-question .link-more{align-self:flex-start;background:transparent;border:0;padding:0;cursor:pointer}
 @media (max-width:760px){
   .admin-ligne{grid-template-columns:minmax(0,1fr) auto}
   .admin-type,.admin-etape{grid-column:1}
