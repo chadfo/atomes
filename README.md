@@ -215,8 +215,9 @@ e-mails) ou à simon@atomes.studio. Le moteur, programme Python de l'ordinateur 
 toutes les 5 minutes, sans rien y changer, et range les e-mails des clients dans leur dossier : `messages`
 (`resend_id = imap:<Message-ID>`), pièces dans `<id>/client/`, réponses aux questions, demandes de modification.
 Mêmes règles que la fonction `espace` (texte sans la citation, pièces, limites) ; vérification de l'expéditeur par
-sa signature DKIM, contrôlée par le moteur. Le webhook Resend ne sert plus qu'aux réponses envoyées aux anciennes
-adresses de dossier (`r.atomes.studio`), le temps de la transition.
+sa signature DKIM, contrôlée par le moteur. La réception par Resend (webhook `email.received`, anciennes adresses de
+réponse des dossiers en `r.atomes.studio`), prévue pour la transition, a été retirée le 20 octobre 2026, aucun vrai
+client n'ayant encore reçu une telle adresse : le moteur est la seule voie d'arrivée des e-mails des clients.
 
 - `supabase/migrations/0001_espace_client.sql` : tables `projets` (une ligne par demande, identifiant
   `AAMMJJHHMMSS` à l'heure de Paris, ex. `261012173615`), `modele_etapes` et `etapes` (timeline), `admins` ;
@@ -253,8 +254,14 @@ adresses de dossier (`r.atomes.studio`), le temps de la transition.
     au client renvoie `mail` (faux si l'e-mail n'est pas parti, ce que l'espace agence signale) ;
   - actions par lien, sans compte, avec le jeton reçu par e-mail : `infos`, `signer`, `valider`, `renoncer` ;
   - `infos_espace`, pour l'espace client, en lecture seule : coordonnées du virement, lien de rétractation ;
-  - webhook Resend `email.received` (anciennes adresses de réponse, pendant la transition vers le moteur ;
-    signature Svix vérifiée sur le corps brut) : l'e-mail est lu par l'API de
+  - webhook Resend `email.received`, **inactif depuis le 20 octobre 2026** : la réception par Resend (anciennes
+    adresses de réponse des dossiers, sous-domaine `r.atomes.studio`) a été retirée, et ses secrets
+    `REPONSES_DOMAINE`, `RESEND_WEBHOOK_SECRET` et `RESEND_RECEPTION_KEY` supprimés. Sans `RESEND_WEBHOOK_SECRET`,
+    tout appel du webhook (en-têtes `svix-…`) est refusé (« signature invalide », 400) ; sans `REPONSES_DOMAINE`,
+    aucune adresse de dossier n'est reconnue. Le code est gardé tel quel : ses fonctions de texte et de pièces
+    jointes (`sansCitation`, `texteDepuisHtml`, `nomSur`, `reponseAutomatique`…) sont la référence des tests de
+    parité du moteur (`atomes-moteur/outils/parite`, qui les extrait de ce fichier). Fonctionnement, s'il était
+    réactivé : signature Svix vérifiée sur le corps brut ; l'e-mail est lu par l'API de
     Resend (clé `RESEND_RECEPTION_KEY` si la réception est dans un compte Resend à part, sinon `RESEND_API_KEY`),
     rattaché au dossier par son adresse de réponse et enregistré dans `messages`. Il est vérifié si son expéditeur
     est l'adresse du dossier (adresse simple, la même dans le champ `from` de Resend et dans l'en-tête From) et si
@@ -281,9 +288,10 @@ adresses de dossier (`r.atomes.studio`), le temps de la transition.
   `SHA-256(date de signature + empreinte du devis signé)`) ; placé dans le fragment, il n'est jamais envoyé au
   serveur des pages. Durées : signer 30 jours (un nouveau devis invalide les anciens liens), valider 90 jours,
   renoncer jusqu'à la fin du délai de rétractation (le lien d'un contrat précédent ne vaut plus). Ancienne adresse de
-  réponse, encore reçue par le webhook pendant la transition : `d<id>-<mac>@<REPONSES_DOMAINE>` (`r.atomes.studio`),
-  `mac` = 20 premiers caractères hexadécimaux de `HMAC-SHA256(JETON_SECRET, "reponse:" + id)`. Sans `JETON_SECRET` :
-  pas de lien ; sans `REPONSES_DOMAINE` : le webhook n'ajoute plus rien.
+  réponse, plus reçue depuis le retrait de la réception Resend (20 octobre 2026) : `d<id>-<mac>@<REPONSES_DOMAINE>`
+  (`r.atomes.studio`), `mac` = 20 premiers caractères hexadécimaux de `HMAC-SHA256(JETON_SECRET, "reponse:" + id)`.
+  Sans `JETON_SECRET` : pas de lien ; sans `REPONSES_DOMAINE` (supprimé le 20 octobre 2026) : le webhook n'ajoute
+  plus rien.
 - `site/assets/js/config.js` : URL Supabase, clé anon, URL des fonctions `demande` (`apiUrl`) et `espace`
   (`espaceUrl`, aussi pour la page d'action). Vide = le formulaire de devis envoie via FormSubmit comme avant ;
   rempli = fonction « demande », FormSubmit en secours si elle ne répond pas.

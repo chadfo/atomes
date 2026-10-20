@@ -11,8 +11,8 @@ ouvre un espace client et envoie les e-mails. Compter une heure, en suivant les 
 | Comptes clients | Supabase Auth, connexion par code reçu par e-mail | Pas de mot de passe à gérer, un client = une adresse e-mail |
 | Fichiers (pièces du client, documents de l'agence) | Supabase Storage, bucket privé `dossiers` | Un dossier par projet, liens de téléchargement temporaires, 1 Go gratuit puis 100 Go (offre Pro) |
 | Réception du formulaire | Supabase Edge Function `demande` | Code serveur sans serveur à maintenir |
-| Suivi du dossier (e-mails au client, signature, réponses) | Supabase Edge Function `espace` | Même principe ; reçoit aussi les réponses des clients |
-| E-mails (envoi, et réception des réponses aux anciennes adresses de dossier) | Resend | 3 000 e-mails/mois gratuits (envoyés et reçus), envoi depuis contact@atomes.studio, réponses reçues sur r.atomes.studio jusqu'à leur retrait (§ 8) |
+| Suivi du dossier (e-mails au client, signature, espace agence) | Supabase Edge Function `espace` | Même principe |
+| Envoi des e-mails | Resend | 3 000 e-mails/mois gratuits, envoi depuis contact@atomes.studio |
 | Lecture des e-mails des clients (contact@, simon@) | Moteur de l'agence, sur ton ordinateur (§ 8) | Le client écrit à l'agence, pas à une adresse technique ; aucun service de plus |
 | Signature du devis | Page du site ouverte par un lien reçu par e-mail | Signature électronique simple, sans abonnement (pas de Yousign) |
 | Paiement | Virement bancaire | Sans frais ; le numéro de dossier sert de référence |
@@ -73,8 +73,8 @@ de dossier.
    `.atomes.studio`. TTL : 15 minutes. Un nom portant un CNAME ne peut porter aucun autre enregistrement.
    Attendre la vérification (quelques minutes à quelques heures). Tant que le domaine n'est pas vérifié,
    Resend n'envoie qu'à ta propre adresse et Supabase répond « Error sending magic link email ».
-3. **API Keys → Create** : permission **Full access** (la fonction `espace` lit les réponses reçues ; une clé
-   « Sending access » ne sait qu'envoyer). Noter la clé (`re_…`).
+3. **API Keys → Create** : permission **Sending access** suffit (les fonctions ne font qu'envoyer ; une clé
+   **Full access** déjà en place convient aussi). Noter la clé (`re_…`).
 4. Dans Supabase, **Authentication → Emails → onglet SMTP Settings** : activer Custom SMTP avec
    host `smtp.resend.com`, port `465`, user `resend`, password = la clé API, sender `contact@atomes.studio`,
    sender name `Atomes studio`. Indispensable : sans SMTP personnalisé, Supabase n'envoie les codes de
@@ -87,7 +87,8 @@ de dossier.
    avec le dossier `images/` à jour. Vérifier aussi, dans **Authentication → Sign In / Providers → Email**,
    « Email OTP Length » = **6** et « Email OTP Expiration » = **3600** (une heure, comme le dit l'e-mail).
 
-La réception des réponses des clients (sous-domaine `r.atomes.studio`) se règle plus loin, au § 7.
+Resend ne sert qu'à envoyer. Les réponses des clients arrivent à contact@atomes.studio (adresse de réponse de tous les
+e-mails), et le moteur de l'agence les range dans les dossiers (§ 8).
 
 ## 3. Déployer la fonction « demande »
 
@@ -103,7 +104,7 @@ Par le tableau de bord (sans rien installer) :
    (défaut `Atomes studio <contact@atomes.studio>`), `SITE_URL` (défaut https://atomes.studio),
    `ORIGINES_AUTORISEES` (sites autorisés à appeler la fonction, séparés par des virgules ; défaut
    `https://atomes.studio,https://www.atomes.studio,http://localhost:3000`). Les secrets sont communs à toutes les
-   fonctions du projet : `JETON_SECRET` et `REPONSES_DOMAINE` (§ 7) servent aussi à celle-ci.
+   fonctions du projet : ceux-ci servent aussi à la fonction `espace` (§ 7).
 5. Rien à faire ici, pour information : l'adresse à laquelle le site appelle la fonction est
    `https://zvgkvovqmxmpdijubmaz.supabase.co/functions/v1/demande`. Elle est déjà inscrite dans
    `site/assets/js/config.js` (étape 4).
@@ -156,7 +157,8 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
    réception au client, notification à l'agence) ; dans Supabase, **Table Editor → projets** contient la
    ligne et **Storage → dossiers → <numéro> → client** contient le fichier.
 3. Se connecter sur /dossier/ avec l'adresse du test : timeline et documents apparaissent.
-4. Le parcours complet (réponses par e-mail, signature, virement) se teste au § 7, point 7.
+4. Le parcours complet (réponses par e-mail, signature, virement) se teste au § 7, point 5, une fois le moteur de
+   l'agence en route (§ 8).
 
 ## Mises à jour à appliquer
 
@@ -223,9 +225,10 @@ clients reçus dans ces deux boîtes (§ 8). Dans la même séance, dans cet ord
    de minutes : l'espace agence affiche les messages du moteur (« En attente du moteur », « Signature DKIM »).
 5. **Lancement automatique du moteur** (§ 8, point 5), puis le test du § 8, point 6.
 
-Garder pour l'instant `REPONSES_DOMAINE`, le webhook de Resend et le compte Resend de réception : un client qui
-répond à un e-mail envoyé avant cette mise à jour écrit encore à l'adresse de son dossier, en `@r.atomes.studio`, et
-sa réponse continue de s'ajouter au dossier. Les retirer dans un mois (§ 8, point 7).
+La réception par Resend (`REPONSES_DOMAINE`, webhook, compte Resend de réception, sous-domaine `r.atomes.studio`),
+qui devait rester un mois pour les réponses aux e-mails envoyés avant cette mise à jour, a été retirée dès le
+20 octobre 2026 : aucun vrai client n'avait encore reçu d'adresse de réponse en `@r.atomes.studio`. Ce qui a été
+supprimé : § 8, point 7. Rien à redéployer.
 
 ### Parcours v3 (mis en ligne le 15 octobre 2026)
 
@@ -233,8 +236,9 @@ sa réponse continue de s'ajouter au dossier. Les retirer dans un mois (§ 8, po
 site du 13 octobre). Le parcours v3 (tout par e-mail, signature par lien, virement, espace client en consultation)
 s'applique **d'une traite, dans la même séance et dans cet ordre**.
 
-**Avant la séance, par exemple la veille** : § 7, point 3 (sous-domaine de réception chez Resend, enregistrements
-chez LWS). Leur vérification peut prendre quelques heures ; ce point ne change rien au site ni à ta messagerie.
+**Avant la séance, par exemple la veille** : sous-domaine de réception chez Resend et enregistrements chez LWS. Plus
+à faire, comme les étapes 6 et 7 : la réception par Resend a été retirée le 20 octobre 2026 (§ 7, point 3) ; les
+réponses des clients arrivent à contact@ et le moteur de l'agence les range (§ 8).
 
 **Avant de retirer Stripe : paiements par carte encore possibles.** Une session de paiement du parcours v2 reste
 valable une heure après le clic du client sur « Payer ». Juste avant l'étape 3, lancer dans le SQL Editor :
@@ -255,7 +259,7 @@ afficheraient « Impossible de charger… ».
 1. **SQL Editor** : coller `supabase/migrations/0005_parcours_email.sql` → Run. Elle est rejouable : sans risque si
    elle a déjà été faite. Dès ce moment, l'ancienne page de l'espace client, encore en ligne, ne peut plus déposer
    de fichiers.
-2. **Secrets** : `JETON_SECRET` et les trois `VIREMENT_…` (§ 7, point 2). Pas encore `REPONSES_DOMAINE`.
+2. **Secrets** : `JETON_SECRET` et les trois `VIREMENT_…` (§ 7, point 2).
 3. **Redéployer la fonction `espace`** (§ 7, point 1). « Verify JWT » reste désactivé.
 4. **Publier le site** (VS Code → Sync Changes) et attendre le vert dans l'onglet Actions de GitHub, puis une
    dizaine de minutes : les navigateurs peuvent garder l'ancienne page en cache jusqu'à 10 minutes. Cette
@@ -263,17 +267,14 @@ afficheraient « Impossible de charger… ».
    des e-mails) et le nouvel espace agence.
 5. **Redéployer la fonction `demande`** avec le `index.ts` à jour (timeline et adresse de réponse dans l'accusé de
    réception).
-6. **Webhook de réception** chez Resend (§ 7, point 4), puis secret `RESEND_WEBHOOK_SECRET`.
-7. **Adresses de réponse** : secret `REPONSES_DOMAINE` (§ 7, point 5), seulement quand Resend affiche la réception
-   vérifiée.
-8. **Retirer Stripe** (§ 7, point 6).
-9. **Tester de bout en bout** (§ 7, point 7).
+6. **Webhook de réception** chez Resend, puis secret `RESEND_WEBHOOK_SECRET` : plus à faire (réception retirée le
+   20 octobre 2026, § 7, point 3).
+7. **Adresses de réponse** (secret `REPONSES_DOMAINE`) : plus à faire, pour la même raison.
+8. **Retirer Stripe** (§ 7, point 4).
+9. **Tester de bout en bout** (§ 7, point 5).
 
 Entre les étapes 3 et 4 (cache compris), l'ancienne page de l'espace client affiche encore ses boutons (répondre,
 signer, payer, valider) : ils renvoient une erreur. Ne rien faire dans l'espace agence pendant ce temps.
-
-Jusqu'à l'étape 7, les e-mails partent avec contact@atomes.studio comme adresse de réponse : les réponses des
-clients arrivent dans ta messagerie, comme avant, sans s'ajouter au dossier.
 
 **Dossiers en cours au moment de la bascule** (liste « En cours » de l'espace agence ; sans doute aucun à ce
 jour) :
@@ -285,89 +286,62 @@ jour) :
   le rappelle) ;
 - documents à valider : « Passer ici » sur « Production de vos documents », puis « Documents prêts : demander la
   validation » : le client reçoit le lien de validation ;
-- questions sans réponse : après l'étape 7, les retirer et les poser de nouveau, pour que le client puisse
-  répondre à l'e-mail.
+- questions sans réponse : une fois le moteur en route (§ 8), les retirer et les poser de nouveau, pour que le
+  client puisse répondre à l'e-mail.
 
 ## 7. Réponses par e-mail et virement
 
 La fonction `espace` mène le dossier après la demande. Chaque étape importante est annoncée au client par e-mail,
 avec la timeline de son dossier. Le client répond simplement aux e-mails : sa réponse et ses pièces jointes
-s'ajoutent au dossier. Il signe le devis et valide ses documents sur une page du site ouverte par un lien reçu par
-e-mail, sans se connecter, et paie par virement avec le numéro de dossier pour référence. L'espace client ne sert
-plus qu'à consulter. La fonction reçoit aussi les actions de l'espace agence.
+s'ajoutent au dossier (par le moteur de l'agence, § 8). Il signe le devis et valide ses documents sur une page du
+site ouverte par un lien reçu par e-mail, sans se connecter, et paie par virement avec le numéro de dossier pour
+référence. L'espace client ne sert plus qu'à consulter. La fonction reçoit aussi les actions de l'espace agence.
 
 1. **Déployer la fonction `espace`**. Première fois : **Edge Functions → Deploy a new function → Via editor**, nom
    `espace`, coller le contenu de `supabase/functions/espace/index.ts`, Deploy. Mise à jour : **Edge Functions →
    espace → Code**, tout remplacer par le contenu du fichier, **Deploy updates**. Puis, dans ses détails, vérifier
-   que **« Verify JWT » est désactivé** : la fonction vérifie elle-même la session de l'agence ou du client, le
-   lien reçu par e-mail ou la signature de Resend.
+   que **« Verify JWT » est désactivé** : la fonction vérifie elle-même la session de l'agence ou du client, ou le
+   lien reçu par e-mail.
 2. **Secrets**, dans **Edge Functions → Secrets** (`RESEND_API_KEY` et `SB_SECRET_KEY` y sont déjà). Ils sont pris
    en compte aussitôt, sans redéployer.
    - `JETON_SECRET` : 40 caractères aléatoires. Pour les obtenir : dans VS Code, **Terminal → New Terminal**,
      coller `node -e "console.log(require('crypto').randomBytes(30).toString('base64url'))"`, Entrée, puis copier
-     la ligne affichée. Il signe les liens envoyés aux clients et les adresses de réponse des dossiers.
-     **Ne le changer qu'en cas de fuite** : les liens déjà envoyés cesseraient de fonctionner, et les réponses aux
-     e-mails déjà envoyés ne s'ajouteraient plus aux dossiers. En garder une copie dans un gestionnaire de mots de
-     passe, jamais dans le site ni dans une conversation. Sans lui, aucun lien ne peut être envoyé (« Liens
-     indisponibles »).
+     la ligne affichée. Il signe les liens envoyés aux clients.
+     **Ne le changer qu'en cas de fuite** : les liens déjà envoyés cesseraient de fonctionner. En garder une copie
+     dans un gestionnaire de mots de passe, jamais dans le site ni dans une conversation. Sans lui, aucun lien ne
+     peut être envoyé (« Liens indisponibles »).
    - `VIREMENT_IBAN` (tel que sur ton RIB), `VIREMENT_BIC` et `VIREMENT_TITULAIRE` (titulaire du compte, tel que
      sur le RIB). Ils s'affichent dans l'e-mail « Devis signé » et dans l'espace client, avec la référence du
      virement (le numéro de dossier). Sans eux, l'e-mail indique :
      « Les coordonnées bancaires figurent sur votre devis. »
      La fonction vérifie l'IBAN (clé de contrôle) et la présence du titulaire : un IBAN mal recopié, ou sans
      titulaire, n'est jamais envoyé (même phrase de repli) et l'erreur apparaît dans **Edge Functions → espace →
-     Logs** (« VIREMENT_IBAN absent ou invalide »). Après le test du point 7, relire les coordonnées de l'e-mail
+     Logs** (« VIREMENT_IBAN absent ou invalide »). Après le test du point 5, relire les coordonnées de l'e-mail
      « Devis signé » reçu.
-   - `REPONSES_DOMAINE` : pas maintenant, au point 5.
-   - Vérifier dans Resend, **API Keys**, que la clé mise dans `RESEND_API_KEY` a la permission **Full access** :
-     une clé « Sending access » envoie, mais ne peut pas lire les réponses reçues. Sinon, créer une clé
-     « Full access », la mettre dans `RESEND_API_KEY`, et garder l'ancienne, qui sert au SMTP de Supabase (§ 2.4).
-   - `RESEND_RECEPTION_KEY` : seulement si la réception est dans un compte Resend à part (point 3, recommandé) : la
-     clé API **Full access** de ce compte-là, qui sert à lire les réponses reçues.
+   - Anciens secrets de la réception par Resend, `REPONSES_DOMAINE`, `RESEND_WEBHOOK_SECRET` et
+     `RESEND_RECEPTION_KEY` : supprimés le 20 octobre 2026, à ne pas recréer. La fonction les lit encore : sans eux,
+     son ancienne réception par webhook reste inactive (point 3).
    - Les liens des e-mails (signature, validation, rétractation) mènent toujours à `SITE_URL` (https://atomes.studio),
      même si l'espace agence est ouvert depuis localhost. Une fois les essais en local finis, tu peux retirer
      localhost des origines autorisées : `ORIGINES_AUTORISEES` = `https://atomes.studio,https://www.atomes.studio`
      (facultatif ; à remettre pour essayer de nouveau le formulaire en local, § 6).
-3. **Resend, sous-domaine de réception**. Les réponses des clients arrivent sur un sous-domaine réservé,
-   `r.atomes.studio` : ta messagerie contact@atomes.studio (LWS) n'est pas touchée.
-   Recommandé : créer ce sous-domaine dans un second compte Resend (ou une seconde équipe), réservé à la réception
-   et gratuit lui aussi, plutôt que dans le compte des envois. Chez Resend, chaque e-mail reçu compte dans le quota
-   du compte (100 par jour en gratuit, envois compris), et n'importe qui peut écrire à n'importe quelle adresse en
-   `@r.atomes.studio` : des e-mails reçus en nombre bloqueraient sinon tous les envois de la journée (devis,
-   confirmations, codes de connexion à l'espace client). Avec un second compte, les points 3.1 à 3.4 et le webhook
-   du point 4 se font dans ce compte-là, et sa clé API (**Full access**) va dans le secret `RESEND_RECEPTION_KEY`
-   (point 2). Autre solution : l'offre Pro de Resend pour un seul compte.
-   1. **Domains → Add Domain** : `r.atomes.studio`, région **eu-west-1 (Irlande)**, comme au § 2.
-   2. Créer chez LWS (zone DNS de `atomes.studio`) les enregistrements affichés par Resend, en recopiant exactement
-      type, nom, valeur et priorité. Mêmes règles qu'au § 2 : nom saisi sans `.atomes.studio`, ici terminé par `.r`
-      (par exemple `resend._domainkey.r`) ; valeur terminée par un point quand c'est un nom de domaine ; TTL
-      15 minutes.
-   3. Sur la page du domaine `r.atomes.studio`, activer la réception (**Enable Receiving**), si elle ne l'est pas
-      déjà. Resend affiche un enregistrement **MX** de plus, pour `r.atomes.studio` lui-même. Le créer chez LWS :
-      type MX, nom `r`, valeur affichée par Resend suivie d'un point, priorité affichée (10). Puis, si Resend le
-      propose, cliquer **I've added the record**.
-   4. Attendre que le domaine et la réception passent à **Verified** (quelques minutes à quelques heures). Si rien
-      ne bouge, relire chaque enregistrement chez LWS.
-4. **Resend, webhook de réception**, une fois la nouvelle fonction `espace` déployée (point 1) :
-   **Webhooks → Add Webhook** ; URL `https://zvgkvovqmxmpdijubmaz.supabase.co/functions/v1/espace` ; événement
-   **`email.received`** seulement ; **Add**. Ouvrir le webhook créé, copier son **Signing Secret** (`whsec_…`) →
-   secret Supabase `RESEND_WEBHOOK_SECRET`. L'offre gratuite de Resend n'autorise qu'un webhook : c'est celui-ci.
-5. **Activer les adresses de réponse**, quand le point 3 est vérifié et le point 4 fait : secret
-   `REPONSES_DOMAINE` = `r.atomes.studio`. Dès lors, chaque e-mail au client a pour adresse de réponse celle de son
-   dossier (`d<numéro>-<code>@r.atomes.studio`) : le client clique sur « Répondre », et sa réponse s'ajoute au
-   dossier. Pas avant : tant que la réception n'est pas vérifiée, les réponses des clients leur reviendraient en
-   erreur. Sans ce secret, les réponses vont à contact@atomes.studio, comme avant.
-6. **Retirer Stripe**, si tu l'avais configuré : dans **Edge Functions → Secrets**, supprimer `STRIPE_SECRET_KEY`
+3. **Réception des réponses par Resend : retirée le 20 octobre 2026**, remplacée par le moteur de l'agence (§ 8). Les
+   clients répondent à contact@atomes.studio, adresse de réponse de tous les e-mails, et le moteur range leurs e-mails
+   dans les dossiers. Plus de sous-domaine `r.atomes.studio`, de webhook ni de compte Resend de réception : rien à
+   créer. Ce qui a été supprimé : § 8, point 7.
+4. **Retirer Stripe**, si tu l'avais configuré : dans **Edge Functions → Secrets**, supprimer `STRIPE_SECRET_KEY`
    et `STRIPE_WEBHOOK_SECRET` ; sur stripe.com, **Développeurs → Webhooks (Workbench)** → la destination vers
    `…/functions/v1/espace` → la supprimer. Le compte Stripe ne sert plus.
-7. **Tester de bout en bout**, depuis https://atomes.studio (depuis localhost, les liens des e-mails mèneraient à
-   localhost), avec une adresse e-mail à toi, différente de contact@atomes.studio :
+5. **Tester de bout en bout**, une fois le moteur en route (§ 8, points 1 à 5), depuis https://atomes.studio (les
+   liens des e-mails mènent toujours au site en ligne, point 2), avec une adresse e-mail personnelle d'une messagerie
+   courante (Gmail, Outlook, Orange…), pas en atomes.studio (le moteur ignore les e-mails de l'agence) :
    1. Envoyer une demande sur https://atomes.studio/devis.html, profil **Particulier**. L'accusé de réception
-      montre la timeline ; « Répondre » propose une adresse en `@r.atomes.studio`.
-   2. Répondre à cet e-mail avec une photo jointe. En quelques instants, « Réponse du client — dossier … » arrive à
-      contact@atomes.studio, et la fiche du dossier (espace agence) montre le message et la photo.
-   3. Espace agence : poser une question, puis y répondre depuis l'e-mail reçu. La réponse s'affiche sous la
-      question.
+      montre la timeline ; « Répondre » propose contact@atomes.studio.
+   2. Répondre à cet e-mail avec une photo jointe. La réponse arrive dans la boîte contact@ ; dans les 5 minutes, le
+      moteur la range : la fiche du dossier (espace agence) montre le message et la photo (aucun e-mail ne
+      l'annonce).
+   3. Espace agence : poser une question, puis y répondre depuis l'e-mail reçu. Dans les 5 minutes, la réponse
+      s'affiche sous la question.
    4. Envoyer un devis (un PDF quelconque, 1 €). L'e-mail « Votre devis est prêt » contient le PDF, le bouton
       « Lire et signer mon devis », l'information sur la rétractation et le formulaire type. Sur la page qui s'ouvre
       (information et formulaire type au-dessus de la case), cliquer « Signer et commander avec obligation de
@@ -379,15 +353,16 @@ plus qu'à consulter. La fonction reçoit aussi les actions de l'espace agence.
    5. Espace agence : le dossier est en « Virement attendu ». Cliquer « Virement reçu » : e-mail « Paiement
       reçu », et le dossier passe en production.
    6. Déposer un document, puis « Documents prêts : demander la validation ». Répondre à l'e-mail « Vos documents
-      sont prêts » : la fiche affiche « Modification demandée ». Puis, dans le même e-mail, cliquer « Voir et
-      valider mes documents », et « Je valide mes documents ».
+      sont prêts » : dans les 5 minutes, la fiche affiche « Modification demandée ». Ensuite seulement (une réponse
+      rangée après la validation ne compte plus comme demande de modification), dans le même e-mail, cliquer « Voir
+      et valider mes documents », et « Je valide mes documents ».
    7. Dans l'e-mail « Devis signé », cliquer « Renoncer au contrat ici », remplir, « Confirmer la rétractation ».
       L'accusé de réception arrive à l'adresse du test, « Rétractation — dossier … » à contact@atomes.studio, et la
       fiche affiche la rétractation : le dossier, clos au point 6, s'affiche « Rétractation reçue » (reçue après la
       clôture) dans les dossiers « À traiter ».
-   8. Depuis contact@atomes.studio, écrire à l'adresse de réponse du dossier (celle que propose « Répondre » au
-      point 1) : « Message à vérifier — dossier … » arrive, et la fiche montre le message avec le badge
-      « À vérifier ». Le supprimer.
+   8. Depuis une autre adresse à toi (ni celle du test, ni une adresse en atomes.studio), écrire à
+      contact@atomes.studio avec le numéro du dossier dans l'objet : dans les 5 minutes, la fiche montre le message
+      avec le badge « À vérifier » (aucun e-mail ne l'annonce). Le supprimer.
    9. Se connecter sur https://atomes.studio/dossier/ avec l'adresse du test, depuis le téléphone ou un autre
       navigateur (dans le même navigateur, la connexion du client remplacerait celle de l'agence) : timeline,
       documents et échanges s'affichent, sans aucun bouton d'action.
@@ -400,10 +375,10 @@ plus qu'à consulter. La fonction reçoit aussi les actions de l'espace agence.
 Le moteur est un programme qui tourne sur ton ordinateur (dossier `atomes-moteur`, à côté de ce dépôt, jamais
 publié ; mode d'emploi complet dans son `README.md`). Toutes les 5 minutes, tant que ta session Windows est ouverte,
 il lit les nouveaux e-mails de contact@atomes.studio et de simon@atomes.studio, sans rien y changer (rien n'est
-marqué lu, déplacé ni supprimé), et range dans leur dossier ceux des clients, comme la fonction `espace` le fait
-pour les réponses reçues par Resend : texte sans la citation, pièces jointes (images et PDF, 25 Mo au plus) dans
-`<numéro>/client/`, réponse aux questions en attente, demande de modification à l'étape « Validation de vos
-documents ». Il n'envoie aucun e-mail : l'original est déjà dans ta boîte.
+marqué lu, déplacé ni supprimé), et range dans leur dossier ceux des clients, comme la fonction `espace` le faisait
+pour les réponses reçues par Resend (jusqu'au 20 octobre 2026, point 7) : texte sans la citation, pièces jointes
+(images et PDF, 25 Mo au plus) dans `<numéro>/client/`, réponse aux questions en attente, demande de modification à
+l'étape « Validation de vos documents ». Il n'envoie aucun e-mail : l'original est déjà dans ta boîte.
 
 Règles :
 - le numéro de dossier dans l'objet (« Re: Quelques questions sur votre dossier 261014093512 ») désigne le dossier ;
@@ -435,10 +410,19 @@ Règles :
    contient le numéro) avec une photo jointe ; dans les 5 minutes, la fiche montre le message et la photo. Puis
    écrire depuis une autre adresse, avec le numéro dans l'objet : badge « À vérifier » ; « Rattacher au dossier »,
    puis 5 minutes : la photo est rangée.
-7. **Dans un mois**, quand plus personne ne répond aux anciennes adresses en `@r.atomes.studio` : supprimer les
-   secrets `REPONSES_DOMAINE`, `RESEND_WEBHOOK_SECRET` et `RESEND_RECEPTION_KEY`, le webhook chez Resend, le
-   domaine `r.atomes.studio` dans le compte Resend de réception (puis ce compte), et chez LWS les enregistrements du
-   sous-domaine `r` (MX et ceux de Resend).
+7. **Réception par Resend retirée le 20 octobre 2026.** Elle devait rester un mois, pour les réponses aux anciennes
+   adresses de dossier en `@r.atomes.studio` ; aucun vrai client n'en ayant encore reçu, elle a été retirée aussitôt.
+   Ont été supprimés :
+   - dans Supabase (**Edge Functions → Secrets**), les secrets `REPONSES_DOMAINE`, `RESEND_WEBHOOK_SECRET` et
+     `RESEND_RECEPTION_KEY` (pris en compte sans redéployer) ;
+   - chez Resend, le webhook `email.received` vers la fonction `espace`, le domaine `r.atomes.studio` et le compte
+     de réception, s'il était à part ;
+   - chez LWS (zone DNS de `atomes.studio`), les enregistrements du sous-domaine `r` : ceux nommés `r` (MX) ou
+     finissant par `.r` (ceux de Resend).
+
+   La fonction `espace` garde le code de cette réception, inactif sans ces secrets : ses règles de texte et de pièces
+   jointes servent de référence aux tests du moteur. Un e-mail envoyé à une ancienne adresse en `@r.atomes.studio`
+   n'est plus reçu.
 
 ## Au quotidien : l'espace agence (https://atomes.studio/admin/)
 
@@ -456,26 +440,21 @@ d'un dossier :
   réponse peut être retirée (« Retirer la question »). Dans la liste, un dossier dont une question attend le
   client reste « À traiter » quand c'est à toi d'agir ; le nombre de questions sans réponse s'affiche à côté de
   l'étape.
-- **Messages du client** : chaque e-mail reçu du client s'affiche dans la fiche (date, expéditeur, objet, texte,
-  pièces jointes) et t'est transmis (« Réponse du client — dossier … »). Ses pièces jointes, images et PDF de
-  25 Mo au plus, rejoignent ses documents ; lui demander les autres formats en PDF. Les images intégrées au texte
-  (logo de sa signature, images de notre e-mail cité, logo d'Atomes studio) ne sont pas rangées : l'e-mail
-  « Réponse du client » les cite à part. Un message n'est rattaché seul que s'il vient de l'adresse du dossier
-  (adresse simple, la même dans l'expéditeur affiché et dans l'en-tête du message) et que Resend l'authentifie
-  (DMARC, ou signature DKIM du domaine de cette adresse) ; c'est le cas des messageries courantes (Google,
-  Microsoft, Orange, Free…). Sinon il attend, avec le badge « À vérifier » (ses pièces jointes y sont listées, « non
-  rangée »), et tu reçois « Message à vérifier — dossier … » (un seul par heure et par dossier ; aucun pour un
-  e-mail que SPF, DKIM et DMARC rejettent tous, visible quand même dans la fiche) : si c'est bien le client (par
-  exemple depuis une autre adresse, ou depuis un domaine sans DKIM), « Rattacher au dossier » (ses pièces jointes
-  sont rangées, sa réponse enregistrée, et le message devient visible dans son espace ; il n'est pas prévenu) ;
-  sinon « Supprimer ». Le faire sans attendre : Resend ne garde les e-mails reçus que 30 jours. Un message au
-  badge « Traitement incomplet » (pièces jointes ou réponse interrompues, par exemple par une panne, et que Resend
-  n'a pas pu reprendre) : « Reprendre le traitement ».
-- **Messages lus par le moteur** (e-mails reçus sur contact@ et simon@, § 8) : mêmes règles, sans e-mail
-  « Réponse du client » ni « Message à vérifier » (l'original est dans ta boîte). Un message « À vérifier » indique
-  l'adresse différente ou le résultat de la signature DKIM (« Signature DKIM : absente », « échec »…). « Rattacher
-  au dossier » le marque « En attente du moteur » : ses pièces sont rangées et sa réponse enregistrée au passage
-  suivant du moteur (5 minutes, ordinateur allumé).
+- **Messages du client** : les e-mails des clients reçus sur contact@ et simon@ sont ajoutés au dossier par le moteur
+  de l'agence (§ 8), dans les 5 minutes, ordinateur allumé ; aucun e-mail ne te les annonce (l'original est dans ta
+  boîte). Chacun s'affiche dans la fiche (date, expéditeur, objet, texte, pièces jointes). Ses pièces jointes,
+  images et PDF de 25 Mo au plus, rejoignent ses documents ; lui demander les autres formats en PDF. Les images
+  intégrées au texte (logo de sa signature, images de notre e-mail cité, logo d'Atomes studio) ne sont pas rangées.
+  Un message n'est rattaché seul que s'il vient de l'adresse du dossier (adresse simple, seule dans l'en-tête From
+  du message) et porte une signature DKIM valable du domaine de cette adresse, contrôlée par le moteur ; c'est le
+  cas des messageries courantes (Gmail, Outlook, Orange, Free, iCloud…). Sinon il attend, avec le badge
+  « À vérifier » (ses pièces jointes y sont listées, « non rangée ») et la raison : adresse différente, ou résultat
+  de la signature DKIM (« Signature DKIM : absente », « échec »…). Si c'est bien le client (par exemple depuis une
+  autre adresse, ou depuis une messagerie sans DKIM), « Rattacher au dossier » : le message devient visible dans son
+  espace (il n'est pas prévenu) et passe « En attente du moteur » ; ses pièces sont rangées et sa réponse
+  enregistrée au passage suivant du moteur (5 minutes, ordinateur allumé). Sinon « Supprimer ». Le faire sans
+  attendre : le moteur ne garde sa copie d'un message à vérifier que 45 jours (au-delà, il relit l'e-mail dans ta
+  boîte de réception, s'il y est encore). Un message qui reste « En attente du moteur » : voir « En dépannage ».
 - **E-mail à renvoyer** : si la confirmation du contrat (« Devis signé ») ou l'accusé de réception d'une
   rétractation n'a pas pu partir (quota d'e-mails atteint, panne de Resend), le dossier s'affiche « E-mail à
   renvoyer » et un bandeau en tête de la fiche propose « Renvoyer ». Ces deux e-mails sont des obligations
@@ -542,21 +521,17 @@ d'un dossier :
   s'ils manquent (dossier créé à la main), Create folder en respectant exactement ces noms en minuscules.
 - **Voir les pièces envoyées par le client** (avec sa demande ou en réponse aux e-mails) : même endroit,
   sous-dossier `client`, ou dans l'espace client avec ton compte agence.
-- **Une réponse du client n'apparaît pas dans le dossier** : dans Resend, **Emails → Receiving** liste les e-mails
-  reçus sur `r.atomes.studio`. S'il n'y est pas, le client a écrit ailleurs (par exemple à contact@atomes.studio :
-  il est alors dans ta messagerie), ou l'enregistrement MX de `r` est à vérifier chez LWS. S'il y est :
-  **Webhooks** → le webhook → le message, pour voir son état. Après correction (par exemple `RESEND_WEBHOOK_SECRET`
-  mal recopié), **Replay** le renvoie. Resend réessaie seul pendant environ un jour, et prévient par e-mail s'il
-  désactive le webhook après des échecs répétés. Un message avec beaucoup de pièces jointes peut être traité en
-  plusieurs fois : les tentatives refusées en « 503 » pendant ce temps sont normales. Au-delà de 30 messages du
-  client (ou 20 messages à vérifier) pour un même dossier en 24 heures, la fonction n'enregistre plus rien : l'e-mail
-  reste lisible dans Resend (Logs : « limite de messages du dossier atteinte »).
 - **Un e-mail d'un client, reçu sur contact@ ou simon@, n'apparaît pas dans le dossier** : `.\moteur etat` (dans
-  le dossier `atomes-moteur`) montre le dernier passage et ses erreurs ; `.\moteur courrier` (essai) dit ce que le
-  moteur décide pour les e-mails récents et pourquoi (par exemple « expéditeur inconnu » : le client a écrit d'une
-  autre adresse sans numéro de dossier dans l'objet ; transférer alors son e-mail n'aide pas, déposer ses pièces
-  depuis l'espace agence). Autres causes : ordinateur éteint (le moteur rattrape au démarrage), e-mail déplacé
-  hors de la boîte de réception par une règle de ta messagerie avant le passage du moteur. Journal :
+  le dossier `atomes-moteur`) montre le dernier passage et ses erreurs ; `.\moteur courrier --depuis AAAA-MM-JJ`
+  (essai, avec la date de l'e-mail : sans `--depuis`, l'essai ne reprend pas les e-mails déjà relevés) dit ce que
+  le moteur décide pour les e-mails reçus depuis ce jour et pourquoi (par exemple « expéditeur inconnu » : le client
+  a écrit d'une autre adresse sans numéro de dossier dans l'objet ; transférer alors son e-mail n'aide pas, déposer
+  ses pièces depuis l'espace agence). Autres causes : ordinateur éteint (le moteur rattrape au démarrage), e-mail
+  déplacé hors de la boîte de réception par une règle de ta messagerie avant le passage du moteur. Au-delà de
+  30 messages du client (ou 20 messages à vérifier) pour un même dossier en 24 heures, le moteur n'enregistre plus
+  rien (journal : « limite de messages sur 24 h atteinte ») : l'e-mail reste dans ta boîte. Un message qui reste
+  « En attente du moteur » : ordinateur éteint, ou erreur (voir `.\moteur etat` et le journal) ; après 10 essais
+  ratés, le moteur le laisse de côté et ses pièces sont à ranger à la main. Journal :
   `%LOCALAPPDATA%\AtomesMoteur\journal\moteur.log`.
 - **Un e-mail légal n'est pas parti** (fiche « E-mail à renvoyer ») : « Renvoyer » dans le bandeau de la fiche. Si
   l'envoi échoue encore (quota de Resend atteint pour la journée), réessayer le lendemain, ou écrire au client
@@ -612,19 +587,19 @@ d'un dossier :
 - Offre gratuite Supabase : un projet inactif pendant 7 jours est mis en pause (l'espace client ne répond
   plus jusqu'à réactivation manuelle). Prévoir l'offre Pro (25 $/mois) quand le site reçoit des demandes,
   ou accepter ce risque au début.
-- Offre gratuite Resend : 3 000 e-mails par mois et 100 par jour, envoyés et reçus confondus, et un seul webhook.
-  Au-delà, offre Pro (20 $/mois). Une fois le quota du jour atteint, plus rien ne part ce jour-là, pas même les
-  codes de connexion à l'espace client : d'où le compte de réception séparé (§ 7, point 3). Surveiller l'usage dans
-  Resend (**Usage**), et regarder la fiche des dossiers « E-mail à renvoyer ».
+- Offre gratuite Resend : 3 000 e-mails par mois et 100 par jour (des envois seulement : depuis le 20 octobre 2026,
+  Resend ne reçoit plus rien). Au-delà, offre Pro (20 $/mois). Une fois le quota du jour atteint, plus rien ne part
+  ce jour-là, pas même les codes de connexion à l'espace client. Surveiller l'usage dans Resend (**Usage**), et
+  regarder la fiche des dossiers « E-mail à renvoyer ».
 - Protections anti-abus de la fonction : champ piège, validation de tous les champs, 10 fichiers et 10 Mo
   maximum, images et PDF uniquement, 3 demandes par adresse e-mail et par jour, 30 demandes par heure au
   total (au-delà, FormSubmit prend le relais). Si des demandes automatisées arrivent malgré tout, l'étape
-  suivante est Cloudflare Turnstile (vérification invisible). Pour les e-mails reçus, la fonction `espace`
-  n'accepte que les envois signés par Resend, adressés à une adresse de dossier valide ; un message d'un autre
-  expéditeur, ou mal authentifié, attend ta vérification. Par dossier et par 24 heures : 30 messages du client et
-  20 messages à vérifier au plus ; un seul e-mail « Message à vérifier » par heure ; 200 Mo de pièces jointes du
-  client par dossier en tout (au-delà, « non rangée »). Ces limites évitent qu'un afflux d'e-mails remplisse la
-  base et le stockage, mais chaque e-mail reçu compte quand même dans le quota de Resend.
+  suivante est Cloudflare Turnstile (vérification invisible). Pour les e-mails reçus, le moteur de l'agence ne
+  range que ceux qui concernent un dossier (son numéro dans l'objet, ou l'adresse d'un client) ; un message d'un
+  autre expéditeur, ou sans signature DKIM valable, attend ta vérification. Par dossier et par 24 heures :
+  30 messages du client et 20 messages à vérifier au plus ; 200 Mo de pièces jointes du client par dossier en tout
+  (au-delà, elles ne sont plus rangées : elles restent dans l'e-mail, dans ta boîte). Ces limites évitent qu'un
+  afflux d'e-mails remplisse la base et le stockage.
 - Ne jamais activer le CAPTCHA de Supabase (Authentication → Attack Protection) sans la modification du site qui va
   avec : la demande de code serait refusée et plus personne ne pourrait se connecter, toi compris.
 - Un e-mail « Votre code de connexion » reçu à contact@ sans l'avoir demandé veut dire que quelqu'un a tapé cette
@@ -635,10 +610,11 @@ d'un dossier :
   `%LOCALAPPDATA%\AtomesMoteur\en-attente`) jusqu'à leur traitement, 45 jours au plus. À mentionner aussi dans les
   mentions légales (traitement des e-mails reçus).
 - Données : Supabase les héberge en Europe (région choisie à l'étape 1). Resend envoie depuis l'Irlande
-  (eu-west-1), mais garde ses journaux et les métadonnées des e-mails aux États-Unis, et conserve les e-mails,
-  réponses des clients comprises, 30 jours. Pour le RGPD : mentionner dans les mentions légales l'espace client,
-  les e-mails échangés (Resend), la durée de conservation et, pour la signature du devis et la rétractation, la
-  conservation de l'adresse IP et du navigateur (preuve) ; supprimer les dossiers à la demande (Table Editor, la
+  (eu-west-1), mais garde ses journaux et les métadonnées des e-mails aux États-Unis, et conserve les e-mails
+  envoyés 30 jours (les réponses des clients n'y passent plus depuis le 20 octobre 2026 : elles arrivent dans ta
+  messagerie, chez LWS). Pour le RGPD : mentionner dans les mentions légales l'espace client, les e-mails envoyés
+  (Resend), la durée de conservation et, pour la signature du devis et la rétractation, la conservation de
+  l'adresse IP et du navigateur (preuve) ; supprimer les dossiers à la demande (Table Editor, la
   suppression du projet supprime sa timeline, ses questions, ses messages, ses demandes de modification et son
   archive ; les fichiers sont à supprimer dans Storage, et le compte dans Authentication → Users).
 - Les sauvegardes quotidiennes de la base sont incluses dans l'offre Pro. En gratuit, exporter de temps en
