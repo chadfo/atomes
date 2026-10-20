@@ -184,8 +184,11 @@ libellé français (voir `champs()`), plus `_template=table`, `_captcha=false`.
 
 GitHub Pages fait garder chaque fichier 10 minutes par les navigateurs. Quand une page change de structure et
 que son script ou la feuille de style changent avec elle, versionner leur adresse dans la page
-(`site.css?v=3`, `dossier.js?v=3`…) et augmenter le numéro à la modification suivante du même genre : sinon,
-pendant ces 10 minutes, un visiteur peut recevoir la nouvelle page avec l'ancien script.
+(`site.css?v=3`, `dossier.js?v=5`…) et augmenter le numéro à la modification suivante du même genre : sinon,
+pendant ces 10 minutes, un visiteur peut recevoir la nouvelle page avec l'ancien script. Le numéro ne protège que
+dans ce sens : GitHub Pages ignore `?v=` et sert toujours le fichier à jour. Une ancienne page encore en cache qui
+redemande son script reçoit donc le nouveau (visiteur qui a rechargé la page peu avant la publication) et peut
+rester sur « Chargement… » jusqu'à un rechargement.
 
 ## Publication
 
@@ -220,7 +223,7 @@ adresses de dossier (`r.atomes.studio`), le temps de la transition.
   règles de sécurité (un client ne voit que ses dossiers, l'agence voit tout) ; bucket privé `dossiers`
   (`<id>/client/` pièces du client, `<id>/agence/` documents fournis par l'agence).
 - `supabase/functions/demande/index.ts` : fonction appelée par le formulaire de devis (devis.html). Crée le dossier, dépose les
-  pièces, crée ou rattache le compte client (connexion par lien e-mail), envoie l'accusé de réception au
+  pièces, crée ou rattache le compte client (connexion par code reçu par e-mail), envoie l'accusé de réception au
   client (avec la timeline ; réponse à contact@) et la notification à l'agence (même objet
   `Nouveau projet — …` qu'avant) via Resend.
 - `supabase/migrations/0004_parcours_client.sql` : parcours v2. 11 étapes (`modele_etapes`) : Demande reçue ·
@@ -284,8 +287,9 @@ adresses de dossier (`r.atomes.studio`), le temps de la transition.
 - `site/assets/js/config.js` : URL Supabase, clé anon, URL des fonctions `demande` (`apiUrl`) et `espace`
   (`espaceUrl`, aussi pour la page d'action). Vide = le formulaire de devis envoie via FormSubmit comme avant ;
   rempli = fonction « demande », FormSubmit en secours si elle ne répond pas.
-- `site/dossier/` + `assets/js/dossier.js` : consultation seule. Connexion sans mot de passe, liste des dossiers,
-  timeline numérotée et datée (« Depuis le … » pour l'étape en cours), sous l'étape en cours une information
+- `site/dossier/` + `assets/js/dossier.js` : consultation seule. Connexion sans mot de passe, par code reçu par
+  e-mail (voir « Connexion par code » plus bas), liste des dossiers, timeline numérotée et datée (« Depuis le … »
+  pour l'étape en cours), sous l'étape en cours une information
   (questions posées par e-mail, devis à signer depuis le lien reçu, montant, référence et coordonnées du virement,
   documents à valider, rétractation), échanges (questions et réponses, messages du client, demandes de
   modification), documents de l'agence et du client, récapitulatif de la demande. Aucune action, sauf le lien
@@ -299,8 +303,9 @@ adresses de dossier (`r.atomes.studio`), le temps de la transition.
   documents, renoncer au contrat. Le jeton est lu dans le fragment puis effacé de la barre d'adresse ; rien ne se
   fait sans clic. `noindex`, sans `Referer`. **Mode démo : `action/?demo=signer`** (particulier), ou
   `?demo=signer-pro`, `valider`, `renoncer` ; ses textes juridiques sont une copie de ceux de la fonction.
-- `site/admin/` + `assets/js/admin.js` : espace agence (compte inscrit dans `admins`). Liste filtrable (en
-  cours, à traiter, clos), fiche : étapes (« Passer ici »), option de suivi, note pour le client, questions (et
+- `site/admin/` + `assets/js/admin.js` : espace agence (compte inscrit dans `admins`, même connexion par code que
+  l'espace client). Liste filtrable (en cours, à traiter, clos), fiche : étapes (« Passer ici »), option de suivi,
+  note pour le client, questions (et
   retrait d'une question sans réponse), messages du client (« À vérifier » : rattacher au dossier ou supprimer ;
   messages du moteur : « En attente du moteur », signature DKIM),
   envoi du devis (un fichier par version, `<id>/agence/devis-<id>-<AAMMJJHHMMSS>.pdf`, jamais écrasé ; montant,
@@ -308,10 +313,36 @@ adresses de dossier (`r.atomes.studio`), le temps de la transition.
   demande de validation, modifications demandées. Chaque opération reste attachée au dossier ouvert au moment
   du clic, même si une autre fiche est ouverte pendant l'envoi.
   **Mode démo : `admin/?demo`**.
+- **Connexion par code** (19 octobre 2026, décision de Simon), espace client et espace agence : étape 1, l'adresse,
+  `signInWithOtp({ email, options: { emailRedirectTo, shouldCreateUser: false } })`, et Supabase envoie un code à usage
+  unique (modèle « Magic link » = `emails/supabase-magic-link.html`, avec seulement `{{ .Token }}`, aucun lien) ;
+  étape 2, le code saisi sur la page (espaces et tirets retirés, 6 à 10 chiffres acceptés),
+  `verifyOtp({ email, token, type: 'email' })`, puis la suite habituelle (SIGNED_IN). Réglages Supabase : « Email OTP
+  Length » = 8, « Email OTP Expiration » = 3600 ; un seul code valable à la fois (une nouvelle demande annule le
+  précédent). Même affichage dans la page qu'une adresse ait un compte ou non, sauf dans un cas de « J'ai déjà un
+  code » (plus bas) : à l'étape 1, l'envoi, une adresse inconnue (422) et un code redemandé moins d'une minute après le précédent
+  (429 « For security purposes… », le précédent reste valable) mènent à la même étape 2 ; « Recevoir un nouveau code »
+  moins d'une minute après le dernier envoi fait par la page répond « patientez une minute » sans appeler Supabase,
+  pour toute adresse. L'API de Supabase, elle, distingue une adresse inconnue (422 contre 200, visible dans les outils
+  du navigateur). Erreurs classées par `classer()`, dupliquée dans les deux pages. Étape 2 gardée dans
+  `sessionStorage` (`atomes-connexion-dossier`, `atomes-connexion-admin` : adresse et heure de l'envoi, une heure au
+  plus), pour l'onglet rechargé au retour de la messagerie ; oubliée à la connexion, à « Modifier l'adresse » et à la
+  déconnexion, qui vide aussi l'adresse. « J'ai déjà un code » (étape 1), pour un code reçu quand l'étape 2 n'est pas
+  dans l'onglet (navigateur intégré d'une messagerie refermé, autre onglet ou appareil) : étape 2 pour l'adresse
+  saisie, sans aucun appel ni rien de mémorisé (un rechargement ramène à l'étape 1). Si la page vient d'envoyer un
+  code à cette adresse (même onglet, casse ignorée), elle garde en mémoire l'heure de l'envoi et tient la minute comme
+  d'habitude. Sinon (autre onglet ou appareil, onglet rechargé), « Recevoir un nouveau code » appelle Supabase
+  aussitôt, et un compte s'y distingue d'une adresse inconnue (429 « For security purposes… » : « patientez une
+  minute » ; 422 : notice « nouveau code »). Jamais le code dans une URL, un stockage, un attribut ou un journal. Ancien lien direct (`#connexion=<jeton>`, e-mails
+  envoyés depuis le 19 octobre au soir, avant la connexion par code) : fragment retiré avant la création du client
+  Supabase (`dossier/` garde `dossier=<id>` en `#<id>`), jeton jamais vérifié, message sur la page de connexion.
+  `emailRedirectTo` reste pour un ancien modèle à lien (`#access_token`, traité par supabase-js). Aucun lien ni code
+  d'accès dans les e-mails des fonctions (lien simple vers `/dossier/`).
+  Démo : après « Se déconnecter », tout code bien formé reconnecte.
 - Un champ caché anti-robots (`_honey`) est présent dans les deux formulaires (devis et Contact). La page
   Contact ne charge pas config.js : elle envoie par FormSubmit dans tous les cas.
 - `emails/` : la signature commune à tous les e-mails de l'agence (`signature.html`, à coller aussi dans le
-  webmail) et le modèle Supabase du lien de connexion (`supabase-magic-link.html`). La fonction `demande`
+  webmail) et le modèle Supabase du code de connexion (`supabase-magic-link.html`). La fonction `demande`
   embarque la même signature. Logo : `site/images/logo-signature.gif` (animation du logo d’après `<atom-logo>`, 120 px, boucle de 10 s, encre sombre sur fond blanc) ; `logo-signature.png` en est la version fixe et `logo-mail.png` l’ancien badge, à supprimer quand plus aucun e-mail envoyé n’y fait référence.
 
 ## Suite prévue

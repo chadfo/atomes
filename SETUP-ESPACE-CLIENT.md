@@ -8,7 +8,7 @@ ouvre un espace client et envoie les e-mails. Compter une heure, en suivant les 
 | Besoin | Outil | Pourquoi |
 |---|---|---|
 | Base de données (dossiers, timeline) | Supabase (Postgres) | Hébergé en Europe, règles de sécurité par ligne, gratuit pour démarrer |
-| Comptes clients | Supabase Auth, connexion par lien e-mail | Pas de mot de passe à gérer, un client = une adresse e-mail |
+| Comptes clients | Supabase Auth, connexion par code reçu par e-mail | Pas de mot de passe à gérer, un client = une adresse e-mail |
 | Fichiers (pièces du client, documents de l'agence) | Supabase Storage, bucket privé `dossiers` | Un dossier par projet, liens de téléchargement temporaires, 1 Go gratuit puis 100 Go (offre Pro) |
 | Réception du formulaire | Supabase Edge Function `demande` | Code serveur sans serveur à maintenir |
 | Suivi du dossier (e-mails au client, signature, réponses) | Supabase Edge Function `espace` | Même principe ; reçoit aussi les réponses des clients |
@@ -45,12 +45,12 @@ de dossier.
    grant usage, select on all sequences in schema public to authenticated, service_role;
    ```
 3. **Authentication → Sign In / Providers → Email** : laisser le provider Email activé (c'est lui qui
-   envoie les liens de connexion). Laisser « Confirm email » tel quel : les comptes sont créés déjà
+   envoie les codes de connexion). Laisser « Confirm email » tel quel : les comptes sont créés déjà
    confirmés par la fonction.
 4. **Authentication → Sign In / Providers → User Signups** (ou « Settings ») : **désactiver « Allow new
    users to sign up »**. Important : sinon n'importe qui pourrait créer un compte avec l'adresse e-mail
    d'un futur client et récupérer son dossier. Les comptes sont créés uniquement par la fonction
-   `demande` (ou par toi, voir § 5), et les clients existants continuent de recevoir leurs liens.
+   `demande` (ou par toi, voir § 5), et les clients existants continuent de recevoir leurs codes.
 5. **Authentication → URL Configuration** : Site URL = `https://atomes.studio` ; Redirect URLs : ajouter
    `https://atomes.studio/dossier/` et `http://localhost:3000/dossier/`.
 6. Le modèle de l'e-mail de connexion se personnalise seulement après l'étape 2.4 (Supabase bloque les
@@ -77,14 +77,15 @@ de dossier.
    « Sending access » ne sait qu'envoyer). Noter la clé (`re_…`).
 4. Dans Supabase, **Authentication → Emails → onglet SMTP Settings** : activer Custom SMTP avec
    host `smtp.resend.com`, port `465`, user `resend`, password = la clé API, sender `contact@atomes.studio`,
-   sender name `Atomes studio`. Indispensable : sans SMTP personnalisé, Supabase n'envoie les liens de
+   sender name `Atomes studio`. Indispensable : sans SMTP personnalisé, Supabase n'envoie les codes de
    connexion qu'aux membres de ton équipe Supabase, et deux par heure. Les clients ne recevraient rien.
-5. Maintenant que le SMTP est configuré, **Authentication → Emails → Templates → Magic link or OTP** :
-   objet `Votre lien de connexion — Atomes studio` ; corps : onglet **Source**, tout effacer, coller le
+5. Maintenant que le SMTP est configuré, **Authentication → Emails → Templates → Magic link** :
+   objet `Votre code de connexion — Atomes studio` ; corps : onglet **Source**, tout effacer, coller le
    contenu de `emails/supabase-magic-link.html` (même mise en page et même signature que les e-mails de la
-   fonction `demande`), puis « Save changes ». Le logo de la signature est
-   `https://atomes.studio/images/logo-signature.gif` : il s'affiche dès que le site est publié avec le dossier
-   `images/` à jour.
+   fonction `demande` ; l'e-mail ne contient que le code, aucun lien de connexion), puis « Save changes ». Le logo
+   de la signature est `https://atomes.studio/images/logo-signature.gif` : il s'affiche dès que le site est publié
+   avec le dossier `images/` à jour. Vérifier aussi, dans **Authentication → Sign In / Providers → Email**,
+   « Email OTP Length » = **8** et « Email OTP Expiration » = **3600** (une heure, comme le dit l'e-mail).
 
 La réception des réponses des clients (sous-domaine `r.atomes.studio`) se règle plus loin, au § 7.
 
@@ -144,7 +145,7 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
    l'étape 5.1 n'existe pas : le créer, puis relancer l'insert. Tu vois alors tous les dossiers dans
    l'espace client, avec tous les documents.
 3. Ouvrir `https://atomes.studio/dossier/` (ou localhost:3000/dossier/), entrer contact@atomes.studio,
-   cliquer sur le lien reçu.
+   puis le code reçu par e-mail.
 
 ## 6. Tester
 
@@ -159,7 +160,54 @@ L'espace client refuse les adresses inconnues : ton compte doit être créé dep
 
 ## Mises à jour à appliquer
 
+### Connexion par code (19 octobre 2026)
+
+Pour entrer dans l'espace client (https://atomes.studio/dossier/) comme dans l'espace agence (/admin/), on tape son
+adresse, puis le code reçu par e-mail (8 chiffres, valable une heure, une seule fois) : plus aucun lien de connexion.
+Les e-mails automatiques (fonctions `espace` et `demande`) gardent le simple lien « Suivre mon dossier en ligne », qui
+mène à cette page : un e-mail transféré (banque, notaire, entreprise) ne donne accès à rien. Cette mise à jour remplace
+le lien direct, publié le 19 octobre au soir puis abandonné : ne pas appliquer ses réglages ; si tu l'as fait, ils sont
+défaits ici. Dans la même séance, dans cet ordre :
+
+1. **Supabase → Authentication → Sign In / Providers → Email** : « Email OTP Expiration » = **3600**, enregistrer ;
+   puis « Email OTP Length » = **8**, enregistrer. Cet ordre, pour qu'un code court ne soit jamais valable 24 heures,
+   même un instant. Si ces valeurs y sont déjà, rien à changer.
+2. **Redéployer la fonction `espace`** (§ 7, point 1), puis **la fonction `demande`** (§ 3) : même copier-coller que
+   d'habitude. Ce redéploiement couvre aussi les étapes 2 et 3 du moteur (sous-section suivante).
+3. Avant de publier, ouvrir **Authentication → Emails → Templates → Magic link**, onglet **Source**. S'il contient
+   `#connexion=` (modèle du lien direct), personne ne pourra se connecter entre la publication et l'étape 4 : faire
+   alors l'étape 4 dès le vert de l'onglet Actions et la vérification en fenêtre privée, sans attendre les dix
+   minutes. S'il contient `ConfirmationURL`, garder l'attente : son lien fonctionne avec les anciennes comme avec les
+   nouvelles pages. Puis **publier le site** (VS Code → Sync Changes), attendre le vert dans l'onglet Actions de
+   GitHub, puis une dizaine de minutes (dans ce délai, une page restée sur « Chargement… » se répare en la
+   rechargeant). Ouvrir https://atomes.studio/dossier/ en fenêtre privée : le bouton doit dire « Recevoir mon code de
+   connexion ».
+4. **Seulement alors**, **Authentication → Emails → Templates → Magic link** : objet `Votre code de connexion — Atomes
+   studio`, corps = contenu de `emails/supabase-magic-link.html` (onglet **Source**, tout remplacer), « Save changes ».
+   Jamais avant l'étape 3 : les pages encore en ligne attendraient un lien, et personne ne pourrait se connecter, toi
+   compris.
+5. **Tester**, en fenêtre privée : ouvrir https://atomes.studio/admin/, entrer contact@atomes.studio, « Recevoir mon
+   code de connexion ». Aussitôt, sans attendre l'e-mail, cliquer « Recevoir un nouveau code » : la page demande de
+   patienter une minute. Quand l'e-mail arrive, taper d'abord un faux code de 8 chiffres : il est refusé. Puis taper
+   le code reçu : l'espace agence s'affiche. Si l'e-mail contient un bouton ou un lien au lieu d'un code, le modèle
+   de l'étape 4 n'est pas enregistré : le recoller. (Si un second e-mail arrive quand même, seul son code est
+   valable.)
+
+Inchangés : les Redirect URLs (laisser celles déjà ajoutées) et le suivi des clics de Resend (Click Tracking),
+désactivé : le garder ainsi.
+
+Pendant la transition, un client qui ouvre le lien d'un e-mail envoyé depuis le 19 octobre au soir, avant cette mise
+à jour (adresse en `#connexion=…`), arrive sur la page de connexion, avec un message qui lui demande son adresse, et
+se connecte par code, une fois l'étape 4 faite.
+
 ### Moteur de l'agence (19 octobre 2026)
+
+Ses étapes 2 à 4 sont faites par la sous-section « Connexion par code » ci-dessus (même redéploiement, même
+publication). Si le moteur tourne déjà sur ton ordinateur (`.\moteur etat` : tâche planifiée installée, passage
+récent), rien d'autre à faire ici. Sinon, faire son étape 1 (jusqu'au premier passage réel, § 8, point 4) avant
+« Connexion par code », puis son étape 5 ; si « Connexion par code » est déjà faite, lancer au § 8, point 4,
+`.\moteur courrier --ecrire --depuis AAAA-MM-JJ` avec la date du redéploiement de `espace`, pour ranger les
+réponses reçues entre-temps.
 
 Les clients écrivent désormais à contact@atomes.studio ou à simon@atomes.studio : contact@ devient l'adresse de
 réponse de tous les e-mails, et le moteur de l'agence, sur ton ordinateur, range dans les dossiers les e-mails des
@@ -286,7 +334,7 @@ plus qu'à consulter. La fonction reçoit aussi les actions de l'espace agence.
    et gratuit lui aussi, plutôt que dans le compte des envois. Chez Resend, chaque e-mail reçu compte dans le quota
    du compte (100 par jour en gratuit, envois compris), et n'importe qui peut écrire à n'importe quelle adresse en
    `@r.atomes.studio` : des e-mails reçus en nombre bloqueraient sinon tous les envois de la journée (devis,
-   confirmations, liens de connexion à l'espace client). Avec un second compte, les points 3.1 à 3.4 et le webhook
+   confirmations, codes de connexion à l'espace client). Avec un second compte, les points 3.1 à 3.4 et le webhook
    du point 4 se font dans ce compte-là, et sa clé API (**Full access**) va dans le secret `RESEND_RECEPTION_KEY`
    (point 2). Autre solution : l'offre Pro de Resend pour un seul compte.
    1. **Domains → Add Domain** : `r.atomes.studio`, région **eu-west-1 (Irlande)**, comme au § 2.
@@ -394,7 +442,9 @@ Règles :
 
 ## Au quotidien : l'espace agence (https://atomes.studio/admin/)
 
-Connexion avec ton compte agence (§ 5), par lien e-mail. La liste montre les dossiers en cours ; le filtre
+Connexion avec ton compte agence (§ 5), par code reçu par e-mail. Si la page ne propose plus de saisir le code reçu
+(rouverte ailleurs : autre onglet, autre appareil), entrer l'adresse puis « J'ai déjà un code » : en redemander un
+annulerait le premier (même bouton pour les clients, sur /dossier/). La liste montre les dossiers en cours ; le filtre
 « À traiter » ne garde que ceux où c'est à toi d'agir. Le client n'agit plus dans son espace : chaque étape
 importante lui est annoncée par e-mail, avec la timeline de son dossier, et il répond à l'e-mail. Dans la fiche
 d'un dossier :
@@ -564,7 +614,7 @@ d'un dossier :
   ou accepter ce risque au début.
 - Offre gratuite Resend : 3 000 e-mails par mois et 100 par jour, envoyés et reçus confondus, et un seul webhook.
   Au-delà, offre Pro (20 $/mois). Une fois le quota du jour atteint, plus rien ne part ce jour-là, pas même les
-  liens de connexion à l'espace client : d'où le compte de réception séparé (§ 7, point 3). Surveiller l'usage dans
+  codes de connexion à l'espace client : d'où le compte de réception séparé (§ 7, point 3). Surveiller l'usage dans
   Resend (**Usage**), et regarder la fiche des dossiers « E-mail à renvoyer ».
 - Protections anti-abus de la fonction : champ piège, validation de tous les champs, 10 fichiers et 10 Mo
   maximum, images et PDF uniquement, 3 demandes par adresse e-mail et par jour, 30 demandes par heure au
@@ -575,6 +625,11 @@ d'un dossier :
   20 messages à vérifier au plus ; un seul e-mail « Message à vérifier » par heure ; 200 Mo de pièces jointes du
   client par dossier en tout (au-delà, « non rangée »). Ces limites évitent qu'un afflux d'e-mails remplisse la
   base et le stockage, mais chaque e-mail reçu compte quand même dans le quota de Resend.
+- Ne jamais activer le CAPTCHA de Supabase (Authentication → Attack Protection) sans la modification du site qui va
+  avec : la demande de code serait refusée et plus personne ne pourrait se connecter, toi compris.
+- Un e-mail « Votre code de connexion » reçu à contact@ sans l'avoir demandé veut dire que quelqu'un a tapé cette
+  adresse sur la page de connexion : ne transmets ce code à personne ; si cela se répète, regarde Authentication → Logs
+  dans Supabase.
 - Moteur de l'agence : il lit tes boîtes contact@ et simon@ sur ton ordinateur et n'en copie dans Supabase que les
   e-mails des clients (texte et pièces jointes). Les e-mails « à vérifier » gardent une copie locale (dossier
   `%LOCALAPPDATA%\AtomesMoteur\en-attente`) jusqu'à leur traitement, 45 jours au plus. À mentionner aussi dans les

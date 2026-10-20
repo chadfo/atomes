@@ -37,7 +37,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SB_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 // Lecture des e-mails reçus : clé du compte (ou de l'équipe) Resend réservé à la réception, pour que des e-mails reçus
-// en nombre n'épuisent pas le quota des envois (devis, confirmations, liens de connexion) ; à défaut, la clé d'envoi.
+// en nombre n'épuisent pas le quota des envois (devis, confirmations, codes de connexion) ; à défaut, la clé d'envoi.
 const RESEND_RECEPTION_KEY = (Deno.env.get("RESEND_RECEPTION_KEY") ?? "").trim() || RESEND_KEY;
 const JETON_SECRET = secretJetons(Deno.env.get("JETON_SECRET") ?? "");
 const RESEND_WEBHOOK_SECRET = (Deno.env.get("RESEND_WEBHOOK_SECRET") ?? "").trim();

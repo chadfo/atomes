@@ -1,14 +1,27 @@
-// Espace agence — connexion par lien e-mail (compte inscrit dans la table admins), liste des dossiers, fiche d'un dossier :
-// avancement (étapes, option de suivi administratif, note pour le client), messages du client (réponses reçues par e-mail ;
-// un message « à vérifier » est rattaché au dossier ou supprimé), questions au client, envoi du devis (le client le reçoit
-// par e-mail et le signe depuis un lien), signature, démarrage anticipé et rétractation, virement reçu, documents de
-// l'agence, pièces du client, modifications demandées.
+// Espace agence — connexion par code reçu par e-mail (compte inscrit dans la table admins), liste des dossiers, fiche
+// d'un dossier : avancement (étapes, option de suivi administratif, note pour le client), messages du client (réponses
+// reçues par e-mail ; un message « à vérifier » est rattaché au dossier ou supprimé), questions au client, envoi du devis
+// (le client le reçoit par e-mail et le signe depuis un lien), signature, démarrage anticipé et rétractation, virement
+// reçu, documents de l'agence, pièces du client, modifications demandées.
 // Les actions qui préviennent le client ou touchent aux messages passent par la fonction « espace » ; dépôts et notes
 // passent directement par Supabase (règles RLS de l'agence). Chaque opération est attachée au dossier ouvert au moment du
 // clic : changer de fiche pendant un envoi ne la détourne pas vers un autre dossier. Mode démo sans backend : admin/?demo
 (() => {
   const cfg = window.ATOMES_CONFIG || {};
   const demo = new URLSearchParams(location.search).has('demo');
+
+  // ---------- Ancien lien direct (#connexion=<jeton>) : retiré de l'adresse avant toute autre chose ----------
+  // Lien de connexion (lien direct) des e-mails envoyés à partir du soir du 19 octobre 2026, jusqu'à la mise en ligne
+  // de la connexion par code : le jeton n'est ni vérifié ni envoyé nulle part ; tout le fragment quitte la barre
+  // d'adresse avant la création du client Supabase et tout appel réseau. Vrai si l'adresse portait un tel lien.
+  const retirerAncienLien = () => {
+    const h = location.hash.replace(/^#/, '');
+    if (!/(^|&)connexion=/.test(h)) return false;
+    history.replaceState(null, '', location.pathname + location.search);
+    return true;
+  };
+  let ancienLien = retirerAncienLien();   // message sous l'adresse au premier affichage de la connexion
+
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
   const vues = {};
@@ -41,7 +54,12 @@
     const lireDossiers = (requete) => requete(SELECTION).catch((e) => { if (sansMessages(e)) return requete(SELECTION.replace(', messages(*)', '')); throw e; });
     return {
       surChangement: (fn) => sb.auth.onAuthStateChange((evt, session) => fn(session, evt)),
+      // Code de connexion envoyé par e-mail (modèle « Magic link ») ; emailRedirectTo ne sert qu'à un ancien modèle à lien
+      // (#access_token=…, traité par supabase-js), le temps de la transition.
       connexion: (email) => sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname.replace(/index\.html$/, ''), shouldCreateUser: false } }).then(ok),
+      // Code saisi (POST /auth/v1/verify) : session enregistrée par supabase-js, puis événement SIGNED_IN.
+      verifierCode: (email, code) => sb.auth.verifyOtp({ email, token: code, type: 'email' }).then(ok)
+        .then((d) => { if (!d || !d.session) throw new Error('session absente'); return d; }),
       deconnexion: () => sb.auth.signOut(),
       estAdmin: (uid) => sb.from('admins').select('user_id').eq('user_id', uid).maybeSingle().then(ok).then((d) => !!d),
       dossiers: () => lireDossiers((s) => sb.from('projets').select(s).order('cree_le', { ascending: false }).then(ok)),
@@ -155,7 +173,8 @@
         client: piecesRangees(d).concat([{ nom: '01-photos.jpg', chemin: 'demo', taille: 2411520, date: d.cree_le }])
       };
     });
-    let session = { user: { id: 'admin', email: 'contact@atomes.studio' } }, ecouteur = null;
+    const compteDemo = { user: { id: 'admin', email: 'contact@atomes.studio' } };
+    let session = compteDemo, ecouteur = null;
     const trouver = (id) => dossiers.find((d) => d.id === id);
     const refus = (message, statut) => { const e = new Error(message); e.statut = statut || 400; return e; };
     const actions = {
@@ -222,6 +241,8 @@
     return {
       surChangement: (fn) => { ecouteur = fn; setTimeout(() => fn(session), 0); },
       connexion: () => Promise.resolve(),
+      // Après « Se déconnecter » : tout code bien formé rouvre la session de démo, comme une vraie connexion.
+      verifierCode: () => new Promise((res) => setTimeout(() => { session = compteDemo; ecouteur(session, 'SIGNED_IN'); res({ session }); }, 300)),
       deconnexion: () => { session = null; ecouteur(null); return Promise.resolve(); },
       estAdmin: () => Promise.resolve(true),
       dossiers: () => Promise.resolve(JSON.parse(JSON.stringify(dossiers))),
@@ -263,24 +284,216 @@
   } catch (ex) { api = null; }
   if (!api) { montrer('config'); return; }
 
-  // ---------- Connexion ----------
-  $('[data-form-connexion]').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const email = $('#a-email').value.trim();
+  // ---------- Connexion par code ----------
+  // Comme l'espace client (dossier.js) : étape 1, l'adresse ; Supabase envoie un code à usage unique (modèle « Magic
+  // link », sans lien), sauf avec « J'ai déjà un code » (aucun envoi). Étape 2 : le code, vérifié ici ; la session
+  // ouverte, l'événement SIGNED_IN affiche l'espace (« Session », plus bas). Même affichage dans la page qu'un compte
+  // existe ou non (clients compris) : à l'étape 1, l'envoi, une adresse inconnue (422) et un code redemandé moins d'une
+  // minute après le précédent (429, le précédent reste valable) mènent à la même étape 2 ; « Recevoir un nouveau code »
+  // moins d'une minute après le dernier envoi fait d'ici répond « patientez une minute » sans appeler Supabase, pour
+  // toute adresse, y compris après « J'ai déjà un code » pour cette même adresse. Exception : « J'ai déjà un code »
+  // sans envoi récent d'ici (autre onglet ou appareil, onglet rechargé) ; « Recevoir un nouveau code » appelle alors
+  // Supabase aussitôt, et un compte (429 : « patientez une minute ») s'y distingue d'une adresse inconnue (422 :
+  // notice « nouveau code »). L'API de Supabase, elle, distingue toujours une adresse inconnue (422 contre 200,
+  // visible dans les outils du navigateur). Le code ne part que dans le corps de la vérification : jamais dans une
+  // URL, un stockage, un attribut ni un journal.
+  const formConnexion = $('[data-form-connexion]');
+  const formCode = $('[data-form-code]');
+  const champEmail = $('#a-email');
+  const champCode = $('#a-code');
+  const zoneCode = $('[data-code-envoye]');
+  const EMAIL_OK = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  const ANCIEN_LIEN = 'La connexion se fait désormais par un code reçu par e-mail : entrez votre adresse ci-dessus.';
+  // Erreurs de la demande de code : sous l'adresse (étape 1), sous le code (« Recevoir un nouveau code »)
+  const ERR_DEMANDE = {
+    limite: 'Trop de demandes de code : patientez quelques minutes.',
+    envoi: 'Impossible d’envoyer le code pour le moment.',
+    autre: 'Impossible d’envoyer le code pour le moment.',
+    frequence: 'Un code vient d’être envoyé : patientez une minute avant d’en demander un nouveau.'
+  };
+  // Erreurs du code, sous le code
+  const ERR_CODE = {
+    vide: 'Entrez le code reçu par e-mail.',
+    format: 'Code invalide : recopiez les chiffres du code reçu par e-mail.',
+    code: 'Code incorrect ou expiré. Vérifiez le code reçu, ou demandez-en un nouveau.',
+    limite: 'Trop de tentatives en peu de temps. Patientez quelques minutes avant de réessayer.',
+    autre: 'Connexion impossible pour le moment. Réessayez dans quelques minutes.'
+  };
+  // Notices de l'étape 2 (texte simple), avant et après l'adresse : code envoyé, nouveau code envoyé, ou « J'ai déjà un
+  // code » (rien d'envoyé d'ici)
+  const NOTICE = {
+    envoi: ['Si un compte est associé à ', ', un code de connexion vient de lui être envoyé. Saisissez-le ci-dessous : il est valable une heure et ne sert qu’une fois.'],
+    nouveau: ['Si un compte est associé à ', ', un nouveau code vient de lui être envoyé : utilisez ce dernier code, le précédent ne fonctionne plus.'],
+    deja: ['Saisissez ci-dessous le dernier code de connexion reçu par e-mail à l’adresse ', ' : un code est valable une heure et ne sert qu’une fois.']
+  };
+  // Classe d'une erreur de Supabase Auth (status, code, message), règles prises dans cet ordre (même règle dans
+  // dossier.js) : « inconnu », adresse sans compte ; « frequence », code redemandé moins d'une minute après le précédent
+  // (« For security purposes, you can only request this after N seconds. ») ; « limite », autres limites d'envoi ou de
+  // requêtes ; « code », code refusé (vérification) ; « envoi », e-mail non parti (demande) ; « autre » : 5xx, réseau…
+  const classer = (ex, verification) => {
+    const statut = (ex && ex.status) || 0, code = String((ex && ex.code) || ''), msg = String((ex && ex.message) || '');
+    if (code === 'otp_disabled' || /signups? not allowed|user not found/i.test(msg)) return 'inconnu';
+    if (statut === 429 && /for security purposes|after \d+ seconds?/i.test(msg)) return 'frequence';
+    if (statut === 429 || code === 'over_email_send_rate_limit' || code === 'over_request_rate_limit' || /rate limit|too many/i.test(msg)) return 'limite';
+    if (verification && (statut === 403 || code === 'otp_expired' || (statut >= 400 && statut < 500))) return 'code';
+    if (!verification && /sending|smtp/i.test(msg)) return 'envoi';
+    return 'autre';
+  };
+
+  // État de l'étape 2 gardé dans l'onglet (sessionStorage), pour l'onglet rechargé au retour de l'application de
+  // messagerie : adresse et heure de l'envoi, une heure au plus (durée du code). Stockage bloqué : la page marche sans.
+  const CLE_CONNEXION = 'atomes-connexion-admin';
+  const oublierConnexion = () => { try { sessionStorage.removeItem(CLE_CONNEXION); } catch (ex) { /* stockage bloqué */ } };
+  const garderConnexion = (email, le) => { try { sessionStorage.setItem(CLE_CONNEXION, JSON.stringify({ email, le })); } catch (ex) { /* stockage bloqué */ } };
+  const lireConnexion = () => {
+    let e = null;
+    try { e = JSON.parse(sessionStorage.getItem(CLE_CONNEXION) || 'null'); } catch (ex) { e = null; }
+    const age = e ? Date.now() - e.le : NaN;
+    if (e && typeof e.email === 'string' && EMAIL_OK.test(e.email) && typeof e.le === 'number' && age >= 0 && age < 3600000) return e;
+    oublierConnexion();   // plus d'une heure, ou illisible
+    return null;
+  };
+
+  let emailCode = '';       // adresse à laquelle le code a été demandé (étape 2)
+  let leCode = 0;           // heure du dernier envoi (étape 2)
+  let dernier = { email: '', le: 0 };   // dernier code demandé d'ici : adresse et heure (mémoire seulement)
+  let occupe = false;       // demande ou vérification en cours : rien d'autre n'est envoyé avant sa réponse
+  let tour = 0;             // change à chaque changement d'étape : une réponse arrivée ensuite n'affiche plus rien
+  let sessionLue = false;   // premier événement de session reçu (« Session », plus bas)
+
+  // Message sous l'adresse ; invalide : champ signalé (aria-invalid)
+  const erreurAdresse = (msg, invalide) => {
     const err = $('#a-err');
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { err.textContent = 'Adresse email invalide'; err.hidden = false; return; }
-    err.hidden = true;
-    const btn = $('[data-btn-connexion]');
-    btn.disabled = true; btn.textContent = 'Envoi…';
-    // Même message qu'un compte existe ou non : la page ne révèle pas quelles adresses ont un compte (clients compris).
-    const envoye = () => { $('[data-lien-envoye]').textContent = 'Si un compte est associé à ' + email + ', un lien de connexion vient de lui être envoyé. Ouvrez l’e-mail et cliquez sur le lien.'; };
-    api.connexion(email).then(envoye).catch((ex) => {
-      const msg = String((ex && ex.message) || '');
-      if (/signup|not allowed|user not found/i.test(msg)) { envoye(); return; }
-      err.textContent = /rate limit|too many/i.test(msg) ? 'Trop de demandes de lien : patientez quelques minutes.' : 'Impossible d’envoyer le lien pour le moment.';
-      err.hidden = false;
-    }).finally(() => { btn.disabled = false; btn.textContent = 'Recevoir mon lien de connexion'; });
+    err.textContent = msg || ''; err.hidden = !msg;
+    if (invalide) champEmail.setAttribute('aria-invalid', 'true'); else champEmail.removeAttribute('aria-invalid');
+  };
+  // Message sous le code ; invalide : champ signalé, focalisé, saisie gardée et sélectionnée
+  const erreurCode = (msg, invalide) => {
+    const err = $('#a-code-err');
+    err.textContent = msg || ''; err.hidden = !msg;
+    if (!invalide) { champCode.removeAttribute('aria-invalid'); return; }
+    champCode.setAttribute('aria-invalid', 'true');
+    champCode.focus(); champCode.select();
+  };
+  // Notice de l'étape 2 (genre : envoi, nouveau, deja), dans la zone « status » toujours présente (vide, la feuille de
+  // style la masque)
+  const afficherEnvoi = (email, genre) => { zoneCode.textContent = NOTICE[genre][0] + email + NOTICE[genre][1]; };
+  // Boutons d'action des deux étapes : tous désactivés pendant un appel (celui qui l'a lancé affiche son attente) ;
+  // « Modifier l'adresse » reste toujours actif. Un changement d'étape les rétablit (liberer) ; la fonction rendue par
+  // boutonOccupe ne touche alors plus à rien, sinon elle les rétablit et rend le focus au bouton s'il l'a perdu.
+  const ACTIONS = ['[data-btn-connexion]', '[data-deja-code]', '[data-btn-code]', '[data-nouveau-code]'].map((s) => $(s));
+  const LIBELLES = ACTIONS.map((b) => b.textContent);
+  const liberer = () => { occupe = false; ACTIONS.forEach((b, i) => { b.disabled = false; b.textContent = LIBELLES[i]; }); };
+  const boutonOccupe = (btn, attente) => {
+    const t = tour;
+    occupe = true; ACTIONS.forEach((b) => { b.disabled = true; }); btn.textContent = attente;
+    return () => {
+      if (t !== tour) return;
+      liberer();
+      if (document.activeElement === document.body) btn.focus();
+    };
+  };
+
+  // Étape 2 : formulaire du code, notice avec l'adresse ; état gardé pour un rechargement de l'onglet. le = 0 (« J'ai
+  // déjà un code ») : aucun envoi pour ce passage, notice propre, état oublié (un rechargement ramène à l'étape 1) ;
+  // la minute n'y est tenue que pour un code demandé d'ici à la même adresse (dernier, voir « J'ai déjà un code »).
+  const etapeCode = (email, le) => {
+    tour++; liberer();
+    emailCode = email; leCode = le;
+    formConnexion.hidden = true; formCode.hidden = false;
+    afficherEnvoi(email, le ? 'envoi' : 'deja');
+    champCode.value = ''; erreurCode('');
+    if (le) { garderConnexion(email, le); dernier = { email, le }; } else oublierConnexion();
+    champCode.focus();
+  };
+  // Étape 1 : « Modifier l'adresse » (adresse gardée), connexion réussie et déconnexion (vider : adresse effacée aussi,
+  // ordinateur partagé) ; notice, code et erreurs effacés, état oublié.
+  const etapeAdresse = (vider) => {
+    tour++; liberer();
+    emailCode = '';
+    oublierConnexion();
+    formCode.hidden = true; formConnexion.hidden = false;
+    zoneCode.textContent = '';
+    champCode.value = ''; erreurCode(''); erreurAdresse('');
+    if (vider) { champEmail.value = ''; dernier = { email: '', le: 0 }; }
+  };
+  // Premier affichage sans session : étape 2 rétablie pour un code demandé dans cet onglet il y a moins d'une heure ;
+  // sous l'adresse, le message d'un ancien lien direct.
+  const reprendre = () => {
+    const etat = lireConnexion();
+    if (etat) { champEmail.value = etat.email; etapeCode(etat.email, etat.le); }
+    if (ancienLien) erreurAdresse(ANCIEN_LIEN);
+  };
+
+  // Étape 1 → « Recevoir mon code de connexion »
+  formConnexion.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (occupe) return;
+    const email = champEmail.value.trim();
+    if (!EMAIL_OK.test(email)) { erreurAdresse('Adresse email invalide', true); return; }
+    erreurAdresse('');
+    const t = tour, fin = boutonOccupe($('[data-btn-connexion]'), 'Envoi…');
+    api.connexion(email).then(() => 'envoye', (ex) => classer(ex, false)).then((k) => {
+      if (t !== tour) return;
+      if (k === 'envoye' || k === 'inconnu' || k === 'frequence') etapeCode(email, Date.now());
+      else erreurAdresse(ERR_DEMANDE[k]);
+    }).finally(fin);
   });
+
+  // Étape 1 → « J'ai déjà un code » : code reçu, mais l'étape 2 n'est pas dans cet onglet (page rouverte depuis la
+  // messagerie, autre onglet ou appareil) ; en redemander un annulerait celui qu'on a sous les yeux. Étape 2 pour cette
+  // adresse sans aucun appel. Si un code vient d'être demandé d'ici pour cette adresse, la page garde l'heure de cet
+  // envoi et tient la minute comme d'habitude. Sinon (autre onglet ou appareil, onglet rechargé), « Recevoir un
+  // nouveau code » appelle Supabase aussitôt : son 429 (code parti il y a moins d'une minute) reçoit « patientez une
+  // minute », son 422 (adresse inconnue) la notice « nouveau code » : une exception au même affichage.
+  $('[data-deja-code]').addEventListener('click', () => {
+    if (occupe) return;
+    const email = champEmail.value.trim();
+    if (!EMAIL_OK.test(email)) { erreurAdresse('Adresse email invalide', true); champEmail.focus(); return; }
+    erreurAdresse('');
+    etapeCode(email, 0);
+    if (dernier.email.toLowerCase() === email.toLowerCase()) leCode = dernier.le;   // code demandé d'ici : minute tenue
+  });
+
+  // Étape 2 → « Se connecter »
+  formCode.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (occupe) return;
+    // Code recopié : espaces (insécables compris) et tirets retirés ; 6 à 10 chiffres (réglage « Email OTP Length »)
+    const code = champCode.value.replace(/[\s\u2010-\u2015\u2212-]/g, '');
+    if (!code) { erreurCode(ERR_CODE.vide, true); return; }
+    if (!/^\d{6,10}$/.test(code)) { erreurCode(ERR_CODE.format, true); return; }
+    erreurCode('');
+    const t = tour, fin = boutonOccupe($('[data-btn-code]'), 'Vérification…');
+    api.verifierCode(emailCode, code).then(() => null, (ex) => classer(ex, true)).then((k) => {
+      if (!k || t !== tour) return;   // connecté : l'événement SIGNED_IN prend le relais
+      erreurCode(k === 'limite' || k === 'frequence' ? ERR_CODE.limite : k === 'autre' ? ERR_CODE.autre : ERR_CODE.code, true);
+    }).finally(fin);
+  });
+
+  // Étape 2 → « Recevoir un nouveau code », pour la même adresse (Supabase annule le code précédent)
+  $('[data-nouveau-code]').addEventListener('click', (e) => {
+    if (occupe || !emailCode) return;
+    erreurCode('');
+    if (Date.now() - leCode < 60000) { erreurCode(ERR_DEMANDE.frequence); return; }   // même réponse, sans appel, qu'il y ait un compte ou non
+    const email = emailCode, t = tour, fin = boutonOccupe(e.currentTarget, 'Envoi…');
+    api.connexion(email).then(() => 'envoye', (ex) => classer(ex, false)).then((k) => {
+      if (t !== tour) return;
+      if (k === 'envoye' || k === 'inconnu') {
+        afficherEnvoi(email, 'nouveau');
+        champCode.value = ''; erreurCode('');
+        leCode = Date.now(); garderConnexion(email, leCode); dernier = { email, le: leCode };
+        champCode.focus();
+      } else erreurCode(ERR_DEMANDE[k]);   // « frequence » : le code envoyé il y a moins d'une minute reste valable
+    }).finally(fin);
+  });
+
+  // Étape 2 → « Modifier l'adresse »
+  $('[data-changer-adresse]').addEventListener('click', () => {
+    etapeAdresse(false);
+    champEmail.focus(); champEmail.select();
+  });
+
   $('[data-deconnexion]').addEventListener('click', () => {
     api.deconnexion().then(() => { history.replaceState(null, '', location.pathname + location.search); });
   });
@@ -433,6 +646,11 @@
     actualiser();
   });
   window.addEventListener('hashchange', () => {
+    // Ancien lien direct ouvert dans cet onglet, page déjà chargée : même traitement qu'au chargement
+    if (retirerAncienLien() && !charge) {
+      if (!sessionLue) ancienLien = true;
+      else if (!vues.connexion.hidden && !formConnexion.hidden) erreurAdresse(ANCIEN_LIEN);
+    }
     if (!charge || !autorise) return;
     const d = dossiers.find((x) => x.id === location.hash.replace('#', ''));
     if (d) ouvrir(d); else rendreListe();
@@ -1127,21 +1345,29 @@
     $('[data-alertes]').hidden = true;
     annoncer(''); erreur('');
   };
+  // Connexion réussie (session reçue) et déconnexion (ici ou dans un autre onglet) : vue de connexion remise à l'étape 1,
+  // adresse et code effacés. Premier affichage sans session : étape rétablie et message d'un ancien lien (reprendre).
   api.surChangement((session, evt) => {
     if (evt === 'TOKEN_REFRESHED' || evt === 'USER_UPDATED') return;
+    const premier = !sessionLue;
+    sessionLue = true;
     if (session && session.user) {
+      etapeAdresse(true);
       $('[data-compte]').hidden = false;
       $('[data-compte-email]').textContent = session.user.email || '';
       if (charge === session.user.id) return;
       const uid = session.user.id;
-      charge = uid; autorise = false;
+      charge = uid; autorise = false; montrer('chargement');
       api.estAdmin(uid).then((admin) => { if (charge !== uid) return; autorise = admin; if (admin) charger(); else montrer('refus'); })
         .catch(() => { if (charge !== uid) return; montrer('refus'); erreur('Vérification du compte impossible pour le moment.'); });
     } else {
+      const deconnexion = charge !== null;
       charge = null; autorise = false;
       oublier();
       $('[data-compte]').hidden = true;
       montrer('connexion');
+      if (deconnexion) etapeAdresse(true);
+      else if (premier) reprendre();
     }
   });
 })();

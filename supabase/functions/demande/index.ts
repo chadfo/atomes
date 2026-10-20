@@ -192,7 +192,7 @@ Deno.serve(async (req) => {
     for (const f of fichiers) if (!deposes.some((x) => x.taille === f.size && x.nom.endsWith(nomSur(f.name, 0).slice(3)))) echoues.push(f.name);
   }
 
-  // 3. Compte client : réutilisé s'il existe déjà (deuxième projet), sinon créé (connexion par lien e-mail).
+  // 3. Compte client : réutilisé s'il existe déjà (deuxième projet), sinon créé (connexion par code reçu par e-mail).
   try {
     const { data: existant, error: errRpc } = await sb.rpc("user_id_par_email", { p_email: d.email });
     if (errRpc) console.error("user_id_par_email", errRpc.message);
@@ -451,7 +451,7 @@ function htmlClient(id: string, d: Demande, deposes: Depose[], echoues: string[]
   return gabarit("Demande reçue", [
     `<h1 style="margin:0 0 18px;font-size:24px;line-height:30px;font-weight:bold">Merci ${esc(d.prenom)}, votre demande est bien reçue.</h1>`,
     p(`Votre dossier porte le numéro <strong>${id}</strong>. Nous étudions votre projet et revenons vers vous sous 48&nbsp;h ouvrées.`),
-    p(`Vous pouvez suivre l'avancement de votre dossier et consulter les documents que nous vous transmettrons dans votre espace client. Connectez-vous avec cette adresse e-mail (${esc(d.email)})&nbsp;: un lien de connexion vous est envoyé à chaque fois, sans mot de passe.`),
+    p(`Vous pouvez suivre l'avancement de votre dossier et consulter les documents que nous vous transmettrons dans votre espace client. Connectez-vous avec cette adresse e-mail (${esc(d.email)})&nbsp;: un code de connexion vous est envoyé à chaque fois, sans mot de passe.`),
     `<p style="margin:0 0 26px"><a href="${espace}" style="display:inline-block;background:#171512;color:#ffffff;text-decoration:none;font-size:12px;line-height:16px;letter-spacing:2px;text-transform:uppercase;padding:14px 24px">Accéder à mon dossier</a></p>`,
     titreBloc("Votre demande"),
     tableau([["Type de projet", aff(d, d.type, "type")], ["Documents souhaités", d.docs.map((x) => aff(d, x, "documents")).join(", ")], ["Commune", d.commune], ["Démarrage souhaité", aff(d, d.calendrier, "calendrier")]]),

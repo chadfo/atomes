@@ -15,7 +15,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" defer></script>
 <script src="../assets/js/config.js" defer></script>
 <script src="../assets/js/atom-logo.js" defer></script>
-<script src="../assets/js/dossier.js?v=3" defer></script>
+<script src="../assets/js/dossier.js?v=5" defer></script>
 </head>
 <body>
 <div class="page">
@@ -48,10 +48,11 @@
         <p class="espace-intro" data-config-msg>L'espace client n'est pas encore activé. Pour tout suivi de dossier, écrivez-nous à <a href="mailto:contact@atomes.studio">contact@atomes.studio</a>.</p>
       </div>
 
-      <!-- Connexion sans mot de passe -->
+      <!-- Connexion sans mot de passe : code à usage unique reçu par e-mail, demandé ici -->
       <div data-vue="connexion" hidden>
         <h1>Suivre votre dossier</h1>
-        <p class="espace-intro">Entrez l'adresse e-mail utilisée pour votre demande&nbsp;: vous recevrez un lien de connexion, sans mot de passe.</p>
+        <p class="espace-intro">Entrez l'adresse e-mail utilisée pour votre demande&nbsp;: vous recevrez un code de connexion, sans mot de passe.</p>
+        <div class="notice" id="e-code-notice" data-code-envoye role="status" aria-live="polite"></div>
         <form class="form espace-form" data-form-connexion novalidate>
           <div class="field">
             <label class="lbl" for="e-email">Email</label>
@@ -59,10 +60,24 @@
             <div class="f-err" id="e-err" role="alert" hidden></div>
           </div>
           <div class="form-actions">
-            <button type="submit" class="btn" data-btn-connexion>Recevoir mon lien de connexion</button>
+            <button type="submit" class="btn" data-btn-connexion>Recevoir mon code de connexion</button>
+            <button type="button" class="btn btn--ghost" data-deja-code>J'ai déjà un code</button>
           </div>
         </form>
-        <div class="notice" data-lien-envoye role="status" aria-live="polite"></div>
+        <form class="form espace-form" data-form-code novalidate hidden>
+          <div class="field">
+            <label class="lbl" for="e-code">Code de connexion</label>
+            <input class="input" type="text" id="e-code" name="code" inputmode="numeric" autocomplete="one-time-code" spellcheck="false" aria-describedby="e-code-notice e-code-err">
+            <div class="f-err" id="e-code-err" role="alert" hidden></div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn" data-btn-code>Se connecter</button>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn--ghost" data-nouveau-code>Recevoir un nouveau code</button>
+            <button type="button" class="btn btn--ghost" data-changer-adresse>Modifier l'adresse</button>
+          </div>
+        </form>
       </div>
 
       <!-- Plusieurs dossiers -->

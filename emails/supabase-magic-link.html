@@ -1,6 +1,12 @@
-<!-- Modèle Supabase : Authentication → Emails → Templates → Magic link or OTP → onglet Source.
-     Objet : Votre lien de connexion — Atomes studio
-     Variables Supabase : {{ .ConfirmationURL }} (lien de connexion), {{ .Email }} (adresse). -->
+<!-- Modèle Supabase : Authentication → Emails → Templates → Magic link → onglet Source, tout remplacer par ce fichier.
+     Objet : Votre code de connexion — Atomes studio
+     Variable de Supabase utilisée (nommée ici sans accolades, pour qu'aucune ne soit remplacée dans ce commentaire) :
+     Token, le code à usage unique, que le visiteur saisit sur la page qui l'a demandé (/dossier/ ou /admin/). Aucun lien
+     de connexion dans cet e-mail.
+     Réglages (Authentication → Sign In / Providers → Email) : « Email OTP Length » = 8 et « Email OTP Expiration » =
+     3600 (une heure, comme le dit l'e-mail).
+     Ne coller ce modèle qu'une fois en ligne les pages de la connexion par code (bouton « Recevoir mon code de
+     connexion » visible sur atomes.studio/dossier/) : les anciennes pages attendent un lien. -->
 <!doctype html>
 <html lang="fr">
 <body style="margin:0;padding:32px 16px;background:#f4f2ee;font-family:Helvetica,Arial,sans-serif;color:#141414">
@@ -8,12 +14,12 @@
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border:1px solid #e3ded4">
 <tr><td style="padding:36px 40px">
 <div style="font-size:11px;line-height:16px;letter-spacing:2px;text-transform:uppercase;color:#8d8d8d;margin-bottom:14px">Espace client</div>
-<h1 style="margin:0 0 18px;font-size:24px;line-height:30px;font-weight:bold;color:#141414">Votre lien de connexion</h1>
+<h1 style="margin:0 0 18px;font-size:24px;line-height:30px;font-weight:bold;color:#141414">Votre code de connexion</h1>
 <p style="margin:0 0 14px;font-size:15px;line-height:24px">Bonjour,</p>
-<p style="margin:0 0 22px;font-size:15px;line-height:24px">Cliquez sur le bouton ci-dessous pour accéder à votre dossier. Ce lien est valable une heure et ne fonctionne qu'une fois.</p>
-<p style="margin:0 0 26px"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#171512;color:#ffffff;text-decoration:none;font-size:12px;line-height:16px;letter-spacing:2px;text-transform:uppercase;padding:14px 24px">Accéder à mon dossier</a></p>
-<p style="margin:0 0 14px;font-size:13px;line-height:20px;color:#7a7a7a">Si le bouton ne fonctionne pas, copiez cette adresse dans votre navigateur :<br><a href="{{ .ConfirmationURL }}" style="color:#3a3a3a;word-break:break-all">{{ .ConfirmationURL }}</a></p>
-<p style="margin:0;font-size:13px;line-height:20px;color:#7a7a7a">Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet e-mail.</p>
+<p style="margin:0 0 18px;font-size:15px;line-height:24px">Voici votre code de connexion. Saisissez-le sur atomes.studio, sur la page où vous l'avez demandé&nbsp;:</p>
+<p style="margin:0 0 22px"><span style="display:inline-block;border:1px solid #e3ded4;background:#f4f2ee;color:#141414;font-family:'Courier New',Courier,monospace;font-size:28px;line-height:36px;letter-spacing:4px;font-weight:bold;padding:12px 16px 12px 20px">{{ .Token }}</span></p>
+<p style="margin:0 0 14px;font-size:15px;line-height:24px">Ce code est valable une heure et ne sert qu'une fois. Si vous en demandez un autre, seul le dernier reçu fonctionne.</p>
+<p style="margin:0;font-size:13px;line-height:20px;color:#7a7a7a">Ne le communiquez à personne et ne le saisissez sur aucun autre site&nbsp;: nous ne vous le demanderons jamais, ni par téléphone ni par e-mail. Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet e-mail&nbsp;: sans ce code, personne ne peut accéder à votre espace.</p>
 <div style="margin-top:36px;padding-top:24px;border-top:1px solid #e3ded4">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Helvetica,Arial,sans-serif;color:#141414">
 <tr>
