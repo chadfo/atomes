@@ -268,6 +268,14 @@ Changes » avant l'étape 3. Les étapes 1 à 3 se font d'affilée, dans la mêm
    4. Espace agence : un message au client avec environ 14 Mo de pièces jointes (PDF ou photos) : l'e-mail arrive
       avec ses pièces.
    5. **Edge Functions → espace → Logs** : ni « CPU Time exceeded » ni « Memory limit exceeded ».
+   6. **Affichage de l'espace client**, sur ce dossier. Sur ordinateur (fenêtre privée du point 3, agrandie) : trois
+      colonnes, « Avancement » et « Votre demande » à gauche, « Discussion » au milieu, les documents à droite.
+      Fenêtre rétrécie : deux colonnes (discussion à droite), puis une seule. La discussion remplit la hauteur de la
+      fenêtre et ne bouge pas quand la page défile. Ses messages défilent à l'intérieur, le dernier visible, et
+      « Envoyer » reste visible en bas. Sur un écran peu haut (fenêtre de moins de 620 px de haut), elle reste dans
+      la page : c'est voulu. Les pièces jointes du point 4 figurent aussi sous « Documents de l'agence ». Sur ton
+      téléphone (même connexion, par code) : une seule colonne, dans l'ordre « Avancement », « Discussion », les
+      documents, puis « Votre demande ».
 
    Si un essai échoue : ne rien défaire ; noter le message affiché et l'heure, regarder Edge Functions → espace →
    Logs, puis prévenir Claude. La base reste telle quelle : l'ancienne fonction et l'ancien site fonctionnent avec

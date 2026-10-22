@@ -434,6 +434,40 @@ d'arrivée des e-mails des clients.
     `message_client` (session lue au moment de l'appel, délai de 2 minutes ; clé `cle` tirée à la première
     tentative et renouvelée quand le contenu change). Compte agence ouvert sur l'espace client : composeur masqué
     (« écrivez au client depuis l'espace agence »).
+  - Tableau de bord (21 octobre 2026), fiche d'un dossier : trois colonnes à partir de 1200 px de large (en-tête du
+    dossier, Avancement et Votre demande à gauche ; Discussion au milieu ; Documents de l'agence et Vos documents à
+    droite). De 981 à 1199 px, deux colonnes : Discussion à droite, le reste à gauche. Jusqu'à 980 px, une seule,
+    comme avant. L'ordre du DOM ne change pas (lecture, tabulation) : les blocs sont placés par `grid-template-areas`
+    (`site.css`, « Tableau de bord »). `montrer()` pose `.espace--tableau` sur la section pour cette vue seulement ;
+    les autres vues gardent leur colonne de 760 px. À partir de 981 px : colonne de gauche resserrée (timeline sur le
+    modèle de `.timeline--compacte`, coordonnées de virement en 12 px : l'IBAN tient sur une ligne), discussion
+    encadrée d'un filet, composeur compact (texte sur trois lignes, fichiers et « Envoyer » sur une ligne, erreur et
+    annonce juste dessous, puis l'aide), documents en deux lignes (le nom, puis taille, date et « Télécharger »).
+    Erreur de la page au-dessus du tableau, collée sous la barre de navigation quand la page défile ; un nouvel essai
+    de téléchargement efface l'échec précédent. Écran d'au moins 620 px de haut : la discussion est un panneau
+    collant qui remplit l'écran, composeur en bas. Son fil défile seul et garde 80 px au moins (un composeur très
+    chargé fait alors défiler le panneau). En trois colonnes, les documents sont collants aussi et défilent seuls si
+    la liste est longue. Haut et seuil collant : `--tableau-haut` (142 px : barre de navigation, marge, étiquette
+    « Espace client », écart), à recalculer si l'un d'eux change ; hauteur : `--tableau-hauteur` (en `vh`, puis en
+    `dvh` si le navigateur la connaît). Écran de moins de 800 px de haut (ordinateur portable) : cadre et composeur
+    resserrés. Écran de moins de 620 px de haut : colonnes sans panneau, fil dans la page. Impression : une colonne
+    (règles en `screen`).
+  - Fil défilant (dans le panneau ; déduit de son `overflow-y` calculé, sans seuil en double avec la feuille de
+    style) : tout en bas à l'ouverture d'un dossier et après un envoi. À une mise à jour, il reste en bas s'il y
+    était (à 40 px près), sinon il garde sa place : ancrage natif, ou (Safari) compensation par son `scrollTop`.
+    Quand sa taille change (polices chargées tard, passage d'une mise en page à l'autre), un `ResizeObserver` le
+    remet en bas s'il y était ou s'il devient défilant. La position où la page l'a mis en bas ne compte plus dès que
+    le visiteur défile ailleurs ; « Message complet » refermé, il suit de nouveau le bas s'il y est. Focalisable
+    (`tabindex="0"`, nom « Discussion ») seulement quand il déborde ; focalisé quand il cesse de défiler (zoom,
+    fenêtre réduite), il garde le focus (`tabindex="-1"`) jusqu'à ce qu'il le perde. Panneau des documents qui
+    déborde : `tabindex="-1"` (Firefox en ferait sinon un arrêt de tabulation sans nom). Focus au clavier dans un
+    panneau collant : l'élément caché sous la barre de navigation ou coupé par le bord d'un panneau est ramené au
+    centre (Firefox ne le fait pas lui-même ; rien au clic de souris).
+  - Documents de l'agence : fichiers de `<id>/agence/` (liste du stockage) et pièces jointes des messages de
+    l'agence, rangées dans `<id>/agence/discussion/` hors de cette liste (nom d'origine, taille, date du message).
+    Du plus récent au plus ancien, sans doublon de chemin ; « Aucun document pour le moment… » seulement si les deux
+    manquent. Ancienne lecture (avant 0006) : aucune pièce de message. Démo : à partir de `?demo=validation`
+    (notice jointe par l'agence).
   - Aucune autre action, sauf le lien légal « Renoncer au contrat ici » vers la page d'action (particulier signé,
     pendant le délai).
   - **Mode démo sans backend : `dossier/?demo`**, ou `?demo=signature`, `paiement`, `production`, `validation`,

@@ -11,6 +11,14 @@
 // (page action/), paie par virement. Le lien légal « Renoncer au contrat ici » (particulier, devis signé, dans le
 // délai) mène à la page action/ ; ce lien et les coordonnées bancaires viennent de l'action « infos_espace » de la
 // fonction « espace » (config.js : espaceUrl).
+// Tableau de bord (21 octobre 2026) : sur un écran d'ordinateur, la feuille de style place la fiche en colonnes
+// (en-tête, timeline et récapitulatif à gauche, discussion au milieu, documents à droite) ; montrer() pose
+// .espace--tableau sur la section quand la vue dossier est affichée. Sur un écran assez haut, le fil de la discussion
+// défile seul dans un panneau qui remplit l'écran (« fil défilant », déduit de son overflow-y calculé) : en bas à
+// l'ouverture et après un envoi, gardé en bas ou à sa place aux mises à jour, focalisable quand il déborde. Panneaux au
+// clavier : documents hors de la tabulation quand ils débordent, élément focalisé caché sous la barre ou coupé par un
+// bord ramené à l'écran (Firefox). « Documents de l'agence » : fichiers du stockage (agence/) et pièces jointes des
+// messages de l'agence (agence/discussion/).
 // Mode démo sans backend : dossier/?demo, ou ?demo=signature, paiement, production, validation, suivi, clos (étape de
 // départ), ou ?demo=retracte (rétractation reçue pendant le paiement) ; la discussion s'y écrit dans les données de la
 // démo.
@@ -48,11 +56,14 @@
 
   const vues = {};
   $$('[data-vue]').forEach((v) => { vues[v.dataset.vue] = v; });
+  const section = $('.espace');
   // Connexion par code réussie : focus sur le titre de la première vue affichée ensuite (liste, dossier ou refus),
-  // jamais à un SIGNED_IN sans code saisi (supabase-js en réémet un à chaque retour sur l'onglet).
+  // jamais à un SIGNED_IN sans code saisi (supabase-js en réémet un à chaque retour sur l'onglet). Vue dossier : la
+  // section passe en tableau de bord (.espace--tableau, colonnes de la feuille de style).
   let focusTitre = false;
   const montrer = (nom) => {
     Object.keys(vues).forEach((k) => { vues[k].hidden = k !== nom; });
+    section.classList.toggle('espace--tableau', nom === 'dossier');
     if (!focusTitre || nom === 'chargement') return;
     focusTitre = false;
     const titre = vues[nom] && $('h1', vues[nom]);
@@ -209,7 +220,9 @@
     };
     // Discussion : messages (colonnes lues par la page), texte intégral des e-mails du client (lu à la demande) et
     // étapes clés datées, comme les écrivent la fonction « espace », le moteur de l'agence et le déclencheur de la base.
-    // Pièces du client rangées aussi dans « Vos documents » ; celles de l'agence (agence/discussion/) n'y sont pas.
+    // Pièces du client rangées aussi dans « Vos documents » (liste du stockage de la démo). Celles de l'agence, rangées
+    // dans agence/discussion/ hors de la liste du stockage, la page les ajoute aux « Documents de l'agence » depuis les
+    // messages (?demo=validation : la notice) ; leurs chemins, comme ceux du stockage, sont distincts (pas de doublon).
     const complets = new Map();
     let dernierId = 0;
     const message = (t, auteur, origine, texte, pieces, complet) => {
@@ -259,11 +272,11 @@
     if (retracte) { projet.retracte_le = iso(now - j); etapeCle('retractation', now - j); }
     if (etapesDemo.includes('production')) { projet.paye_le = iso(now - 4 * j); etapeCle('paiement_recu', now - 4 * j); avance('production', now - 4 * j); }
     if (etapesDemo.includes('validation')) {
-      docs.agence.unshift({ nom: 'Plans-et-perspective-' + ID + '.pdf', chemin: 'demo', taille: 3145728, date: iso(now - j) });
+      docs.agence.unshift({ nom: 'Plans-et-perspective-' + ID + '.pdf', chemin: ID + '/agence/Plans-et-perspective-' + ID + '.pdf', taille: 3145728, date: iso(now - j) });
       etapeCle('documents_prets', now - j);
       avance('validation', now - j);
       message(now - j + 600000, 'agence', 'espace', 'Vos documents sont prêts. Je joins ici la notice de la déclaration préalable, à garder avec votre dossier.',
-        [{ nom: 'notice-declaration-prealable.pdf', chemin: 'demo', taille: 412672 }]);
+        [{ nom: 'notice-declaration-prealable.pdf', chemin: ID + '/agence/discussion/261020101000-notice-declaration-prealable.pdf', taille: 412672 }]);
     }
     if (jusqua === 'suivi') {
       projet.suivi_administratif = true; projet.documents_valides_le = iso(now - 20 * h);
@@ -623,7 +636,8 @@
   };
 
   // Fiche d'un dossier. Même dossier déjà affiché : le fil est mis à jour sans être redessiné (fenêtre, « Message
-  // complet » ouverts et focus gardés) ; autre dossier : fil et composeur repris de zéro (brouillon de ce dossier).
+  // complet » ouverts, focus et position du fil gardés) ; autre dossier : fil et composeur repris de zéro (brouillon de
+  // ce dossier), fil défilant placé tout en bas une fois la vue affichée (une vue masquée n'a pas de hauteur).
   const ouvrir = (d) => {
     const meme = !!courant && courant.id === d.id && !vues.dossier.hidden;
     courant = d;
@@ -636,6 +650,8 @@
     rendreDiscussion(d, meme);
     rendreRecap(d);
     montrer('dossier');
+    if (!meme && filDefile()) mettreEnBas();
+    accesFil();
     rafraichirDocs();
     completer(d);
   };
@@ -818,8 +834,100 @@
   const ajouts = new Map();                                 // id de dossier → lignes renvoyées par l'envoi, jusqu'à la relecture qui les contient
   // Ancrage de défilement natif (Chromium, Firefox) ; sinon (Safari) la page compense elle-même.
   const ancrageNatif = !!(window.CSS && CSS.supports && CSS.supports('overflow-anchor', 'auto'));
+  // Fil défilant (tableau de bord, écran assez haut) : le fil défile seul dans le panneau de la discussion. Déduit de son
+  // overflow-y calculé, sans seuil en double avec la feuille de style ; sinon (une colonne, écran bas), le fil est dans
+  // la page, comme avant. « En bas » : à 40 px près.
+  const filDefile = () => /^(auto|scroll)$/.test(getComputedStyle(listeFil).overflowY);
+  const filEnBas = () => listeFil.scrollHeight - listeFil.scrollTop - listeFil.clientHeight <= 40;
+  let basFil = true;      // fil en bas : placé là par la page, ou laissé là par le visiteur
+  let pose = -1;          // position (scrollTop) où la page a mis le fil en bas
+  let defilant = false;   // fil défilant au dernier changement de taille
+  const mettreEnBas = () => { listeFil.scrollTop = listeFil.scrollHeight; pose = listeFil.scrollTop; basFil = true; };
+  // Clavier : le fil (nom « Discussion », aria-labelledby dans le HTML) n'est focalisable que s'il défile et déborde.
+  // Focalisé quand il cesse de défiler (zoom, fenêtre rétrécie ou abaissée), il garde le focus, hors de la tabulation
+  // (tabindex -1), jusqu'à ce qu'il le perde.
+  const accesFil = () => {
+    if (filDefile() && listeFil.scrollHeight > listeFil.clientHeight) listeFil.setAttribute('tabindex', '0');
+    else if (document.activeElement === listeFil) listeFil.setAttribute('tabindex', '-1');
+    else listeFil.removeAttribute('tabindex');
+  };
+  listeFil.addEventListener('blur', () => accesFil());
+  // Panneau des documents qui défile et déborde (trois colonnes, écran assez haut) : hors de la tabulation (tabindex -1 ;
+  // Firefox en ferait sinon un arrêt sans nom) ; il défile au clavier depuis ses « Télécharger ». Même règle que le fil
+  // s'il a le focus (clic dans le panneau).
+  const panneauDocs = $('.tableau-docs');
+  const accesDocs = () => {
+    if (/^(auto|scroll)$/.test(getComputedStyle(panneauDocs).overflowY) && panneauDocs.scrollHeight > panneauDocs.clientHeight) panneauDocs.setAttribute('tabindex', '-1');
+    else if (document.activeElement !== panneauDocs) panneauDocs.removeAttribute('tabindex');
+  };
+  panneauDocs.addEventListener('blur', () => accesDocs());
+  // Défilement du fil : le visiteur quitte le bas ou y revient. Celui de la page (fil mis en bas, position notée) le
+  // laisse en bas, même compté après un changement de mise en page (polices chargées entre-temps). Dès que le visiteur
+  // défile ailleurs, la position notée ne compte plus : y revenir après un ajout dessous (« Message complet », message
+  // reçu) n'est pas être en bas.
+  listeFil.addEventListener('scroll', () => {
+    basFil = filEnBas() || listeFil.scrollTop === pose;
+    if (listeFil.scrollTop !== pose) pose = -1;
+  }, { passive: true });
+  // « Message complet » ouvert : le visiteur lit, la bulle qui grandit ne ramène pas le fil en bas ; refermé : le fil
+  // suit de nouveau le bas s'il y est (toggle, detailComplet).
+  listeFil.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('summary')) basFil = false; });
+  // Taille du fil ou de ses éléments changée (fenêtre, passage d'une mise en page à l'autre, composeur qui grandit,
+  // polices chargées après le premier rendu) : fil remis en bas s'il devient défilant ou s'il était en bas ; accès au
+  // clavier du fil et du panneau des documents mis à jour. Éléments du fil observés de nouveau à chaque rendu
+  // (observerFil).
+  const suivreFil = () => {
+    accesDocs();
+    const d = filDefile();
+    if (d && (!defilant || basFil)) mettreEnBas();
+    defilant = d;
+    accesFil();
+  };
+  const observateur = window.ResizeObserver ? new ResizeObserver(suivreFil) : null;
+  const observerFil = () => {
+    if (!observateur) return;
+    observateur.disconnect();
+    observateur.observe(listeFil);
+    Array.from(listeFil.children).forEach((li) => observateur.observe(li));
+  };
+  if (observateur) observerFil(); else window.addEventListener('resize', suivreFil);
 
-  const telecharger = (chemin, nom) => api.lien(chemin, nom).then((url) => { if (url && url !== '#') location.assign(url); }).catch(() => erreur('Téléchargement impossible pour le moment.'));
+  // Panneaux collants (discussion, documents ; écran assez haut) et erreur de la page collée sous la barre (tableau de
+  // bord) : Firefox ne fait défiler ni un élément focalisé déjà en partie visible dans un panneau, ni un élément passé
+  // sous la barre de navigation (panneaux repoussés vers le haut en bas de page) ou sous l'erreur. Focus au clavier dans
+  // un panneau collant, ou n'importe où dans la fiche tant que l'erreur est collée : l'élément (zone de dépôt pour le
+  // champ de fichiers) qui n'est pas entier, contour compris, sous la barre (et l'erreur) et dans les zones qui défilent
+  // est ramené au centre, deux images plus tard, une fois le défilement natif fait (WebKit le fait parfois après la
+  // première ; Chromium et WebKit, qui le font, ne bougent pas). Rien au clic de souris (le bouton ne fuit pas sous le
+  // pointeur), ni pour un élément plus haut que la place.
+  const barreNav = $('.nav');
+  const auClavier = (a) => { try { return a.matches(':focus-visible'); } catch (ex) { return true; } };
+  vues.dossier.addEventListener('focusin', (e) => requestAnimationFrame(() => requestAnimationFrame(() => {
+    const a = e.target;
+    if (document.activeElement !== a || !auClavier(a)) return;
+    const bande = $('[data-erreur]'), collee = !bande.hidden && getComputedStyle(bande).position === 'sticky';
+    const panneau = a.closest('.discussion-bloc, .tableau-docs');
+    if (!collee && (!panneau || getComputedStyle(panneau).position !== 'sticky')) return;
+    const n = a.matches('input[type=file]') ? a.closest('.dropzone') || a : a;
+    const cs = getComputedStyle(a), o = cs.outlineStyle === 'none' ? 0 : Math.max(0, parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth));
+    let haut = Math.max(barreNav.getBoundingClientRect().bottom, collee ? bande.getBoundingClientRect().bottom : 0), bas = window.innerHeight;
+    for (let z = n.parentElement; z && z !== vues.dossier; z = z.parentElement) {
+      if (!/^(auto|scroll)$/.test(getComputedStyle(z).overflowY) || z.scrollHeight <= z.clientHeight) continue;
+      const q = z.getBoundingClientRect();
+      haut = Math.max(haut, q.top + z.clientTop); bas = Math.min(bas, q.top + z.clientTop + z.clientHeight);
+    }
+    const b = n.getBoundingClientRect();
+    if (b.height + 2 * o > bas - haut) return;
+    if (b.top - o < haut - 0.5 || b.bottom + o > bas + 0.5) n.scrollIntoView({ block: 'center', inline: 'nearest' });
+  })));
+
+  // Téléchargement par un lien signé. Un nouvel essai efface l'échec précédent (en tableau de bord, l'erreur resterait
+  // sinon au-dessus des colonnes jusqu'au prochain chargement des dossiers).
+  const ECHEC_TELECHARGEMENT = 'Téléchargement impossible pour le moment.';
+  const telecharger = (chemin, nom) => {
+    if ($('[data-erreur]').textContent === ECHEC_TELECHARGEMENT) erreur('');
+    return api.lien(chemin, nom).then((url) => { if (url && url !== '#') location.assign(url); }).catch(() => erreur(ECHEC_TELECHARGEMENT));
+  };
   // Pièces d'un message : « Télécharger » une fois rangées ; sans chemin (message que le moteur de l'agence n'a pas
   // encore traité) : en cours de rangement.
   const listePieces = (pieces) => {
@@ -855,7 +963,7 @@
     const p = el('p', 'msg-texte');
     det.appendChild(p);
     const cle = String(m.id), lire = () => remplirComplet(m.id, p, String(m.texte || '').trim());
-    det.addEventListener('toggle', () => { if (det.open) { fil.ouverts.add(cle); lire(); } else fil.ouverts.delete(cle); });
+    det.addEventListener('toggle', () => { if (det.open) { fil.ouverts.add(cle); lire(); } else { fil.ouverts.delete(cle); basFil = filEnBas(); } });
     if (fil.ouverts.has(cle)) { det.open = true; lire(); }
     return det;
   };
@@ -898,17 +1006,24 @@
     });
     return items.sort(comparer);
   };
-  // Ancre de défilement (même règle que l'espace agence) : le champ qui a le focus s'il est à l'écran (l'ancrage natif le
-  // prend en priorité), sinon le premier élément visible parmi les éléments du fil gardés à ce rendu, le composeur et les
-  // blocs qui suivent la discussion
+  // Ancre de défilement de la page, fil dans la page (même règle que l'espace agence) : le champ qui a le focus s'il est
+  // à l'écran (l'ancrage natif le prend en priorité), sinon le premier élément visible parmi les éléments du fil gardés à
+  // ce rendu, le composeur et les blocs qui suivent la discussion (documents, dans .tableau-docs, et Votre demande ; en
+  // colonnes, ils ne bougent pas avec le fil et ne servent que si rien de la discussion n'est à l'écran)
   const aLEcran = (n) => { const r = n.getBoundingClientRect(); return r.height > 0 && r.bottom > 0 && r.top < window.innerHeight; };
   const choisirAncre = (gardes) => {
     const a = document.activeElement;
     if (a && /^(TEXTAREA|INPUT)$/.test(a.tagName) && aLEcran(a)) return a;
-    return Array.from(listeFil.children).filter((li) => gardes.has(li)).concat($$('.composeur, .discussion-bloc ~ .bloc', vues.dossier)).find(aLEcran) || null;
+    return Array.from(listeFil.children).filter((li) => gardes.has(li)).concat($$('.composeur, .tableau-docs > .bloc, .discussion-bloc ~ .bloc', vues.dossier)).find(aLEcran) || null;
+  };
+  // Repère du fil défilant : premier élément du fil gardé à ce rendu et visible dans le fil
+  const repereFil = (gardes) => {
+    const r = listeFil.getBoundingClientRect();
+    return Array.from(listeFil.children).filter((li) => gardes.has(li))
+      .find((li) => { const b = li.getBoundingClientRect(); return b.height > 0 && b.bottom > r.top && b.top < r.bottom; }) || null;
   };
 
-  // premier : premier dessin de la fiche (rien à compenser)
+  // premier : premier dessin de la fiche, ou fil entier montré (rien à compenser ; la position est fixée par l'appelant)
   const majFil = (d, premier) => {
     const items = elementsFil(d);
     if (fil.debut === undefined) fil.debut = items.length > FENETRE ? items[items.length - FENETRE] : null;
@@ -926,12 +1041,22 @@
       signatures.set(n, it.sig);
       return n;
     });
-    // Sans ancrage natif, du contenu ajouté au-dessus de la zone visible ferait bouger la page : compensé.
-    const ancre = !premier && !ancrageNatif && window.scrollY > 0 ? choisirAncre(gardes) : null;
+    // Fil défilant en bas avant la mise à jour : il y reste (nouveau message visible). Sinon, sans ancrage natif, du
+    // contenu ajouté au-dessus de la zone visible ferait bouger le fil (fil défilant : compensé par son scrollTop) ou la
+    // page (fil dans la page : compensée par window.scrollBy).
+    const defile = !premier && filDefile();
+    const bas = defile && filEnBas();
+    const ancre = premier || bas || ancrageNatif ? null : defile ? repereFil(gardes) : window.scrollY > 0 ? choisirAncre(gardes) : null;
     const haut = ancre ? ancre.getBoundingClientRect().top : 0;
     existants.forEach((li) => { if (!gardes.has(li) && !li.contains(actif)) li.remove(); });
     noeuds.forEach((n, i) => { if (listeFil.children[i] !== n) listeFil.insertBefore(n, listeFil.children[i] || null); });
-    if (ancre) { const dy = ancre.getBoundingClientRect().top - haut; if (Math.abs(dy) >= 1) window.scrollBy(0, dy); }
+    if (bas) mettreEnBas();
+    else if (ancre) {
+      const dy = ancre.getBoundingClientRect().top - haut;
+      if (Math.abs(dy) >= 1) { if (defile) listeFil.scrollTop += dy; else window.scrollBy(0, dy); }
+    }
+    accesFil();
+    observerFil();
   };
 
   // « Afficher les messages précédents » : tout le fil ; focus sur le premier élément nouvellement montré
@@ -1095,6 +1220,7 @@
     brouillons.clear(); ajouts.clear(); complets.clear();
     fil.debut = undefined; fil.ouverts.clear();
     listeFil.textContent = ''; boutonPlus.hidden = true; videDiscussion.hidden = true;
+    accesFil(); observerFil();
     champMessage.value = ''; champMessage.readOnly = false; invalide(champMessage, false);
     champFichiers.value = ''; champFichiers.disabled = false; invalide(champFichiers, false);
     dessinerFichiers({ fichiers: [], envoi: false });
@@ -1148,10 +1274,10 @@
     if (type === 'dragover') e.dataTransfer.dropEffect = 'none';
   }));
 
-  // Envoi : attaché au dossier et au compte du clic. Succès (ou message déjà enregistré) : la ligne entre dans le fil,
-  // brouillon de ce dossier vidé, « Message envoyé. », focus sur le champ, documents relus. Échec : brouillon gardé,
-  // erreur sous le composeur ; si un autre dossier est affiché entre-temps, rien ne change à l'écran sauf l'erreur
-  // en bas de page (« Dossier N° … : »).
+  // Envoi : attaché au dossier et au compte du clic. Succès (ou message déjà enregistré) : la ligne entre dans le fil
+  // (fil défilant : tout en bas, message envoyé visible), brouillon de ce dossier vidé, « Message envoyé. », focus sur le
+  // champ, documents relus. Échec : brouillon gardé, erreur sous le composeur ; si un autre dossier est affiché
+  // entre-temps, rien ne change à l'écran sauf l'erreur de la page (« Dossier N° … : »).
   const messageEchec = (ex) => {
     if (ex && ex.statut === 401) return 'Session expirée : reconnectez-vous.';
     if (ex && ex.statut && ex.erreur) return ex.erreur;
@@ -1183,6 +1309,7 @@
       statutMessage.textContent = 'Message envoyé.';
       champMessage.focus();
       majFil(courant, false);
+      if (filDefile()) mettreEnBas();
       rafraichirDocs();
     }, (ex) => {
       if (utilisateurCharge !== pour) return;
@@ -1227,13 +1354,28 @@
       li.appendChild(a);
       ul.appendChild(li);
     });
+    accesDocs();
   };
 
+  // Pièces jointes des messages de l'agence (vérifiés, pièces rangées : chemin présent), déposées dans
+  // <id>/agence/discussion/, hors de la liste du stockage : nom d'origine, taille, date du message. Ancienne lecture
+  // (avant la migration 0006, messages sans auteur) : aucune.
+  const piecesAgence = (d) => (Array.isArray(d.messages) ? d.messages : [])
+    .filter((m) => m && m.auteur === 'agence' && m.verifie !== false && Array.isArray(m.pieces))
+    .flatMap((m) => m.pieces.filter((pc) => pc && pc.nom && pc.chemin).map((pc) => ({ nom: pc.nom, chemin: pc.chemin, taille: Number(pc.taille) || 0, date: m.recu_le })));
+  // Documents de l'agence : fichiers du stockage (agence/) et pièces des messages de l'agence, du plus récent au plus
+  // ancien, sans doublon (chemin) ; texte vide seulement si les deux manquent.
+  const docsAgence = (d, stockage) => {
+    const vus = new Set();
+    return stockage.concat(piecesAgence(d)).filter((f) => !vus.has(f.chemin) && !!vus.add(f.chemin)).sort((a, b) => temps(b.date) - temps(a.date));
+  };
+
+  // Listes relues à l'ouverture de la fiche, quand des pièces sont rangées et après un envoi
   const rafraichirDocs = () => {
     if (!courant) return;
     const id = courant.id;
     const pour = (fn) => (l) => { if (courant && courant.id === id) fn(l); };
-    api.lister(id, 'agence').then(pour((l) => rendreDocs($('[data-docs-agence]'), $('[data-vide-agence]'), l))).catch(() => erreur('Documents de l’agence indisponibles pour le moment.'));
+    api.lister(id, 'agence').then(pour((l) => rendreDocs($('[data-docs-agence]'), $('[data-vide-agence]'), docsAgence(courant, l)))).catch(() => erreur('Documents de l’agence indisponibles pour le moment.'));
     api.lister(id, 'client').then(pour((l) => rendreDocs($('[data-docs-client]'), $('[data-vide-client]'), l))).catch(() => erreur('Vos documents sont indisponibles pour le moment.'));
   };
 

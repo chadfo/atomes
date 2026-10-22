@@ -86,36 +86,43 @@
         <div class="dossiers" data-dossiers></div>
       </div>
 
-      <!-- Un dossier -->
-      <div data-vue="dossier" hidden>
-        <a href="#" class="link-more" data-retour hidden><span aria-hidden="true">←</span> Vos dossiers</a>
-        <div class="dossier-head">
-          <div class="num" data-d-num></div>
-          <h1 data-d-titre></h1>
-          <p class="espace-intro" data-d-sous></p>
+      <!-- Un dossier : tableau de bord. Ordre du DOM (lecture et tabulation) : en-tête, Avancement, Discussion, documents,
+           Votre demande ; la feuille de style place les blocs en trois colonnes à partir de 1200 px (en-tête, Avancement
+           et Votre demande à gauche, Discussion au milieu, documents à droite), en deux de 981 à 1199 px (Discussion à
+           droite), en une seule en dessous. -->
+      <div data-vue="dossier" class="tableau" hidden>
+        <div class="tableau-tete">
+          <a href="#" class="link-more" data-retour hidden><span aria-hidden="true">←</span> Vos dossiers</a>
+          <div class="dossier-head">
+            <div class="num" data-d-num></div>
+            <h1 data-d-titre></h1>
+            <p class="espace-intro" data-d-sous></p>
+          </div>
+          <!-- Particulier, devis signé, dans le délai : lien légal vers la page de rétractation (action/) -->
+          <p class="retractation" data-renoncer hidden></p>
         </div>
-        <!-- Particulier, devis signé, dans le délai : lien légal vers la page de rétractation (action/) -->
-        <p class="retractation" data-renoncer hidden></p>
 
-        <section class="bloc" aria-labelledby="lbl-avancement">
+        <section class="bloc tableau-avancement" aria-labelledby="lbl-avancement">
           <div class="lbl bloc-lbl" id="lbl-avancement">Avancement</div>
           <ol class="timeline" role="list" data-timeline></ol>
         </section>
 
         <!-- Discussion : messages des deux côtés et étapes clés, du plus ancien au plus récent ; message du client envoyé
-             à la fonction « espace » (multipart). Champs sans name (aucun envoi natif) ni maxlength (contrôle à l'envoi). -->
+             à la fonction « espace » (multipart). Champs sans name (aucun envoi natif) ni maxlength (contrôle à l'envoi).
+             Sur un écran d'ordinateur, panneau qui remplit l'écran : le fil défile seul (focalisable quand il déborde,
+             dossier.js), le composeur reste en bas. -->
         <section class="bloc discussion-bloc" aria-labelledby="lbl-discussion">
           <div class="lbl bloc-lbl" id="lbl-discussion">Discussion</div>
           <button type="button" class="link-more discussion-plus" data-discussion-plus hidden>Afficher les messages précédents</button>
-          <ol class="discussion" role="list" data-discussion></ol>
+          <ol class="discussion" role="list" data-discussion aria-labelledby="lbl-discussion"></ol>
           <p class="docs-vide" data-discussion-vide hidden>Aucun message pour le moment. Écrivez-nous ci-dessous, ou répondez à l'un de nos e-mails.</p>
           <form class="composeur" data-form-message novalidate>
-            <div class="field">
+            <div class="field composeur-texte">
               <label class="lbl" for="e-message">Votre message</label>
               <textarea class="input" id="e-message" rows="4" aria-describedby="e-message-aide e-message-err"></textarea>
               <p class="f-hint composeur-compte" data-message-compte hidden></p>
             </div>
-            <div class="field">
+            <div class="field composeur-pj">
               <span class="lbl" id="lbl-e-fichiers">Pièces jointes <span class="lbl-opt">(facultatif — photos, plans, PDF)</span></span>
               <label class="dropzone" aria-labelledby="lbl-e-fichiers">
                 <span class="dropzone-cta">+ Ajouter des fichiers</span>
@@ -124,7 +131,7 @@
               </label>
               <div class="files" data-message-liste hidden></div>
             </div>
-            <p class="f-hint" id="e-message-aide">Photos et PDF, 10 fichiers et 10&nbsp;Mo au plus par message. Vous pouvez aussi répondre à nos e-mails&nbsp;: vos réponses s'ajoutent ici, parfois avec quelques heures de décalage.</p>
+            <p class="f-hint composeur-aide" id="e-message-aide">Photos et PDF, 10 fichiers et 10&nbsp;Mo au plus par message. Vous pouvez aussi répondre à nos e-mails&nbsp;: vos réponses s'ajoutent ici, parfois avec quelques heures de décalage.</p>
             <div class="f-err" id="e-message-err" role="alert" hidden></div>
             <div class="form-actions"><button type="submit" class="btn" data-btn-message>Envoyer</button></div>
             <p class="f-hint composeur-statut" data-message-statut role="status"></p>
@@ -132,19 +139,22 @@
           <p class="f-hint" data-composeur-agence hidden>Compte agence&nbsp;: écrivez au client depuis l'espace agence.</p>
         </section>
 
-        <section class="bloc" aria-labelledby="lbl-docs-agence">
-          <div class="lbl bloc-lbl" id="lbl-docs-agence">Documents de l'agence</div>
-          <ul class="docs" role="list" data-docs-agence></ul>
-          <p class="docs-vide" data-vide-agence hidden>Aucun document pour le moment. Votre devis et vos documents apparaîtront ici.</p>
-        </section>
+        <!-- Documents de l'agence : fichiers du stockage (agence/) et pièces jointes des messages de l'agence (dossier.js) -->
+        <div class="tableau-docs">
+          <section class="bloc" aria-labelledby="lbl-docs-agence">
+            <div class="lbl bloc-lbl" id="lbl-docs-agence">Documents de l'agence</div>
+            <ul class="docs" role="list" data-docs-agence></ul>
+            <p class="docs-vide" data-vide-agence hidden>Aucun document pour le moment. Votre devis et vos documents apparaîtront ici.</p>
+          </section>
 
-        <section class="bloc" aria-labelledby="lbl-docs-client">
-          <div class="lbl bloc-lbl" id="lbl-docs-client">Vos documents</div>
-          <ul class="docs" role="list" data-docs-client></ul>
-          <p class="docs-vide" data-vide-client hidden>Aucun document pour le moment. Les pièces jointes de vos e-mails et de vos messages apparaîtront ici.</p>
-        </section>
+          <section class="bloc" aria-labelledby="lbl-docs-client">
+            <div class="lbl bloc-lbl" id="lbl-docs-client">Vos documents</div>
+            <ul class="docs" role="list" data-docs-client></ul>
+            <p class="docs-vide" data-vide-client hidden>Aucun document pour le moment. Les pièces jointes de vos e-mails et de vos messages apparaîtront ici.</p>
+          </section>
+        </div>
 
-        <section class="bloc" aria-labelledby="lbl-demande">
+        <section class="bloc tableau-demande" aria-labelledby="lbl-demande">
           <div class="lbl bloc-lbl" id="lbl-demande">Votre demande</div>
           <dl class="recap-liste" data-recap></dl>
         </section>

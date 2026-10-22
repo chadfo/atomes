@@ -389,6 +389,130 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .recap-liste dt{font:500 11.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:rgba(var(--ink-rgb),.5);padding-top:2px}
 .recap-liste dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
 .espace-pied{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding-top:24px;border-top:1px solid var(--line)}
+/* ---------- Tableau de bord (vue « dossier ») ----------
+   Jusqu'à 980 px : une colonne, comme avant ; les enveloppes .tableau-tete (lien, en-tête, rétractation) et .tableau-docs
+   (les deux listes de documents) gardent les écarts de 40 px. Écran d'ordinateur (981 px et plus ; dossier.js pose
+   .espace--tableau sur la section quand la vue dossier est affichée) : espace élargi, ordre du DOM inchangé (lecture et
+   tabulation), blocs placés par grid-template-areas ; de 981 à 1199 px, deux colonnes (en-tête, Avancement, documents et
+   Votre demande à gauche, Discussion à droite) ; à partir de 1200 px, trois (en-tête, Avancement et Votre demande à
+   gauche, Discussion au milieu, documents à droite). La colonne de gauche suit la page ; la ligne de Votre demande (1fr)
+   prend la hauteur en trop : les blocs de gauche gardent la leur. Colonne de gauche resserrée (écarts, timeline sur le
+   modèle de .timeline--compacte) : l'étape en cours reste près du haut. Discussion encadrée d'un filet, composeur compact
+   (texte sur trois lignes, ajout de fichiers et « Envoyer » sur une ligne, aide en dessous). L'erreur de la page
+   ([data-erreur]) passe au-dessus du tableau, sous l'étiquette « Espace client » ; page défilée, elle reste collée sous
+   la barre de navigation (bande du fond, au-dessus de la colonne de gauche ; les panneaux commencent sous elle).
+   Écran d'au moins 620 px de haut : la discussion est un panneau collant qui remplit l'écran ; son haut au défilement 0
+   est aussi son seuil collant (--tableau-haut, 142 px : barre de navigation 79 + marge 24 + étiquette 15, à hauteur de
+   ligne fixée, + écart 24 ; mesuré dans Chromium, Firefox et WebKit). Hauteur des panneaux : --tableau-hauteur, en vh,
+   puis en dvh (@supports : un navigateur sans dvh garde la valeur en vh). Son fil défile seul (dossier.js le déduit de
+   l'overflow-y calculé du fil) ; peu nombreux, les éléments se placent en bas, près du composeur (marge automatique du
+   premier : le haut reste accessible). En trois colonnes, les documents sont collants aussi et défilent seuls si la
+   liste est longue. Écran de moins de 800 px de haut (ordinateur portable) : panneau resserré. Écran plus bas que
+   620 px et impression : rien de fixe, le fil reste dans la page. Marges intérieures des zones qui défilent : aucun
+   contour de focus coupé. */
+.tableau-tete,.tableau-docs{display:flex;flex-direction:column;gap:40px}
+@media screen and (min-width:981px){
+  .espace--tableau{max-width:1480px;padding-top:24px;gap:24px}
+  .espace--tableau > .lbl{order:-2;line-height:15px}
+  /* Erreur de la page : bande du fond qui couvre les écarts autour d'elle (marges négatives), collée sous la barre de
+     navigation (79 px) quand la page défile ; tant qu'elle est affichée, le défilement du focus s'arrête sous elle
+     (142 px + 17, comme les 96 px de la barre seule) */
+  .espace--tableau > [data-erreur]{order:-1;position:sticky;top:79px;z-index:1;margin-block:-24px;padding-block:24px;background:var(--bg)}
+  html:has(.espace--tableau > [data-erreur]:not([hidden])){scroll-padding-top:159px}
+  .espace--tableau > .tableau{--tableau-haut:142px;--tableau-hauteur:calc(100vh - var(--tableau-haut) - 24px);display:grid;align-items:start;gap:24px 40px;grid-template-columns:clamp(280px,36%,360px) minmax(0,1fr);
+    grid-template-rows:auto auto auto 1fr;grid-template-areas:"tete discussion" "avancement discussion" "docs discussion" "demande discussion"}
+  @supports (height:100dvh){
+    .espace--tableau > .tableau{--tableau-hauteur:calc(100dvh - var(--tableau-haut) - 24px)}
+  }
+  .espace--tableau .tableau-tete{grid-area:tete;gap:16px}
+  .espace--tableau .tableau-avancement{grid-area:avancement}
+  .espace--tableau .tableau-docs{grid-area:docs;gap:24px}
+  .espace--tableau .tableau-demande{grid-area:demande}
+  .espace--tableau .dossier-head h1{font-size:26px;overflow-wrap:break-word}
+  .espace--tableau .dossier-head .espace-intro{margin-top:8px;font-size:14px;line-height:1.55}
+  .espace--tableau .retractation{padding:12px 14px}
+  /* Timeline resserrée : date sous le titre, information de l'étape sur toute la largeur, coordonnées de virement sur
+     une colonne, en 12 px (l'IBAN, 33 caractères : 237,6 px, tient sur une ligne dès 1200 px de large, barre de
+     défilement classique comprise) */
+  .espace--tableau .timeline > li{grid-template-columns:12px minmax(0,1fr);padding:10px 0}
+  .espace--tableau .tl-title{font-size:14px}
+  .espace--tableau .tl-desc{margin-top:2px}
+  .espace--tableau .tl-date{grid-column:2;padding-top:1px}
+  .espace--tableau .info-etape{grid-column:1 / -1;margin-top:10px;padding:16px 10px}
+  .espace--tableau .virement{grid-template-columns:minmax(0,1fr);gap:2px}
+  .espace--tableau .virement dd{margin-bottom:8px;font-size:12px}
+  /* Documents : le nom sur sa ligne (coupable), puis la taille et la date avec « Télécharger » (l'enveloppe du nom et de
+     la taille, sans rôle, s'efface) ; pièces d'une bulle : « Télécharger » reste à droite quand le nom le fait passer à
+     la ligne */
+  .espace--tableau .docs li{flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+  .espace--tableau .docs li > div{display:contents}
+  .espace--tableau .docs .doc-name{flex:1 0 100%}
+  .espace--tableau .docs .doc-meta{flex:1 1 auto;margin-top:0}
+  .espace--tableau .docs button.link-more,.espace--tableau .pieces button.link-more{margin-left:auto}
+  /* Récapitulatif : libellé au-dessus de la valeur */
+  .espace--tableau .recap-liste{grid-template-columns:minmax(0,1fr);gap:4px}
+  .espace--tableau .recap-liste dd{margin-bottom:8px}
+  /* Discussion : cadre ; fil et composeur de bord à bord (barre de défilement du fil contre le filet) ; compte agence :
+     la phrase qui remplace le composeur prend son filet */
+  .espace--tableau .discussion-bloc{grid-area:discussion;box-sizing:border-box;padding:20px;border:1px solid var(--line)}
+  .espace--tableau .discussion{margin:0 -20px;padding:4px 20px}
+  .espace--tableau .discussion:focus-visible{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:-4px}
+  .espace--tableau .discussion-bloc > [data-composeur-agence]{margin:0 -20px;padding:14px 20px 0;border-top:1px solid var(--line)}
+  /* Composeur compact : mêmes éléments et même ordre de tabulation (texte, fichiers, Envoyer) ; le champ de fichiers
+     s'efface (display: contents) pour placer son libellé, sa zone de dépôt et ses puces dans la grille du formulaire.
+     L'erreur et l'annonce viennent juste sous « Envoyer », avant les puces et l'aide (visibles quand le panneau est
+     juste). Écarts portés par des marges : un élément masqué ne laisse pas de vide ; l'annonce vide ne prend pas de
+     place. */
+  .espace--tableau .composeur{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"texte texte" "pj pj" "zone envoi" "err err" "statut statut" "puces puces" "aide aide";
+    gap:0 12px;margin:0 -20px;padding:14px 20px 0}
+  .espace--tableau .composeur-texte{grid-area:texte;gap:6px}
+  .espace--tableau .composeur-texte .input{height:92px;padding:9px 12px} /* trois lignes de 24 px */
+  .espace--tableau .composeur-pj{display:contents}
+  .espace--tableau .composeur-pj > .lbl{grid-area:pj;margin-top:10px}
+  .espace--tableau .composeur-pj > .dropzone{grid-area:zone;margin-top:6px;padding:8px 12px;flex-wrap:wrap;row-gap:2px} /* étroite : « Aucun fichier sélectionné » passe sous l'invite, sans se couper */
+  .espace--tableau .composeur-pj > .files{grid-area:puces;margin-top:8px}
+  .espace--tableau .composeur > .composeur-aide{grid-area:aide;margin-top:8px;line-height:1.5}
+  .espace--tableau .composeur > .f-err{grid-area:err;margin-top:8px}
+  .espace--tableau .composeur > .form-actions{grid-area:envoi;margin-top:6px;padding-top:0;align-items:stretch}
+  .espace--tableau .composeur > .form-actions .btn{padding:8px 20px}
+  .espace--tableau .composeur > .composeur-statut{grid-area:statut;margin-top:8px}
+  .espace--tableau .composeur > .composeur-statut:empty{margin-top:0}
+  @supports (field-sizing:content){
+    .espace--tableau .composeur-texte .input{field-sizing:content;height:auto;min-height:92px;max-height:188px} /* suit le texte, de 3 à 7 lignes */
+  }
+}
+@media screen and (min-width:1200px){
+  /* Colonne de droite de 290 px au moins : taille et date (« 1023 Ko · 30 septembre 2026 ») et « Télécharger » sur une ligne */
+  .espace--tableau > .tableau{grid-template-columns:clamp(260px,24%,340px) minmax(0,1fr) clamp(290px,22%,320px);column-gap:clamp(32px,2.8vw,40px);grid-template-rows:auto auto 1fr;
+    grid-template-areas:"tete discussion docs" "avancement discussion docs" "demande discussion docs"}
+}
+@media screen and (min-width:981px) and (min-height:620px){
+  /* Composeur plus haut que la place (texte long, pièces jointes, erreur ; sur un écran de 620 à 700 px de haut, dès une
+     à trois pièces selon la largeur) : le fil garde 80 px et le panneau défile dans son cadre */
+  .espace--tableau .discussion-bloc{position:sticky;top:var(--tableau-haut);height:var(--tableau-hauteur);min-height:420px;
+    overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(var(--ink-rgb),.4) transparent;scroll-padding-block:12px}
+  .espace--tableau .discussion{flex:1 1 auto;min-height:80px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(var(--ink-rgb),.4) transparent;scrollbar-gutter:stable;scroll-padding-block:12px}
+  .espace--tableau .discussion:empty{min-height:0}
+  .espace--tableau .discussion > :first-child{margin-top:auto}
+  /* Composeur : même gouttière que le fil (barres classiques : bulles et champs finissent au même bord droit) ; jamais
+     rétréci (sans débordement visible, il perdrait sa hauteur minimale) */
+  .espace--tableau .composeur{flex-shrink:0;overflow:hidden;scrollbar-gutter:stable;scrollbar-width:thin}
+  /* Champ qui suit le texte : il ne grandit que dans la place que laisse l'écran (fil à sa hauteur minimale, composeur
+     le plus haut à vide : 275 px) */
+  .espace--tableau .composeur-texte .input{max-height:min(188px,calc(var(--tableau-hauteur) - 356px))}
+}
+@media screen and (min-width:981px) and (min-height:620px) and (max-height:799px){
+  /* Écran bas (ordinateur portable : 1366 × 768 laisse 635 à 657 px à la page) : cadre et composeur resserrés, le fil
+     garde la place (champ toujours sur trois lignes) */
+  .espace--tableau .discussion-bloc{padding-block:14px;gap:10px}
+  .espace--tableau .composeur{padding-top:10px}
+  .espace--tableau .composeur-pj > .lbl{margin-top:8px}
+  .espace--tableau .composeur > .composeur-aide{margin-top:6px;font-size:12.5px;line-height:1.45}
+}
+@media screen and (min-width:1200px) and (min-height:620px){
+  .espace--tableau .tableau-docs{position:sticky;top:var(--tableau-haut);max-height:var(--tableau-hauteur);
+    overflow-y:auto;margin:0 -6px;padding:0 6px;scrollbar-width:thin;scrollbar-color:rgba(var(--ink-rgb),.4) transparent;scroll-padding-block:8px}
+}
 /* ==========================================================================
    Parcours v3 : information sous l'étape en cours (espace client), page d'action (action/index.html) et éléments
    partagés avec l'espace agence (virement, pièces jointes, rétractation)
@@ -456,6 +580,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .discussion-bloc .f-hint{margin:0}
 .discussion{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
 .discussion > li[tabindex]:focus{outline:none} /* focus programmatique (« Afficher les messages précédents ») */
+.discussion:focus-visible{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:4px} /* fil focalisé au clavier qui cesse de défiler (zoom, fenêtre réduite : dossier.js) */
 .msg{align-self:flex-start;box-sizing:border-box;max-width:min(560px,85%);min-width:0;display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid rgba(var(--ink-rgb),.25);overflow-wrap:anywhere}
 .msg--moi{align-self:flex-end;background:var(--surface);border-color:rgba(var(--ink-rgb),.16)}
 .msg--autre{align-self:flex-start}
