@@ -8,6 +8,6 @@ window.ATOMES_CONFIG = {
   supabaseAnonKey: 'sb_publishable_GabjhmLQGgTnSBKA8MHcpw_O_lg_Kca',
   apiUrl: 'https://zvgkvovqmxmpdijubmaz.supabase.co/functions/v1/demande',
   // Fonction « espace » : actions de l'espace agence, page d'action (liens reçus par e-mail : signer, valider,
-  // renoncer), coordonnées de virement et lien de rétractation de l'espace client
+  // renoncer), formulaire public de rétractation (renoncer/), coordonnées de virement de l'espace client
   espaceUrl: 'https://zvgkvovqmxmpdijubmaz.supabase.co/functions/v1/espace'
 };

@@ -5,9 +5,12 @@
 // de l'agence (envoyés en entier au client par e-mail), entre les étapes clés du dossier (table evenements, notées par
 // un déclencheur SQL). Chaque e-mail au client montre la timeline du dossier.
 //   Liens d'action (page site/action/, jeton signé reçu par e-mail, sans session) :
-//             infos (lecture), signer (devis), valider (documents), renoncer (rétractation d'un particulier)
-//   Client  : infos_espace (coordonnées de virement, lien de rétractation), message_client (message de la discussion,
-//             avec pièces jointes : envoi multipart ; avis à l'agence au plus une fois par quart d'heure) ; session Supabase
+//             infos (lecture), signer (devis), valider (documents), renoncer (rétractation d'un particulier : anciens
+//             liens seulement, aucun n'est plus envoyé)
+//   Public  : renoncer_formulaire (rétractation d'un particulier par le formulaire du site, page site/renoncer/, sans
+//             session ni jeton : contrat reconnu par le numéro de dossier et l'adresse e-mail du dossier)
+//   Client  : infos_espace (coordonnées de virement), message_client (message de la discussion, avec pièces jointes :
+//             envoi multipart ; avis à l'agence au plus une fois par quart d'heure) ; session Supabase
 //   Agence  : devis (envoi du devis à signer), etape, option (suivi administratif), paye (« Virement reçu »),
 //             message_agence (message de la discussion, envoyé au client par e-mail), renvoyer_message (e-mail d'un
 //             message qui n'est pas parti), messages_lus, rattacher et supprimer_message (messages à vérifier), renvoyer
@@ -19,11 +22,16 @@
 //             et ajoute au dossier les e-mails des clients (messages « imap:<Message-ID> ») ; « rattacher » un tel
 //             message le marque à traiter, le moteur range ses pièces jointes à son passage suivant
 // Les e-mails au client ont pour adresse de réponse MAIL_AGENCE (contact@) : le client écrit toujours à l'agence.
+// Rétractation (décisions de Simon des 21 et 22 octobre 2026) : lien « Renoncer au contrat ici » en bas de l'espace
+// client et de la page d'action, vers le formulaire du site (renoncer_formulaire) ; information sur la rétractation
+// et formulaire type dans les conditions générales imprimées à la fin du devis, toujours joint à l'e-mail (15 Mo au
+// plus) ; aucun lien de rétractation dans les e-mails ni dans les réponses aux pages.
 // Appel : POST JSON { action, projet, … } (64 Ko au plus) avec Authorization: Bearer <session Supabase>, ou { action,
-// jeton, … } pour les liens d'action ; message_client seulement en multipart/form-data (champs action, projet, cle,
-// texte, fichiers ; session vérifiée avant toute lecture du corps, 10,5 Mo au plus). « Verify JWT » est désactivé : la
-// session ou le jeton sont vérifiés ici (Resend n'envoie ni l'un ni l'autre). Les transitions d'étapes passent par
-// projets.etape : le déclencheur SQL recalcule la timeline (migration 0004) ; table messages, colonnes
+// jeton, … } pour les liens d'action, ou { action: "renoncer_formulaire", nom, dossier, email, email_accuse } sans
+// session ni jeton ; message_client seulement en multipart/form-data (champs action, projet, cle, texte, fichiers ;
+// session vérifiée avant toute lecture du corps, 10,5 Mo au plus). « Verify JWT » est désactivé : la session ou le
+// jeton sont vérifiés ici (ni Resend ni le formulaire du site n'envoient l'un ou l'autre). Les transitions d'étapes
+// passent par projets.etape : le déclencheur SQL recalcule la timeline (migration 0004) ; table messages, colonnes
 // demarrage_anticipe_* et retracte_* : migration 0005 ; discussion (colonnes auteur, origine, lu_agence_le, mail_etat,
 // cle… de messages) et étapes clés (evenements) : migration 0006. Le client lit par l'API toutes les colonnes de ses
 // messages visibles (la RLS filtre les lignes, pas les colonnes) : rien d'interne n'y est écrit.
@@ -33,8 +41,8 @@
 // que pour la fonction « demande »). RESEND_WEBHOOK_SECRET, REPONSES_DOMAINE et RESEND_RECEPTION_KEY (réception des
 // réponses par Resend) : supprimés le 20 octobre 2026 : sans eux, tout appel du webhook est refusé (400).
 // Sans JETON_SECRET : aucun lien d'action (refus 503).
-// Les liens placés dans les e-mails mènent toujours à SITE_URL (jamais à l'origine de la requête, par exemple un
-// essai depuis localhost) ; seuls les liens renvoyés à la page qui appelle suivent son origine (ORIGINES).
+// Les liens placés dans les e-mails ou renvoyés aux pages mènent toujours à SITE_URL (jamais à l'origine de la requête,
+// par exemple un essai depuis localhost) ; ORIGINES ne sert qu'au CORS.
 // =============================================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -58,7 +66,9 @@ const ESPACE_AGENCE = `${SITE_URL}/admin/`;
 
 const DUREE_SIGNER = 30 * 86400;                  // validité des liens, en secondes
 const DUREE_VALIDER = 90 * 86400;
-const MAX_DEVIS_JOINT = 15 * 1024 * 1024;         // au-delà, le devis n'est pas joint à l'e-mail (lien seulement)
+// Devis joint à l'e-mail : toujours (conditions générales sur support durable) ; au-delà, l'envoi du devis est refusé à
+// l'agence. Confirmation d'un devis plus lourd envoyé avant cette règle : sans pièce jointe.
+const MAX_DEVIS_JOINT = 15 * 1024 * 1024;
 const MAX_PIECE = 25 * 1024 * 1024;               // pièces jointes reçues du client
 const MAX_PIECES = 20;                            // par message
 const MAX_PIECES_TOTAL = 100 * 1024 * 1024;       // par message
@@ -102,12 +112,17 @@ const MAX_JOINTES_MESSAGE = 15 * 1024 * 1024;     // pièces d'un message de l'a
 const DELAI_RENVOI = 10 * 60 * 1000;              // e-mail d'un message de l'agence « en cours » depuis plus longtemps : à renvoyer
 const CLE_ENVOI = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;   // clé anti-doublon tirée par la page (uuid)
 
-// Textes juridiques (cahier des charges § 7), à reprendre mot pour mot ; renvoyés tels quels à la page d'action
-// (source unique). À faire valider par l'Ordre des architectes.
+// Textes juridiques, à reprendre mot pour mot ; renvoyés tels quels à la page d'action (source unique, la démo de la
+// page en garde une copie). Signature : case de démarrage anticipé (version corrigée choisie par Simon le 22 octobre
+// 2026, la même qu'à l'article 11.4 des conditions générales), bouton, et phrase des conditions générales au-dessus du
+// bouton, pour tous les clients. L'information sur la rétractation et le formulaire type remis au client figurent
+// dans les conditions générales imprimées à la fin du devis (décision de Simon du 21 octobre 2026) ; le formulaire
+// ci-dessous n'est plus montré que par l'ancien lien de rétractation (mode « renoncer »). À faire valider par l'Ordre
+// des architectes.
 const TEXTES = {
-  case: "Je demande que la mission commence avant la fin du délai de rétractation de 14 jours. Je reconnais perdre ce droit une fois la mission entièrement exécutée, et devoir, si je me rétracte avant, le montant du travail déjà réalisé.",
+  case: "Je demande que la mission commence avant la fin du délai de rétractation de 14 jours. Je reconnais perdre mon droit de rétractation une fois la mission entièrement exécutée, et devoir, si je me rétracte avant, un montant proportionné au travail déjà réalisé.",
   bouton: "Signer et commander avec obligation de paiement",
-  retractation: "Vous disposez de 14 jours à compter de la signature pour renoncer au contrat, sans avoir à vous justifier : depuis le lien « Renoncer au contrat ici », avec le formulaire type ou par toute déclaration claire adressée à Atomes studio. Si vous renoncez, les sommes versées vous sont remboursées sous 14 jours, déduction faite du montant du travail déjà réalisé à votre demande.",
+  cgv: "En signant, vous acceptez nos conditions générales, jointes au devis.",
   formulaire: [
     "Formulaire de rétractation",
     "(Veuillez compléter et renvoyer le présent formulaire uniquement si vous souhaitez vous rétracter du contrat.)",
@@ -121,15 +136,24 @@ const TEXTES = {
     "Date : …",
   ].join("\n"),
 };
-const CASE_COCHEE = "Vous avez demandé que la mission commence avant la fin du délai de rétractation.";
 
 const LIEN_INVALIDE = "Lien invalide";
 const LIEN_EXPIRE = "Ce lien a expiré : écrivez-nous à contact@atomes.studio pour en recevoir un nouveau";
 const DELAI_EXPIRE = "Le délai de rétractation est expiré";
+const NOM_REQUIS = "Saisissez votre nom et votre prénom";
+const EMAIL_INVALIDE = "Saisissez une adresse e-mail valide";
+// Formulaire du site (renoncer_formulaire) : refus de format (message du champ), délai expiré, et refus unique de tout
+// contrat non reconnu (dossier inconnu, professionnel, non signé, autre adresse) : rien ne révèle qu'un numéro existe
+// ni à qui il appartient.
+const DOSSIER_INVALIDE = "Saisissez le numéro de dossier (12 chiffres)";
+const EMAIL_ACCUSE_INVALIDE = "Saisissez une adresse e-mail valide pour l'accusé de réception, ou laissez ce champ vide";
+const DELAI_EXPIRE_FORMULAIRE = `${DELAI_EXPIRE}. Si vous pensez que ce n'est pas le cas, écrivez-nous à contact@atomes.studio.`;
+const CONTRAT_INCONNU = "Nous ne retrouvons pas de contrat en cours avec ce numéro de dossier et cette adresse e-mail. Vérifiez-les : le numéro figure dans nos e-mails, l'adresse est celle de votre demande. Vous pouvez aussi nous écrire à contact@atomes.studio : toute déclaration claire vaut rétractation.";
 const DEVIS_CHANGE = "Le devis a été mis à jour : utilisez le lien du dernier e-mail reçu";
+const DEVIS_LOURD = "Devis trop lourd (15 Mo au plus) : il doit toujours être joint à l'e-mail du client. Allégez le PDF, puis envoyez-le de nouveau.";
 const DEJA_PAYE = "Ce dossier est déjà payé : le devis ne peut plus être remplacé";
 const PAS_DE_CONTRAT = "Aucun devis signé n'est en cours sur ce dossier : il n'y a pas de contrat auquel renoncer.";
-const CONTRAT_PRECEDENT = "Ce lien concerne un contrat précédent : utilisez le lien « Renoncer au contrat ici » du dernier e-mail reçu, ou écrivez-nous à contact@atomes.studio.";
+const CONTRAT_PRECEDENT = "Ce lien concerne un contrat précédent : utilisez le lien « Renoncer au contrat ici » en bas de cette page, ou écrivez-nous à contact@atomes.studio.";
 const STOCKAGE_INDISPONIBLE = "Documents momentanément indisponibles : réessayez dans quelques minutes";
 // Discussion : refus affichés tels quels par les pages (pièces jointes : mêmes textes que le formulaire de devis).
 const MESSAGE_VIDE = "Écrivez un message ou joignez un fichier.";
@@ -158,8 +182,9 @@ type Projet = {
   envois_echoues: Echec[] | null;
   etapes: Etape[];
 };
-// E-mail légal au client qui n'a pas pu partir pendant une action par lien (confirmation du contrat, accusé de
-// rétractation) : noté dans projets.envois_echoues, signalé dans l'espace agence avec un bouton « Renvoyer ».
+// E-mail légal au client qui n'a pas pu partir pendant une action du client (confirmation du contrat après la signature
+// par lien, accusé de rétractation après le formulaire du site ou un ancien lien) : noté dans projets.envois_echoues,
+// signalé dans l'espace agence avec un bouton « Renvoyer ».
 type Echec = { quoi: "confirmation" | "retractation"; sujet: string; le: string };
 // Pièce rangée dans <id>/client/ ; id_resend : identifiant de la pièce jointe chez Resend (une reprise du traitement ne
 // la range pas une seconde fois).
@@ -188,7 +213,7 @@ type Sb = any;
 // deno-lint-ignore no-explicit-any
 type Json = any;
 type Utilisateur = { id: string };                // compte connecté (session Supabase)
-type Contexte = { sb: Sb; projet: Projet; corps: Record<string, unknown>; req: Request; base: string; user: Utilisateur };
+type Contexte = { sb: Sb; projet: Projet; corps: Record<string, unknown>; req: Request; user: Utilisateur };
 type ContexteLien = Omit<Contexte, "user"> & { jeton: Charge };
 type Action = (c: Contexte) => Promise<Record<string, unknown>>;
 type ActionLien = (c: ContexteLien) => Promise<Record<string, unknown>>;
@@ -210,9 +235,6 @@ Deno.serve(async (req) => {
   if (["svix-id", "svix-timestamp", "svix-signature"].some((h) => req.headers.has(h))) return webhookResend(sb, req);
 
   try {
-    // Base des liens renvoyés à la page qui appelle (lien de rétractation affiché après la signature ou dans l'espace
-    // client) : son origine si elle est autorisée, sinon le site. Les liens des e-mails mènent toujours à SITE_URL.
-    const base = ORIGINES.includes(origine) ? origine : SITE_URL;
     let corps: Record<string, unknown>;
     let user: Utilisateur;
     if (/^\s*multipart\/form-data/i.test(req.headers.get("content-type") ?? "")) {
@@ -223,8 +245,11 @@ Deno.serve(async (req) => {
     } else {
       corps = await lireJson(req);
       if (corps.action === "message_client") throw new Refus("Requête illisible");   // pièces jointes : multipart seulement
+      // Rétractation par le formulaire du site : action publique, avant toute exigence de session (un champ « jeton »
+      // éventuel n'y change rien) ; mêmes CORS et même format de réponse que les autres actions.
+      if (corps.action === "renoncer_formulaire") return json({ ok: true, ...(await renoncerFormulaire(sb, corps, req)) }, 200, cors);
       // Lien d'action reçu par e-mail : le jeton signé tient lieu de session.
-      if (Object.hasOwn(corps, "jeton")) return json({ ok: true, ...(await actionParLien(sb, String(corps.action ?? ""), corps, req, base)) }, 200, cors);
+      if (Object.hasOwn(corps, "jeton")) return json({ ok: true, ...(await actionParLien(sb, String(corps.action ?? ""), corps, req)) }, 200, cors);
       user = await utilisateur(sb, req);
     }
     const action = String(corps.action ?? "");
@@ -241,7 +266,7 @@ Deno.serve(async (req) => {
       }
       throw new Refus("Dossier introuvable", 404);
     }
-    const c: Contexte = { sb, projet, corps, req, base, user };
+    const c: Contexte = { sb, projet, corps, req, user };
     return json({ ok: true, ...(await (estClient ? ACTIONS_CLIENT : ACTIONS_AGENCE)[action](c)) }, 200, cors);
   } catch (e) {
     if (e instanceof Refus) return json({ ok: false, erreur: e.message }, e.statut, cors);
@@ -312,7 +337,7 @@ async function lireCorps(req: Request, max: number): Promise<ArrayBuffer | null>
 
 // ---------- Actions par lien (page d'action, jeton reçu par e-mail) ----------------------------
 
-async function actionParLien(sb: Sb, action: string, corps: Record<string, unknown>, req: Request, base: string): Promise<Record<string, unknown>> {
+async function actionParLien(sb: Sb, action: string, corps: Record<string, unknown>, req: Request): Promise<Record<string, unknown>> {
   if (!Object.hasOwn(ACTIONS_LIEN, action)) throw new Refus("Action inconnue");
   if (!JETON_SECRET) throw new Refus("Liens indisponibles", 503);
   const { charge, expire } = await lireJeton(String(corps.jeton ?? ""));
@@ -327,13 +352,14 @@ async function actionParLien(sb: Sb, action: string, corps: Record<string, unkno
   }
   const projet = await chargerProjet(sb, charge.p);
   if (!projet) throw new Refus("Dossier introuvable", 404);
-  return await ACTIONS_LIEN[action]({ sb, projet, corps, req, base, jeton: charge });
+  return await ACTIONS_LIEN[action]({ sb, projet, corps, req, jeton: charge });
 }
 
 const ACTIONS_LIEN: Record<string, ActionLien> = {
-  // Lecture pour la page d'action : dossier, timeline, puis selon le lien (mode) le devis à signer, les documents
-  // à valider ou l'état de la rétractation. Aucune écriture.
-  async infos({ sb, projet, jeton, base }) {
+  // Lecture pour la page d'action : dossier, timeline, puis selon le lien (mode) le devis à signer et les textes de la
+  // signature (case, bouton, phrase des conditions générales), les documents à valider, ou l'état de la rétractation
+  // (ancien lien) et le formulaire type qu'il montre encore. Aucun lien de rétractation, aucune écriture.
+  async infos({ sb, projet, jeton }) {
     const particulier = estParticulier(projet);
     const r: Record<string, unknown> = {
       mode: jeton.a,
@@ -351,8 +377,7 @@ const ACTIONS_LIEN: Record<string, ActionLien> = {
         envoye_le: projet.devis_envoye_le,
       };
       r.signe = projet.signe_le ? { le: projet.signe_le, nom: projet.signe_nom } : null;
-      r.textes = TEXTES;
-      r.renoncer = await lienRenoncer(projet, base);
+      r.textes = { case: TEXTES.case, bouton: TEXTES.bouton, cgv: TEXTES.cgv };
     } else if (jeton.a === "valider") {
       r.documents = (await documentsAgence(sb, projet, true)).map(({ nom, url, taille, date }) => ({ nom, url, taille, date }));
       // Nouvelle demande de validation (dossier revenu à cette étape) : une validation précédente ne vaut plus.
@@ -367,7 +392,7 @@ const ACTIONS_LIEN: Record<string, ActionLien> = {
       // Accusé de réception de la rétractation parti par e-mail (faux tant qu'il reste à renvoyer).
       if (projet.retracte_le) r.accuse_envoye = !echecs(projet).some((x) => x.quoi === "retractation");
       r.expire = Date.now() > finRetractation(projet.signe_le).getTime();
-      r.textes = TEXTES;
+      r.textes = { formulaire: TEXTES.formulaire };
     }
     return r;
   },
@@ -375,16 +400,15 @@ const ACTIONS_LIEN: Record<string, ActionLien> = {
   // Signature électronique simple : nom saisi, date, adresse IP, navigateur et empreinte SHA-256 du PDF signé.
   // Elle porte sur la version et le montant affichés (corps.empreinte, corps.montant) et sur le devis du lien
   // (jeton.d) : un devis remplacé depuis est refusé (409). Particulier : case de démarrage anticipé obligatoire.
-  async signer({ sb, projet, corps, req, base, jeton }) {
-    if (projet.signe_le && String(corps.empreinte ?? "") === projet.signe_empreinte) {
-      return { deja: true, renoncer: await lienRenoncer(projet, base) };   // double envoi
-    }
+  // Réponse { etape, mail }, ou { deja } (double envoi) : aucun lien de rétractation (formulaire du site).
+  async signer({ sb, projet, corps, req, jeton }) {
+    if (projet.signe_le && String(corps.empreinte ?? "") === projet.signe_empreinte) return { deja: true };   // double envoi
     if (!projet.devis_empreinte || jeton.d !== projet.devis_empreinte.slice(0, 16)) throw new Refus(DEVIS_CHANGE, 409);
     if (projet.etape !== "signature") throw new Refus("Ce devis ne peut pas être signé à cette étape du dossier : écrivez-nous à contact@atomes.studio.", 409);
     if (!projet.devis_chemin) throw new Refus("Le devis n'est pas encore disponible", 409);
     if (corps.accepte !== true) throw new Refus(`Confirmez la signature avec le bouton « ${TEXTES.bouton} »`);
     const nom = propre(String(corps.nom ?? ""), 120);
-    if (nom.length < 3) throw new Refus("Saisissez votre nom et votre prénom");
+    if (nom.length < 3) throw new Refus(NOM_REQUIS);
     if (String(corps.empreinte ?? "") !== projet.devis_empreinte || Number(corps.montant ?? 0) !== Number(projet.montant_cents ?? 0)) {
       throw new Refus(DEVIS_CHANGE, 409);
     }
@@ -410,14 +434,12 @@ const ACTIONS_LIEN: Record<string, ActionLien> = {
       // Rien d'écrit : double envoi (déjà signé, même version) ou dossier modifié entre-temps par l'agence.
       const relu = await chargerProjet(sb, projet.id);
       if (relu?.signe_le && relu.signe_empreinte === empreinte && relu.devis_empreinte === empreinte && relu.montant_cents === projet.montant_cents) {
-        return { deja: true, renoncer: await lienRenoncer(relu, base) };
+        return { deja: true };
       }
       const change = !relu || relu.devis_empreinte !== empreinte || relu.montant_cents !== projet.montant_cents;
       throw new Refus(change ? DEVIS_CHANGE : "Le dossier a changé entre-temps : rechargez la page avant de signer", 409);
     }
     const maj = await relire(sb, projet, valeurs);
-    // Lien renvoyé à la page qui signe (son origine) ; celui de l'e-mail mène toujours au site (mailConfirmation).
-    const renoncer = particulier ? await lienRenoncer(maj, base) : null;
     // Confirmation du contrat (cahier des charges § 5) ; si elle ne part pas, c'est noté pour l'agence (« Renvoyer »).
     const mail = await mailConfirmation(maj, pdf);
     if (!mail) await majEchecs(sb, maj, [], { quoi: "confirmation", sujet: `Devis signé — dossier ${projet.id}`, le: new Date().toISOString() });
@@ -431,9 +453,9 @@ const ACTIONS_LIEN: Record<string, ActionLien> = {
       ]),
       mail
         ? p("Le client a reçu la confirmation de sa commande avec le devis signé et les instructions de virement. Quand le virement arrive, cliquez sur «&nbsp;Virement reçu&nbsp;» dans l'espace agence.")
-        : alerte("La confirmation de la commande (devis signé, instructions de virement" + (particulier ? ", information sur la rétractation" : "") + ") n'a pas pu être envoyée au client&nbsp;: renvoyez-la depuis l'espace agence (bouton «&nbsp;Renvoyer&nbsp;» en tête de la fiche du dossier)."),
+        : alerte("La confirmation de la commande (devis signé, instructions de virement) n'a pas pu être envoyée au client&nbsp;: renvoyez-la depuis l'espace agence (bouton «&nbsp;Renvoyer&nbsp;» en tête de la fiche du dossier)."),
     ].join(""));
-    return { etape: suivante, renoncer, mail };
+    return { etape: suivante, mail };
   },
 
   // Documents validés : étape suivante (dépôt avec l'option de suivi, sinon dossier clos).
@@ -469,9 +491,10 @@ const ACTIONS_LIEN: Record<string, ActionLien> = {
     return { etape: suivante, valide_le: le, mail };
   },
 
-  // Rétractation d'un particulier (renonciation au contrat), pendant le délai légal. L'étape ne change pas :
-  // l'agence arrête la mission et rembourse s'il y a lieu. Le lien porte sur le contrat en cours (jeton.d) : celui
-  // d'un contrat précédent (devis remplacé puis signé de nouveau) est refusé.
+  // Rétractation d'un particulier par un ancien lien reçu par e-mail (aucun n'est plus envoyé : formulaire du site),
+  // pendant le délai légal ; mêmes effets que le formulaire (enregistrerRetractation). Le lien porte sur le contrat en
+  // cours (jeton.d) : celui d'un contrat précédent (devis remplacé puis signé de nouveau) est refusé. Adresse saisie
+  // facultative (accusé de réception).
   async renoncer({ sb, projet, corps, req, jeton }) {
     if (!estParticulier(projet)) throw new Refus("La rétractation ne s'applique qu'aux contrats conclus par un particulier.", 409);
     if (!projet.signe_le) throw new Refus(PAS_DE_CONTRAT, 409);
@@ -479,55 +502,117 @@ const ACTIONS_LIEN: Record<string, ActionLien> = {
     if (projet.retracte_le) return { deja: true, retracte_le: projet.retracte_le };
     if (Date.now() > finRetractation(projet.signe_le).getTime()) throw new Refus(DELAI_EXPIRE, 410);
     const nom = propre(String(corps.nom ?? ""), 120);
-    if (nom.length < 3) throw new Refus("Saisissez votre nom et votre prénom");
+    if (nom.length < 3) throw new Refus(NOM_REQUIS);
     const email = propre(String(corps.email ?? ""), 200).toLowerCase();
-    if (email && !EMAIL.test(email)) throw new Refus("Saisissez une adresse e-mail valide");
-    const le = new Date();
-    const ip = ipClient(req);
-    const navigateur = propre(req.headers.get("user-agent") ?? "", 300) || null;
-    const valeurs = { retracte_le: le.toISOString(), retracte_nom: nom, retracte_email: email || null, retracte_ip: ip, retracte_agent: navigateur };
-    const { data, error } = await sb.from("projets").update(valeurs).eq("id", projet.id).is("retracte_le", null).select("id");
-    if (error) throw refusSql(error);
-    if (!data?.length) {
-      const relu = await chargerProjet(sb, projet.id);
-      if (relu?.retracte_le) return { deja: true, retracte_le: relu.retracte_le };
-      throw new Refus("Le dossier a changé entre-temps : rechargez la page", 409);
-    }
-    const maj = await relire(sb, projet, valeurs);
-    // Accusé de réception (à l'adresse du dossier, et séparément à l'adresse saisie si elle diffère) ; s'il ne part
-    // nulle part, c'est noté pour l'agence (« Renvoyer ») et la page le dit au client. Une confirmation du contrat
-    // restée à renvoyer n'a plus lieu d'être (contrat rétracté).
-    const mail = await mailsAccuse(maj);
-    await majEchecs(sb, maj, ["confirmation"], mail ? null : { quoi: "retractation", sujet: `Rétractation reçue — dossier ${projet.id}`, le: new Date().toISOString() });
-    const signeLe = dateParis(new Date(projet.signe_le));
-    await mailAgence(maj, `Rétractation — dossier ${projet.id} (${projet.nom})`, "Rétractation", [
-      p(`${esc(projet.prenom)} ${esc(projet.nom)} a renoncé au contrat (droit de rétractation) le ${esc(dateParis(le))}. <strong>Arrêtez la mission.</strong>`),
-      projet.paye_le
-        ? alerte(`Un virement a été reçu le ${esc(dateParis(new Date(projet.paye_le)))}&nbsp;: remboursez-le sous 14 jours, déduction faite, le cas échéant, du montant du travail déjà réalisé à sa demande.`)
-        : p("Aucun virement n'est enregistré pour ce dossier."),
-      mail ? "" : alerte("L'accusé de réception de la rétractation n'a pas pu être envoyé au client&nbsp;: renvoyez-le depuis l'espace agence (bouton «&nbsp;Renvoyer&nbsp;» en tête de la fiche du dossier)."),
-      tableau([
-        ["Nom saisi", nom], ["Adresse e-mail saisie", email], ["Devis signé le", signeLe],
-        ["Démarrage anticipé demandé le", projet.demarrage_anticipe_le ? dateParis(new Date(projet.demarrage_anticipe_le)) : "Non"],
-        ["Montant du devis", projet.montant_cents ? montantTexte(projet) : ""], ["Adresse IP", ip ?? ""], ["Navigateur", navigateur ?? ""],
-      ]),
-    ].join(""));
-    return { retracte_le: valeurs.retracte_le, mail };
+    if (email && !EMAIL.test(email)) throw new Refus(EMAIL_INVALIDE);
+    return await enregistrerRetractation(sb, projet, { nom, email, autre: "" }, req, false);
   },
 };
+
+// ---------- Rétractation d'un particulier : formulaire du site (public) et effets communs avec l'ancien lien ------
+
+// Formulaire du site (page site/renoncer/, ouverte par le lien « Renoncer au contrat ici » en bas de l'espace client
+// et de la page d'action ; L221-21 : sans connexion, pendant tout le délai) : { nom, dossier, email, email_accuse },
+// sans session ni jeton. Formats : nom et prénom de 3 à 120 caractères, numéro de dossier de 12 chiffres, adresse
+// e-mail valide de 200 caractères au plus, autre adresse pour l'accusé facultative (vide : absente), au même format ;
+// sinon 400 avec le message du champ. Contrat reconnu seulement si le dossier existe, est celui d'un particulier,
+// porte un devis signé et a pour adresse celle saisie (espaces retirés, sans tenir compte de la casse) ; sinon un seul
+// refus (404, même texte), sans rien écrire ni envoyer. Rétractation déjà reçue : { deja, retracte_le } ; délai
+// écoulé : 410 ; sinon mêmes effets que l'ancien lien. Pas de limite de fréquence : un refus n'écrit et n'envoie rien,
+// un succès n'a lieu qu'une fois (« deja » ensuite). Journaux : jamais le nom, les adresses ni le numéro saisis
+// (erreur inattendue : son code et son statut seulement). Réponse { retracte_le, mail } (mail faux si l'accusé n'est
+// parti nulle part).
+async function renoncerFormulaire(sb: Sb, corps: Record<string, unknown>, req: Request): Promise<Record<string, unknown>> {
+  const nom = propre(champTexte(corps.nom), 121);
+  if (nom.length < 3 || nom.length > 120) throw new Refus(NOM_REQUIS);
+  const dossier = (typeof corps.dossier === "number" ? String(corps.dossier) : champTexte(corps.dossier)).replace(/\s+/g, "");
+  if (!/^[0-9]{12}$/.test(dossier)) throw new Refus(DOSSIER_INVALIDE);
+  const email = adresseSaisie(corps.email);
+  if (!adresseValide(email)) throw new Refus(EMAIL_INVALIDE);
+  const autre = adresseSaisie(corps.email_accuse);
+  if (autre && !adresseValide(autre)) throw new Refus(EMAIL_ACCUSE_INVALIDE);
+  try {
+    const projet = await chargerProjet(sb, dossier);
+    if (!projet || !estParticulier(projet) || !projet.signe_le || adresseSaisie(projet.email) !== email) throw new Refus(CONTRAT_INCONNU, 404);
+    if (projet.retracte_le) return { deja: true, retracte_le: projet.retracte_le };
+    if (Date.now() > finRetractation(projet.signe_le).getTime()) throw new Refus(DELAI_EXPIRE_FORMULAIRE, 410);
+    return await enregistrerRetractation(sb, projet, { nom, email, autre }, req, true);
+  } catch (e) {
+    if (e instanceof Refus) throw e;
+    console.error("rétractation par le formulaire du site : erreur", resumeErreur(e));
+    throw new Error("rétractation par le formulaire du site");
+  }
+}
+
+// Erreur inattendue notée dans un journal qui ne doit rien garder de la saisie (formulaire du site) : son code et son
+// statut seulement. Le message d'une erreur réseau de supabase-js reprend l'adresse de la requête, numéro du dossier
+// compris (Deno : « error sending request for url (…&id=eq.<numéro>) »).
+function resumeErreur(e: unknown): string {
+  const x = (e ?? {}) as Json;
+  return JSON.stringify({ code: x.code ?? null, statut: x.status ?? x.statusCode ?? null });
+}
+
+// Champ texte du formulaire du site : sa valeur si c'est un texte, sinon vide.
+const champTexte = (v: unknown) => (typeof v === "string" ? v : "");
+// Adresse e-mail saisie : caractères de contrôle et espaces retirés (avant, après, dedans), en minuscules.
+const adresseSaisie = (v: unknown) => propre(champTexte(v), 1000).replace(/\s+/g, "").toLowerCase();
+const adresseValide = (a: string) => a.length > 0 && a.length <= 200 && EMAIL.test(a);
+
+// Rétractation enregistrée (ancien lien ou formulaire du site : mêmes effets). Écriture conditionnelle de retracte_*
+// (nom saisi ; adresse de l'accusé : l'autre adresse du formulaire si elle est donnée, sinon l'adresse saisie ; IP ;
+// navigateur) sur le contrat lu : pas encore rétracté, même signature. Accusé de réception à l'adresse du dossier, et
+// séparément à l'adresse de l'accusé si elle diffère ; s'il n'est pas parti vers l'une d'elles, c'est noté pour l'agence
+// (« Renvoyer », alerte dans l'avis) ; s'il n'est parti nulle part, la page le dit au client (mail faux) ; une
+// confirmation du contrat restée à renvoyer n'a plus lieu d'être (contrat rétracté). Avis à l'agence (« par le
+// formulaire du site » s'il y a lieu). L'étape ne change pas : l'agence arrête la mission et rembourse s'il y a lieu.
+// Réponse { retracte_le, mail }, ou { deja, retracte_le } (rétractation enregistrée entre-temps). Formulaire du site :
+// journal sans le numéro du dossier.
+async function enregistrerRetractation(sb: Sb, projet: Projet, saisie: { nom: string; email: string; autre: string }, req: Request, formulaire: boolean): Promise<Record<string, unknown>> {
+  if (!projet.signe_le) throw new Refus(PAS_DE_CONTRAT, 409);
+  const le = new Date();
+  const ip = ipClient(req);
+  const navigateur = propre(req.headers.get("user-agent") ?? "", 300) || null;
+  const valeurs = {
+    retracte_le: le.toISOString(), retracte_nom: saisie.nom, retracte_email: saisie.autre || saisie.email || null, retracte_ip: ip, retracte_agent: navigateur,
+  };
+  const { data, error } = await sb.from("projets").update(valeurs).eq("id", projet.id).is("retracte_le", null).eq("signe_le", projet.signe_le).select("id");
+  if (error) throw refusSql(error);
+  if (!data?.length) {
+    const relu = await chargerProjet(sb, projet.id);
+    if (relu?.retracte_le) return { deja: true, retracte_le: relu.retracte_le };
+    throw new Refus("Le dossier a changé entre-temps : rechargez la page", 409);
+  }
+  const journal = formulaire ? "(formulaire du site)" : projet.id;
+  const maj = await relire(sb, projet, valeurs, journal);
+  const accuse = await mailsAccuse(maj);
+  await majEchecs(sb, maj, ["confirmation"], accuse.complet ? null : { quoi: "retractation", sujet: `Rétractation reçue — dossier ${projet.id}`, le: new Date().toISOString() }, journal);
+  await mailAgence(maj, `Rétractation — dossier ${projet.id} (${projet.nom})`, "Rétractation", [
+    p(`${esc(projet.prenom)} ${esc(projet.nom)} a renoncé au contrat (droit de rétractation)${formulaire ? " par le formulaire du site" : ""} le ${esc(dateParis(le))}. <strong>Arrêtez la mission.</strong>`),
+    projet.paye_le
+      ? alerte(`Un virement a été reçu le ${esc(dateParis(new Date(projet.paye_le)))}&nbsp;: remboursez-le sous 14 jours, déduction faite, le cas échéant, du montant du travail déjà réalisé à sa demande.`)
+      : p("Aucun virement n'est enregistré pour ce dossier."),
+    accuse.complet ? "" : alerte("L'accusé de réception de la rétractation n'a pas pu être envoyé au client&nbsp;: renvoyez-le depuis l'espace agence (bouton «&nbsp;Renvoyer&nbsp;» en tête de la fiche du dossier)."),
+    tableau([
+      ["Nom saisi", saisie.nom], ["Adresse e-mail saisie", saisie.email], ["Autre adresse pour l'accusé de réception", saisie.autre],
+      ["Devis signé le", dateParis(new Date(projet.signe_le))],
+      ["Démarrage anticipé demandé le", projet.demarrage_anticipe_le ? dateParis(new Date(projet.demarrage_anticipe_le)) : "Non"],
+      ["Montant du devis", projet.montant_cents ? montantTexte(projet) : ""], ["Adresse IP", ip ?? ""], ["Navigateur", navigateur ?? ""],
+    ]),
+  ].join(""));
+  return { retracte_le: valeurs.retracte_le, mail: accuse.parti };
+}
 
 // ---------- Actions du client (session Supabase) ---------------------------------------------------
 
 const ACTIONS_CLIENT: Record<string, Action> = {
-  // Coordonnées de virement (dossier en attente de paiement ou payé) et lien de rétractation (particulier signé,
-  // dans le délai), en lecture seule : signer, valider et renoncer se font sur la page d'action.
-  async infos_espace({ projet, base }) {
+  // Coordonnées de virement (dossier en attente de paiement ou payé), en lecture seule : signer et valider se font sur
+  // la page d'action, la rétractation sur le formulaire du site (lien en bas de l'espace client).
+  async infos_espace({ projet }) {
     const virement = !!projet.montant_cents && !projet.retracte_le && (projet.etape === "paiement" || !!projet.paye_le);
     return {
       virement: virement ? {
         iban: VIREMENT.iban ? ibanLisible(VIREMENT.iban) : null, bic: VIREMENT.bic || null, titulaire: VIREMENT.titulaire || null, reference: projet.id,
       } : null,
-      renoncer: await lienRenoncer(projet, base),
     };
   },
 
@@ -672,9 +757,11 @@ const ACTIONS_AGENCE: Record<string, Action> = {
 
   // Envoi du devis : PDF déposé dans <id>/agence/ (un fichier par version, jamais écrasé), montant à régler par
   // virement après la signature ; empreinte calculée ici. Signature, démarrage anticipé et rétractation remis à
-  // zéro (nouveau contrat). Refusé une fois le dossier payé. E-mail : PDF joint et lien de signature (30 jours) ;
-  // pour un particulier, information sur la rétractation et formulaire type avant la signature. Le lien est aussi
-  // renvoyé à l'agence (à transmettre au client si l'e-mail n'est pas parti : mail faux).
+  // zéro (nouveau contrat). Refusé une fois le dossier payé, et au-delà de 15 Mo (413, rien d'écrit ni d'envoyé : la
+  // page retire le fichier déposé) : le devis porte les conditions générales (information sur la rétractation et
+  // formulaire type compris) et doit toujours être joint à l'e-mail (support durable). E-mail : PDF joint, lien de
+  // signature (30 jours), phrase sur les conditions générales. Le lien est aussi renvoyé à l'agence (à transmettre au
+  // client si l'e-mail n'est pas parti : mail faux).
   async devis({ sb, projet, corps }) {
     if (projet.paye_le) throw new Refus(DEJA_PAYE, 409);
     if (!JETON_SECRET) throw new Refus("Liens indisponibles : configurez le secret JETON_SECRET (voir SETUP-ESPACE-CLIENT.md) avant d'envoyer un devis.", 503);
@@ -690,6 +777,7 @@ const ACTIONS_AGENCE: Record<string, Action> = {
     if (!cents) throw new Refus("Montant invalide");
     const libelle = propre(String(corps.libelle ?? ""), 120) || "Montant du devis";
     const { octets: pdf, empreinte } = await empreinteFichier(sb, chemin);
+    if (pdf.byteLength > MAX_DEVIS_JOINT) throw new Refus(DEVIS_LOURD, 413);
     const valeurs = {
       devis_chemin: chemin, devis_empreinte: empreinte, devis_envoye_le: new Date().toISOString(),
       montant_cents: cents, montant_libelle: libelle,
@@ -706,16 +794,15 @@ const ACTIONS_AGENCE: Record<string, Action> = {
     const maj = await relire(sb, projet, valeurs);
     const lien = await lienAction(SITE_URL, "signer", projet.id, Math.floor(Date.now() / 1000) + DUREE_SIGNER, empreinte.slice(0, 16));
     const fichier = chemin.split("/").pop() ?? "devis.pdf";
-    const joint = pdf.byteLength <= MAX_DEVIS_JOINT;
     const mail = await mailClient(maj, `Votre devis est prêt — dossier ${projet.id}`, "Votre devis", [
       `<h1 style="${H1}">Bonjour ${esc(projet.prenom)}, votre devis est prêt.</h1>`,
-      p(joint ? "Vous le trouverez en pièce jointe. Lisez-le, puis signez-le en ligne&nbsp;:" : "Lisez-le, puis signez-le en ligne&nbsp;:"),
+      p("Vous le trouverez en pièce jointe. Lisez-le, puis signez-le en ligne&nbsp;:"),
       bouton("Lire et signer mon devis", lien),
       tableau([["Montant", montantTexte(maj)]]),
       p("Le règlement se fait par virement, après la signature&nbsp;: vous recevrez alors la confirmation de votre commande, les coordonnées bancaires et la référence à indiquer."),
       p("Ce lien est personnel et reste valable 30&nbsp;jours."),
-      estParticulier(maj) ? retractationHtml(null, "") : "",
-    ].join(""), joint ? [{ filename: fichier, content: base64(new Uint8Array(pdf)) }] : []);
+      p("Nos conditions générales figurent à la fin du devis."),
+    ].join(""), [{ filename: fichier, content: base64(new Uint8Array(pdf)) }]);
     return { etape: "signature", empreinte, lien, mail };
   },
 
@@ -805,9 +892,10 @@ const ACTIONS_AGENCE: Record<string, Action> = {
     return { paye: true, etape: maj.etape, mail };
   },
 
-  // « Renvoyer » : e-mail légal qui n'a pas pu partir pendant une action du client par lien (confirmation du contrat,
-  // accusé de réception de la rétractation), renvoyé tel qu'il est dû aujourd'hui. Une fois parti, il n'est plus
-  // signalé dans l'espace agence. Réponse { renvoye, mail }.
+  // « Renvoyer » : e-mail légal qui n'a pas pu partir pendant une action du client (confirmation du contrat, accusé de
+  // réception de la rétractation), renvoyé tel qu'il est dû aujourd'hui. Une fois parti (l'accusé : vers l'adresse du
+  // dossier et, s'il y en a une, vers l'autre adresse pour l'accusé), il n'est plus signalé dans l'espace agence.
+  // Réponse { renvoye, mail }.
   async renvoyer({ sb, projet, corps }) {
     const quoi = String(corps.quoi ?? "");
     let mail: boolean;
@@ -821,7 +909,7 @@ const ACTIONS_AGENCE: Record<string, Action> = {
       mail = await mailConfirmation(projet, octets);
     } else if (quoi === "retractation") {
       if (!projet.retracte_le) throw new Refus("Aucune rétractation n'est enregistrée sur ce dossier.", 409);
-      mail = await mailsAccuse(projet);
+      mail = (await mailsAccuse(projet)).complet;
     } else throw new Refus("E-mail à renvoyer inconnu");
     if (mail) await majEchecs(sb, projet, [quoi], null);
     return { renvoye: quoi, mail };
@@ -1717,8 +1805,9 @@ function reponseWebhook(corps: unknown, statut: number): Response {
 
 // ---------- Jetons des liens d'action et adresses de réponse -------------------
 // Jeton = base64url(JSON { a: action, p: dossier, e: expiration en secondes, d?: 16 premiers caractères de
-// l'empreinte du devis }) + « . » + base64url(HMAC-SHA256(JETON_SECRET, première partie)). Sans état : un nouveau
-// devis invalide les liens de signature des versions précédentes (d).
+// l'empreinte du devis, ou du contrat pour un lien de rétractation }) + « . » + base64url(HMAC-SHA256(JETON_SECRET,
+// première partie)). Sans état : un nouveau devis invalide les liens de signature des versions précédentes (d). Liens
+// de rétractation (renoncer) : plus aucun n'est créé (formulaire du site) ; ceux déjà envoyés restent acceptés.
 
 function secretJetons(v: string): string {
   const s = v.trim();
@@ -1748,20 +1837,8 @@ async function lienAction(base: string, a: string, id: string, e: number, d?: st
   return `${base}/action/#t=${await creerJeton(a, id, e, d)}`;
 }
 
-// Lien de rétractation (particulier, devis signé, non rétracté, dans le délai), valable jusqu'à la fin du délai et
-// lié au contrat en cours (d) : après un nouveau devis signé, le lien d'un contrat précédent ne vaut plus.
-async function lienRenoncer(projet: Projet, base: string): Promise<{ url: string; date_limite: string } | null> {
-  if (!JETON_SECRET || !estParticulier(projet) || !projet.signe_le || projet.retracte_le) return null;
-  const fin = finRetractation(projet.signe_le);
-  if (Date.now() > fin.getTime()) return null;
-  return {
-    url: await lienAction(base, "renoncer", projet.id, Math.floor(fin.getTime() / 1000), await empreinteContrat(projet)),
-    date_limite: dernierJourRetractation(projet.signe_le),
-  };
-}
-
-// Empreinte du contrat en cours (jeton de rétractation, d) : 16 premiers caractères hexadécimaux de
-// SHA-256(date de signature + empreinte du devis signé).
+// Empreinte du contrat en cours (d d'un ancien lien de rétractation : celui d'un contrat précédent est refusé) : 16
+// premiers caractères hexadécimaux de SHA-256(date de signature + empreinte du devis signé).
 async function empreinteContrat(projet: Projet): Promise<string> {
   const le = projet.signe_le ? new Date(projet.signe_le).toISOString() : "";
   const octets = new TextEncoder().encode(le + (projet.signe_empreinte ?? ""));
@@ -1880,13 +1957,15 @@ async function chargerProjet(sb: Sb, id: string): Promise<Projet | null> {
   return data as Projet;
 }
 
-// Dossier relu après une écriture (timeline recalculée par le déclencheur) ; à défaut, valeurs locales.
-async function relire(sb: Sb, projet: Projet, maj: Partial<Projet>): Promise<Projet> {
+// Dossier relu après une écriture (timeline recalculée par le déclencheur) ; à défaut, valeurs locales. journal : ce
+// que le journal note à la place du numéro du dossier (formulaire du site : jamais le numéro saisi, ni donc l'erreur
+// entière, résumée par resumeErreur()).
+async function relire(sb: Sb, projet: Projet, maj: Partial<Projet>, journal = projet.id): Promise<Projet> {
   try {
     const relu = await chargerProjet(sb, projet.id);
     if (relu) return relu;
   } catch (e) {
-    console.error("relecture du dossier", projet.id, e);
+    console.error("relecture du dossier", journal, journal === projet.id ? e : resumeErreur(e));
   }
   return { ...projet, ...maj };
 }
@@ -2097,8 +2176,10 @@ function json(corps: unknown, statut: number, cors: Record<string, string>): Res
 
 // ---------- E-mails (même gabarit et même signature que la fonction « demande ») ----------
 
+// Sans clé Resend (erreur de configuration), rien de l'e-mail n'est journalisé : son objet porte le numéro du dossier,
+// celui saisi dans le formulaire du site pour une rétractation.
 async function envoyerMail(m: { to: string[]; subject: string; html: string; replyTo?: string; attachments?: PieceJointe[] }): Promise<boolean> {
-  if (!RESEND_KEY) { console.warn("RESEND_API_KEY absent : e-mail non envoyé", m.subject); return false; }
+  if (!RESEND_KEY) { console.warn("RESEND_API_KEY absent : e-mail non envoyé"); return false; }
   try {
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -2164,18 +2245,6 @@ function virementHtml(projet: Projet): string {
   ].join("");
 }
 
-// Droit de rétractation (particulier) : information, date limite et lien « Renoncer au contrat ici » (après la
-// signature), formulaire type (aussi avant la signature, dans l'e-mail du devis : dateLimite nulle, pas de lien).
-function retractationHtml(dateLimite: string | null, lien: string): string {
-  return [
-    titreBloc("Droit de rétractation"),
-    p(esc(TEXTES.retractation)),
-    dateLimite ? p(`Vous pouvez renoncer au contrat jusqu'au <strong>${esc(dateJour(dateLimite))}</strong> inclus.`) : "",
-    lien ? bouton("Renoncer au contrat ici", lien) : "",
-    `<div style="margin:0 0 18px;padding:14px 16px;border:1px solid #e3ded4;font-size:13px;line-height:20px;color:#3a3a3a">${TEXTES.formulaire.split("\n").map(esc).join("<br>")}</div>`,
-  ].join("");
-}
-
 // Preuve de la signature (e-mails « Devis signé ») : date, nom, document, empreinte du PDF signé.
 function preuveSignature(projet: Projet): [string, string][] {
   return [
@@ -2184,53 +2253,68 @@ function preuveSignature(projet: Projet): [string, string][] {
   ];
 }
 
-// Confirmation du contrat (cahier des charges § 5) : envoyée à la signature, puis par l'agence (« Renvoyer ») si elle
-// n'est pas partie. pdf : devis signé, joint s'il fait 15 Mo au plus. Faux si l'e-mail n'est pas parti.
+// Confirmation du contrat (cahier des charges § 5 ; L221-13) : envoyée à la signature, puis par l'agence (« Renvoyer »)
+// si elle n'est pas partie. pdf : devis signé (conditions générales comprises), joint s'il fait 15 Mo au plus (un devis
+// plus lourd n'a pu être envoyé qu'avant cette limite). Particulier qui a demandé le démarrage anticipé : confirmation
+// de sa demande, la case citée mot pour mot telle qu'il l'a cochée (texte enregistré avec la signature). Aucun bloc ni
+// lien de rétractation : information et formulaire type sont dans les conditions générales du devis. Faux si l'e-mail
+// n'est pas parti.
 async function mailConfirmation(projet: Projet, pdf: ArrayBuffer | null): Promise<boolean> {
   const particulier = estParticulier(projet);
   const fichier = (projet.devis_chemin ?? "").split("/").pop() || "devis.pdf";
   const joint = !!pdf && pdf.byteLength <= MAX_DEVIS_JOINT;
-  const renoncer = particulier ? await lienRenoncer(projet, SITE_URL) : null;
+  const caseCochee = projet.demarrage_anticipe_texte || TEXTES.case;
   return await mailClient(projet, `Devis signé — dossier ${projet.id}`, "Devis signé", [
     `<h1 style="${H1}">Merci ${esc(projet.prenom)}, votre devis est signé.</h1>`,
     tableau(preuveSignature(projet)),
     p(joint ? "Cet e-mail confirme votre commande&nbsp;: votre devis signé y est joint." : "Cet e-mail confirme votre commande. Votre devis signé est disponible dans votre espace client."),
-    particulier && projet.demarrage_anticipe_le ? p(esc(CASE_COCHEE)) : "",
+    particulier && projet.demarrage_anticipe_le
+      ? p(`Vous avez demandé que la mission commence avant la fin du délai de rétractation, en cochant la case&nbsp;: «&nbsp;${esc(caseCochee)}&nbsp;»`)
+      : "",
     virementHtml(projet),
-    particulier && projet.signe_le ? retractationHtml(dernierJourRetractation(projet.signe_le), renoncer?.url ?? "") : "",
   ].join(""), joint && pdf ? [{ filename: fichier, content: base64(new Uint8Array(pdf)) }] : []);
 }
 
-// Accusé de réception de la rétractation : complet (timeline, réponse à l'adresse du dossier) à l'adresse du dossier ;
-// à l'adresse saisie, si elle diffère, un envoi séparé, sans timeline, réponse à l'agence (cette adresse est choisie
-// par le détenteur du lien). Vrai si l'accusé est parti vers au moins une des deux adresses.
-async function mailsAccuse(projet: Projet): Promise<boolean> {
+// Accusé de réception de la rétractation : complet (timeline, réponse à l'agence) à l'adresse du dossier ; à l'adresse
+// de l'accusé (saisie avec l'ancien lien, ou autre adresse du formulaire du site), si elle diffère, un envoi séparé,
+// sans timeline, réponse à l'agence (cette adresse est choisie par la personne qui renonce). Il reprend le contenu de la
+// déclaration (D221-5 ; conditions générales, article 11.3 et annexe 1), sous les libellés du formulaire du site : nom,
+// numéro de dossier, adresse e-mail de la demande, autre adresse pour l'accusé s'il y en a une ; puis la date et l'heure
+// de réception. Résultat : parti (vers au moins une des deux adresses : la page l'annonce comme envoyé) et complet
+// (vers chacune ; sinon, c'est à renvoyer : « Renvoyer » l'envoie de nouveau aux deux).
+async function mailsAccuse(projet: Projet): Promise<{ parti: boolean; complet: boolean }> {
   const sujet = `Rétractation reçue — dossier ${projet.id}`;
+  const dossier = projet.email.trim().toLowerCase();
+  const saisie = (projet.retracte_email ?? "").trim().toLowerCase();
+  const ailleurs = saisie && saisie !== dossier ? saisie : "";
   const corps = [
     `<h1 style="${H1}">Votre rétractation est bien reçue.</h1>`,
     p("Nous accusons réception de votre rétractation du contrat suivant&nbsp;:"),
     tableau([
-      ["Nom", projet.retracte_nom ?? ""], ["Dossier N°", projet.id], ["Devis signé le", projet.signe_le ? dateParis(new Date(projet.signe_le)) : ""],
+      ["Nom", projet.retracte_nom ?? ""], ["Dossier N°", projet.id],
+      ["Adresse e-mail de votre demande", dossier], ["Autre adresse pour l'accusé de réception", ailleurs],
+      ["Devis signé le", projet.signe_le ? dateParis(new Date(projet.signe_le)) : ""],
       ["Rétractation reçue le", projet.retracte_le ? dateParis(new Date(projet.retracte_le)) : ""],
     ]),
     p("Conservez cet e-mail&nbsp;: il en est la preuve."),
   ].join("");
   const auDossier = await mailClient(projet, sujet, "Accusé de réception", corps);
-  const saisie = (projet.retracte_email ?? "").trim().toLowerCase();
-  const autre = saisie && saisie !== projet.email.trim().toLowerCase()
-    ? await envoyerMail({ to: [saisie], replyTo: MAIL_AGENCE, subject: sujet, html: gabarit("Accusé de réception", corps) })
-    : false;
-  return auDossier || autre;
+  const autre = ailleurs
+    ? await envoyerMail({ to: [ailleurs], replyTo: MAIL_AGENCE, subject: sujet, html: gabarit("Accusé de réception", corps) })
+    : null;
+  return { parti: auDossier || autre === true, complet: auDossier && autre !== false };
 }
 
-// E-mails légaux non partis pendant une action par lien : notés dans le dossier (espace agence : « Renvoyer »), retirés
-// une fois renvoyés. Une erreur d'écriture est journalisée, sans faire échouer l'action déjà enregistrée.
+// E-mails légaux non partis pendant une action du client (signature, rétractation) : notés dans le dossier (espace
+// agence : « Renvoyer »), retirés une fois renvoyés. Une erreur d'écriture est journalisée, sans faire échouer l'action
+// déjà enregistrée.
 function echecs(projet: Projet): Echec[] {
   return Array.isArray(projet.envois_echoues) ? projet.envois_echoues.filter((x) => x && typeof x === "object") : [];
 }
 
 // Mentions retirées (e-mail renvoyé, ou qui n'a plus lieu d'être) et mention ajoutée (e-mail non parti), en une écriture.
-async function majEchecs(sb: Sb, projet: Projet, retirer: string[], ajouter: Echec | null): Promise<void> {
+// journal : comme pour relire().
+async function majEchecs(sb: Sb, projet: Projet, retirer: string[], ajouter: Echec | null, journal = projet.id): Promise<void> {
   const avant = echecs(projet);
   const apres = [...avant.filter((x) => !retirer.includes(x.quoi) && x.quoi !== ajouter?.quoi), ...(ajouter ? [ajouter] : [])];
   if (!ajouter && apres.length === avant.length) return;
@@ -2238,7 +2322,7 @@ async function majEchecs(sb: Sb, projet: Projet, retirer: string[], ajouter: Ech
     const { error } = await sb.from("projets").update({ envois_echoues: apres }).eq("id", projet.id);
     if (error) throw error;
   } catch (e) {
-    console.error("e-mails à renvoyer : dossier non mis à jour", projet.id, ajouter?.quoi ?? retirer.join(","), e);
+    console.error("e-mails à renvoyer : dossier non mis à jour", journal, ajouter?.quoi ?? retirer.join(","), journal === projet.id ? e : resumeErreur(e));
   }
 }
 

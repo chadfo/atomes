@@ -1,10 +1,14 @@
 // Page d'action (parcours v3) : ouverte depuis un lien reçu par e-mail, https://atomes.studio/action/#t=<jeton>.
-// Trois modes, fixés par le jeton : signer (devis), valider (documents), renoncer (rétractation d'un particulier).
+// Trois modes, fixés par le jeton : signer (devis), valider (documents), renoncer (rétractation d'un particulier, pour
+// les anciens liens seulement : la fonction n'en crée plus ; le lien « Renoncer au contrat ici » du pied de page mène
+// au formulaire public, renoncer/).
 // Le jeton est lu dans le fragment de l'adresse (jamais envoyé au serveur de pages ni dans le Referer), effacé aussitôt
 // de la barre d'adresse et gardé en mémoire ; il n'est jamais journalisé. Au chargement, seule la lecture « infos » est
 // faite : signer, valider et renoncer exigent un clic. Appels : fonction « espace » (config.js : espaceUrl), POST JSON
-// avec l'en-tête apikey, sans session ni supabase-js. Textes juridiques (case, information, bouton, formulaire type) :
-// ceux renvoyés par la fonction, source unique.
+// avec l'en-tête apikey, sans session ni supabase-js. Textes juridiques (case, phrase des conditions générales au-dessus
+// du bouton, bouton) : ceux renvoyés par la fonction, source unique (la phrase et le bouton ont ici une copie de
+// secours). L'information sur la rétractation et le formulaire type figurent dans les conditions générales, à la fin
+// du devis (décision de Simon du 21 octobre 2026).
 // Mode démo sans backend : action/?demo=signer (particulier), ?demo=signer-pro, ?demo=valider, ?demo=renoncer.
 (() => {
   const cfg = window.ATOMES_CONFIG || {};
@@ -29,7 +33,7 @@
   };
   const fmtTaille = (o) => (o >= 1048576 ? (o / 1048576).toFixed(1).replace('.', ',') + ' Mo' : Math.max(1, Math.round((o || 0) / 1024)) + ' Ko');
   const euros = (c) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format((c || 0) / 100);
-  // Adresse renvoyée par la fonction (lien signé, lien de rétractation) : http(s) seulement.
+  // Adresse renvoyée par la fonction (lien signé d'un document) : http(s) seulement.
   const urlSure = (u) => {
     if (!u) return '';
     try { const x = new URL(String(u), location.href); return /^https?:$/.test(x.protocol) ? x.href : ''; } catch (ex) { return ''; }
@@ -47,6 +51,7 @@
   const ACCUSE_NON_ENVOYE = 'L’accusé de réception n’a pas pu vous être envoyé par e-mail pour le moment : conservez cette page (imprimez-la ou enregistrez-la). Nous vous l’adresserons dans les meilleurs délais.';
   const LIEN_INVALIDE = 'Ce lien n’est pas valide : ouvrez-le de nouveau depuis l’e-mail reçu, en entier.';
   const BOUTON_SIGNER = 'Signer et commander avec obligation de paiement';   // § 7 ; textes.bouton de la fonction prévaut
+  const CGV = 'En signant, vous acceptez nos conditions générales, jointes au devis.';   // textes.cgv de la fonction prévaut
   const TITRES = { signer: 'Signature du devis', valider: 'Vos documents', renoncer: 'Renoncer au contrat' };
   const ETIQUETTES = { signer: 'Votre devis', valider: 'Documents à valider', renoncer: 'Votre rétractation' };
   const URL_ESPACE = cfg.espaceUrl || (cfg.supabaseUrl ? String(cfg.supabaseUrl).replace(/\/$/, '') + '/functions/v1/espace' : '');
@@ -235,7 +240,9 @@
       btn.focus();
     });
   };
-  // Confirmation affichée et focalisée (annoncée par les lecteurs d'écran).
+  // Confirmation affichée et focalisée (annoncée par les lecteurs d'écran). Son haut caché sous la barre de navigation
+  // collante (zoom, petit écran), elle est alignée en haut, juste sous la barre (scroll-padding-top de html) ; sinon,
+  // défilement minimal.
   const confirmation = (zone, ...lignes) => {
     const ok = el('div', 'action-ok');
     ok.tabIndex = -1;
@@ -244,21 +251,11 @@
     zone.textContent = '';
     zone.appendChild(ok);
     ok.focus({ preventScroll: true });
-    ok.scrollIntoView({ block: 'nearest' });
+    const barre = $('.nav');
+    ok.scrollIntoView({ block: barre && ok.getBoundingClientRect().top < barre.getBoundingClientRect().bottom ? 'start' : 'nearest' });
     return ok;
   };
-  const lienRenoncer = (ren) => {
-    const url = ren && urlSure(ren.url);
-    if (!url) return null;
-    const limite = fmtLimite(ren.date_limite);
-    const p = el('p', 'retractation');
-    ecrire(p, 'Vous pouvez renoncer au contrat ' + (limite ? 'jusqu’au ' + limite + ' inclus' : 'pendant le délai de rétractation') + ' : ');
-    const a = el('a', 'lien-legal', 'Renoncer au contrat ici');
-    a.href = url;
-    p.appendChild(a);
-    return p;
-  };
-  // Formulaire type de rétractation (texte de la fonction, une ligne par élément), dans le bloc légal.
+  // Formulaire type de rétractation (texte de la fonction, une ligne par élément), sous le formulaire du mode « renoncer ».
   const texteFormulaire = (t) => (Array.isArray(t && t.formulaire) ? t.formulaire.join('\n') : String((t && t.formulaire) || ''));
   const boiteFormulaire = (formulaire) => {
     const box = el('div', 'retractation');
@@ -274,9 +271,6 @@
     if (j.signe) {
       bloc.appendChild(texte('Ce devis est signé depuis le ' + fmtDate(j.signe.le) + '.'));
       if (devis) bloc.appendChild(lienDocument('Lire le devis (PDF)', 'btn btn--ghost', 'devis'));
-      // Particulier dans le délai : lien de rétractation renvoyé par la fonction (renoncer), s'il y en a un.
-      const ren = j.dossier.particulier !== false ? lienRenoncer(j.renoncer) : null;
-      if (ren) bloc.appendChild(ren);
       return;
     }
     if (!devis) { bloc.appendChild(texte('Votre devis sera bientôt disponible.')); return; }
@@ -286,8 +280,8 @@
     }
     const particulier = j.dossier.particulier !== false;
     const t = j.textes || {};
-    // Particulier : la case et l'information viennent de la fonction (texte enregistré avec la signature) ; sans elles,
-    // pas de signature possible.
+    // Particulier : la case vient de la fonction (texte enregistré avec la signature) ; sans elle, pas de signature
+    // possible.
     if (particulier && !t.case) { bloc.appendChild(texte(ECHEC)); return; }
     const montant = el('p', 'montant');
     montant.appendChild(el('span', '', 'À régler par virement' + (devis.montant_libelle ? ' · ' + devis.montant_libelle : '')));
@@ -300,10 +294,6 @@
     const err = champErreur();
     let cb = null;
     if (particulier) {
-      // Information précontractuelle sur la rétractation, avec le formulaire type, avant la case et la signature.
-      if (t.retractation) f.appendChild(el('p', 'retractation', t.retractation));
-      const formulaire = texteFormulaire(t);
-      if (formulaire) f.appendChild(boiteFormulaire(formulaire));
       const lab = el('label', 'case');
       cb = el('input'); cb.type = 'checkbox'; cb.id = 'sig-demarrage'; cb.setAttribute('aria-describedby', err.id);
       lab.htmlFor = cb.id;
@@ -317,13 +307,16 @@
     f.appendChild(champ);
     f.appendChild(el('p', 'f-hint', 'Votre signature électronique est enregistrée avec la date, l’heure, votre adresse IP, votre navigateur et l’empreinte du devis. Vous recevez une confirmation par e-mail.'));
     const signer = el('button', 'btn', t.bouton || BOUTON_SIGNER); signer.type = 'submit';
+    // Phrase des conditions générales, pour tous les clients, juste au-dessus du bouton, qu'elle décrit.
+    const cgv = el('p', 'action-cgv', t.cgv || CGV); cgv.id = 'sig-cgv';
+    signer.setAttribute('aria-describedby', cgv.id);
     // Particulier : signature impossible tant que la case n'est pas cochée (bouton indisponible, explication au clic).
     const majBouton = () => { if (!cb || cb.checked) signer.removeAttribute('aria-disabled'); else signer.setAttribute('aria-disabled', 'true'); };
     majBouton();
     if (cb) cb.addEventListener('change', () => { majBouton(); if (cb.checked) effacerErreur(err, MSG_CASE, cb); });
     inom.addEventListener('input', () => { if (inom.value.trim().length >= 3) effacerErreur(err, MSG_NOM, inom); });
     const actions = el('div', 'form-actions'); actions.appendChild(signer);
-    f.appendChild(err); f.appendChild(actions);
+    f.appendChild(err); f.appendChild(cgv); f.appendChild(actions);
     f.addEventListener('submit', (ev) => {
       ev.preventDefault();
       if (signer.disabled) return;
@@ -339,8 +332,6 @@
         if (r.mail === false) {
           confirmation(zone, 'Merci, votre devis est signé.', 'La confirmation de votre commande et les informations de virement n’ont pas pu vous être envoyées par e-mail pour le moment : nous vous les adresserons dans les meilleurs délais.');
         } else confirmation(zone, 'Merci, votre devis est signé. Vous allez recevoir par e-mail la confirmation et les informations de virement.');
-        const ren = particulier ? lienRenoncer(r.renoncer) : null;
-        if (ren) bloc.appendChild(ren);
         relireTimeline();
       });
     });
@@ -471,10 +462,11 @@
     const signeLe = iso(now - 2 * jour);
     const d = { signe: mode === 'signer' ? null : { le: signeLe, nom: 'Jean Dupont' }, valide_le: null, retracte_le: null };
     const limite = new Date(now + 12 * jour).toISOString().slice(0, 10);
-    // Textes de démonstration : copie mot pour mot de TEXTES dans la fonction « espace », qui les envoie en service.
+    // Textes de démonstration : copie mot pour mot des textes de TEXTES (fonction « espace ») que la page affiche ; la
+    // fonction les envoie en service.
     const TEXTES = {
-      case: 'Je demande que la mission commence avant la fin du délai de rétractation de 14 jours. Je reconnais perdre ce droit une fois la mission entièrement exécutée, et devoir, si je me rétracte avant, le montant du travail déjà réalisé.',
-      retractation: 'Vous disposez de 14 jours à compter de la signature pour renoncer au contrat, sans avoir à vous justifier : depuis le lien « Renoncer au contrat ici », avec le formulaire type ou par toute déclaration claire adressée à Atomes studio. Si vous renoncez, les sommes versées vous sont remboursées sous 14 jours, déduction faite du montant du travail déjà réalisé à votre demande.',
+      case: 'Je demande que la mission commence avant la fin du délai de rétractation de 14 jours. Je reconnais perdre mon droit de rétractation une fois la mission entièrement exécutée, et devoir, si je me rétracte avant, un montant proportionné au travail déjà réalisé.',
+      cgv: CGV,
       bouton: BOUTON_SIGNER,
       formulaire: ['Formulaire de rétractation', '(Veuillez compléter et renvoyer le présent formulaire uniquement si vous souhaitez vous rétracter du contrat.)',
         "À l'attention d'Atomes studio, Simon Charles, 31 rue Chevalier Paul, 83000 Toulon, contact@atomes.studio :",
@@ -491,7 +483,7 @@
     };
     const infos = () => {
       const r = { ok: true, mode, dossier: { id: '261003091422', type: 'Extension', commune: 'Hyères', prenom: 'Jean', particulier: !pro }, timeline: timeline() };
-      if (mode === 'signer') Object.assign(r, { devis: { nom: 'devis-261003091422-261008101500.pdf', url: '#', empreinte: 'demo', montant_cents: 72000, montant_libelle: 'Acompte de 40 %', envoye_le: iso(now - jour) }, signe: d.signe, textes: pro ? { bouton: BOUTON_SIGNER } : TEXTES });
+      if (mode === 'signer') Object.assign(r, { devis: { nom: 'devis-261003091422-261008101500.pdf', url: '#', empreinte: 'demo', montant_cents: 72000, montant_libelle: 'Acompte de 40 %', envoye_le: iso(now - jour) }, signe: d.signe, textes: { case: TEXTES.case, bouton: TEXTES.bouton, cgv: TEXTES.cgv } });
       if (mode === 'valider') Object.assign(r, { documents: [{ nom: 'Plans-et-perspective-261003091422.pdf', url: '#', taille: 3145728, date: iso(now - jour) }, { nom: 'Notice-descriptive-261003091422.pdf', url: '#', taille: 284000, date: iso(now - jour) }], valide_le: d.valide_le });
       if (mode === 'renoncer') Object.assign(r, { signe_le: signeLe, date_limite: limite, retracte_le: d.retracte_le, expire: false, textes: { formulaire: TEXTES.formulaire } });
       return r;
@@ -501,7 +493,7 @@
       signer: (c) => {
         if (d.signe) return { ok: true, deja: true };
         d.signe = { le: iso(Date.now()), nom: c.nom }; courante = 'paiement';
-        return { ok: true, etape: 'paiement', renoncer: pro ? null : { url: '?demo=renoncer', date_limite: limite }, mail: true };
+        return { ok: true, etape: 'paiement', mail: true };
       },
       valider: () => { if (d.valide_le) return { ok: true, deja: true }; d.valide_le = iso(Date.now()); courante = 'clos'; return { ok: true, etape: 'clos', mail: true }; },
       renoncer: () => { if (d.retracte_le) return { ok: true, deja: true }; d.retracte_le = iso(Date.now()); return { ok: true, retracte_le: d.retracte_le, mail: true }; }

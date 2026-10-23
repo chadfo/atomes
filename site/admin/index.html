@@ -11,11 +11,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/site.css?v=4">
+<link rel="stylesheet" href="../assets/css/site.css?v=5">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" defer></script>
 <script src="../assets/js/config.js" defer></script>
 <script src="../assets/js/atom-logo.js" defer></script>
-<script src="../assets/js/admin.js?v=7" defer></script>
+<script src="../assets/js/admin.js?v=8" defer></script>
 </head>
 <body>
 <div class="page">
@@ -168,9 +168,10 @@
               <span class="lbl" id="lbl-devis-pdf">Devis (PDF)</span>
               <label class="dropzone" aria-labelledby="lbl-devis-pdf">
                 <span class="dropzone-cta">+ Choisir le PDF</span>
-                <input type="file" class="sr-only" accept=".pdf,application/pdf" data-devis-fichier>
+                <input type="file" class="sr-only" accept=".pdf,application/pdf" data-devis-fichier aria-describedby="a-devis-cg">
                 <span class="dropzone-info" data-devis-info>Aucun fichier choisi</span>
               </label>
+              <p class="f-hint" id="a-devis-cg">Le devis doit contenir nos conditions générales, droit de rétractation et formulaire type compris.</p>
             </div>
             <div class="grid-2">
               <div class="field">

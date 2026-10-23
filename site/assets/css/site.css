@@ -80,6 +80,12 @@ atom-logo canvas{position:absolute;inset:0}
 .footer a:hover{color:var(--ink)}
 .footer-contact{display:flex;flex-direction:column}
 .footer-line{display:inline-flex;align-items:center;gap:8px;color:rgba(var(--ink-rgb),.6);text-decoration:none}
+/* Lien légal « Renoncer au contrat ici » (pied de page de l'espace client, de la page d'action et du formulaire de
+   rétractation, vers renoncer/) : petite mention comme le reste du pied de page, en capitales par la feuille de style
+   (texte du DOM : « Renoncer au contrat ici »), souligné ; encre à .6 comme les autres liens (contraste de 5,96:1 sur
+   le fond) ; cible de 24 px de haut */
+.footer .lien-legal{display:inline-block;line-height:24px;text-transform:uppercase;text-decoration:underline;text-underline-offset:3px}
+.footer .lien-legal:focus-visible{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:2px}
 
 /* ---------- Section image / dégradé / texte ----------
    Image absolue sur la moitié gauche, dégradé vers le fond, texte à droite.
@@ -324,7 +330,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 
 /* ==========================================================================
    Espace client (dossier/index.html) : timeline, discussion (bloc commun aux deux espaces, plus bas), documents,
-   récapitulatif ; le client signe, valide et renonce sur la page d'action (action/index.html, plus bas).
+   récapitulatif ; le client signe et valide sur la page d'action (action/index.html, plus bas), renonce au contrat sur
+   le formulaire public (renoncer/index.html, plus bas).
    ========================================================================== */
 .espace{width:100%;max-width:760px;margin:0 auto;padding:clamp(40px,6vw,72px) var(--pad-x);box-sizing:border-box;display:flex;flex-direction:column;gap:40px}
 .espace > [data-vue="dossier"]{display:flex;flex-direction:column;gap:40px}
@@ -390,7 +397,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .recap-liste dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
 .espace-pied{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding-top:24px;border-top:1px solid var(--line)}
 /* ---------- Tableau de bord (vue « dossier ») ----------
-   Jusqu'à 980 px : une colonne, comme avant ; les enveloppes .tableau-tete (lien, en-tête, rétractation) et .tableau-docs
+   Jusqu'à 980 px : une colonne, comme avant ; les enveloppes .tableau-tete (lien, en-tête) et .tableau-docs
    (les deux listes de documents) gardent les écarts de 40 px. Écran d'ordinateur (981 px et plus ; dossier.js pose
    .espace--tableau sur la section quand la vue dossier est affichée) : espace élargi, ordre du DOM inchangé (lecture et
    tabulation), blocs placés par grid-template-areas ; de 981 à 1199 px, deux colonnes (en-tête, Avancement, documents et
@@ -430,7 +437,6 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   .espace--tableau .tableau-demande{grid-area:demande}
   .espace--tableau .dossier-head h1{font-size:26px;overflow-wrap:break-word}
   .espace--tableau .dossier-head .espace-intro{margin-top:8px;font-size:14px;line-height:1.55}
-  .espace--tableau .retractation{padding:12px 14px}
   /* Timeline resserrée : date sous le titre, information de l'étape sur toute la largeur, coordonnées de virement sur
      une colonne, en 12 px (l'IBAN, 33 caractères : 237,6 px, tient sur une ligne dès 1200 px de large, barre de
      défilement classique comprise) */
@@ -514,8 +520,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     overflow-y:auto;margin:0 -6px;padding:0 6px;scrollbar-width:thin;scrollbar-color:rgba(var(--ink-rgb),.4) transparent;scroll-padding-block:8px}
 }
 /* ==========================================================================
-   Parcours v3 : information sous l'étape en cours (espace client), page d'action (action/index.html) et éléments
-   partagés avec l'espace agence (virement, pièces jointes, rétractation)
+   Parcours v3 : information sous l'étape en cours (espace client), page d'action (action/index.html), formulaire public
+   de rétractation (renoncer/index.html) et éléments partagés avec l'espace agence (virement, pièces jointes)
    ========================================================================== */
 /* Bouton indisponible (aria-disabled) : il reste focalisable et son clic explique ce qui manque */
 .btn[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
@@ -536,15 +542,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .pieces li{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:2px 16px;font:400 13.5px/1.5 var(--font);color:rgba(var(--ink-rgb),.75)}
 .pieces li > span{min-width:0;overflow-wrap:anywhere}
 .pieces button.link-more{background:transparent;border:0;padding:0;cursor:pointer;white-space:nowrap}
-/* Bloc légal : information de rétractation, lien « Renoncer au contrat ici », formulaire type */
+/* Bloc légal : formulaire type, sous le formulaire du mode « renoncer » de la page d'action (anciens liens) */
 .retractation{margin:0;padding:16px 18px;border:1px solid rgba(var(--ink-rgb),.25);font:400 13.5px/1.65 var(--font);color:rgba(var(--ink-rgb),.75);text-wrap:pretty;box-sizing:border-box;max-width:100%}
 .retractation p{margin:0}
 .retractation p + p{margin-top:10px}
-.retractation a{color:var(--ink)}
 .formulaire-type{white-space:pre-line;overflow-wrap:anywhere}
-.lien-legal{font:500 11.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink);text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
-.lien-legal:hover{color:var(--white)}
-.lien-legal:focus-visible{outline:1px solid rgba(var(--ink-rgb),.8);outline-offset:3px}
 /* Page d'action : un lien reçu par e-mail, une action (signer le devis, valider les documents, renoncer au contrat) */
 .action-page > [data-vue="page"]{display:flex;flex-direction:column;gap:40px}
 .action-page h1:focus{outline:none} /* focus programmatique sur le titre d'un message plein écran */
@@ -555,11 +557,23 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .action-form .form-actions{padding-top:0}
 .action-texte{margin:0;font:400 15px/1.65 var(--font);color:rgba(var(--ink-rgb),.8);text-wrap:pretty}
 .action-texte a{color:var(--ink)}
+/* Phrase des conditions générales, juste au-dessus du bouton de signature (texte juridique, lisible comme la case) */
+.action-cgv{margin:0;font:400 14px/1.6 var(--font);color:var(--ink);text-wrap:pretty}
 .action-ok{display:flex;flex-direction:column;gap:14px;padding:22px 24px;border:1px solid rgba(var(--ink-rgb),.25);font:400 14px/1.6 var(--font);color:rgba(var(--ink-rgb),.8)}
 .action-ok:focus{outline:none} /* focus programmatique : annoncé, sans contour natif */
 .action-ok p{margin:0}
 .action-ok-titre{font:500 18px/1.5 var(--font);color:var(--ink);text-wrap:pretty}
 .action-ok .recap-liste{gap:6px 24px}
+/* Formulaire public de rétractation (renoncer/index.html) : gabarit de la page d'action (étiquette, titre, bloc « Votre
+   rétractation ») ; quatre champs, chacun avec son message, « Confirmer la rétractation », puis la phrase sur le travail
+   déjà réalisé ; refus de la fonction sous les champs, l'adresse de contact en lien ; après l'envoi, la confirmation
+   (.action-ok) remplace le formulaire et la phrase */
+.renoncer-page > [data-vue="formulaire"]{display:flex;flex-direction:column;gap:40px}
+.renoncer-form > .f-err{line-height:1.6;text-wrap:pretty}
+.renoncer-form > .f-err a{color:inherit}
+/* Page légale : étiquette « Votre rétractation », mention « (facultatif) » et exemple d'adresse lisibles, à 5,2:1 sur le
+   fond (encre à .55, comme .f-hint), au lieu de 3,33:1 et 2,85:1 ailleurs sur le site */
+.renoncer-page :is(.bloc-lbl,.lbl-opt),.renoncer-page .input::placeholder{color:rgba(var(--ink-rgb),.55)}
 /* Timeline compacte (lecture seule) */
 .timeline--compacte > li{padding:10px 0}
 .timeline--compacte .tl-title{font-size:14px}
@@ -664,4 +678,28 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   .recap-liste dd{margin-bottom:8px}
   .timeline > li{grid-template-columns:12px minmax(0,1fr);}
   .tl-date{grid-column:2;padding-top:4px}
+}
+/* ==========================================================================
+   Impression des pages avec .espace (espace client, espace agence, page d'action, formulaire de rétractation) ;
+   pages vitrine inchangées. Texte foncé sur papier blanc (exception à la palette : le papier n'a pas le fond sombre),
+   par les jetons : encre #171512, fond et surfaces #ffffff ; textes secondaires foncés (dates et heures des messages,
+   des étapes et des documents lisibles) ; marques des étapes faites et filets des étapes clés imprimés même sans les
+   arrière-plans. Ni barre de navigation, ni composeur, ni boutons ; pied de page retiré des espaces client et agence,
+   gardé sur la page d'action et le formulaire de rétractation (.action-page : l'imprimé d'une confirmation nomme
+   l'agence, son adresse et son e-mail) ; « Message complet » imprimé s'il est ouvert (sans son intitulé), comme à
+   l'écran ; une bulle, une étape ou une ligne jamais coupée entre deux pages. Espace client : fiche en une colonne
+   (règles du tableau de bord en screen), discussion entière (dossier.js montre tout le fil avant l'impression ;
+   conditions générales, article 18).
+   ========================================================================== */
+@media print{
+  :root:has(.espace){--bg:#ffffff;--ink:#171512;--ink-rgb:23,21,18;--white:#171512;--surface:#ffffff;--surface-hover:#ffffff;--line:rgba(23,21,18,.25)}
+  :root:has(.espace) .nav,:root:has(.espace:not(.action-page)) .footer{display:none}
+  :root:has(.action-page) .footer,:root:has(.action-page) .footer :is(a,.footer-line){color:rgba(var(--ink-rgb),.8)}
+  .espace :is(button,.btn,.composeur,.dropzone,[data-composeur-agence],.espace-pied,[data-retour],.msg-complet:not([open]),.msg-complet > summary,[data-erreur]){display:none !important}
+  .espace{max-width:none;padding:0}
+  .espace :is(.lbl,.bloc-lbl,.num,.tl-num,.tl-date,.tl-desc,.tl-a_venir .tl-title,.doc-meta,.docs-vide,.msg-meta,.jalon,.recap-liste dt,.virement dt,.f-hint,.lbl-opt,.espace-intro,.info-etape,.montant,.pieces li,.action-texte,.action-ok){color:rgba(var(--ink-rgb),.8)}
+  .espace .msg{border-color:rgba(var(--ink-rgb),.35)}
+  .espace .tl-mark,.espace .jalon::before,.espace .jalon::after{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .espace :is(.timeline > li,.msg,.jalon,.docs li,.info-etape,.action-ok){break-inside:avoid}
+  .espace .bloc-lbl{break-after:avoid}
 }

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Renoncer au contrat — Atomes studio</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Atomes studio : renoncer au contrat signé en ligne, pendant le délai de rétractation.">
+<meta name="theme-color" content="#171512">
+<link rel="icon" type="image/png" href="../favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css?v=5">
+<script src="../assets/js/config.js" defer></script>
+<script src="../assets/js/atom-logo.js" defer></script>
+<script src="../assets/js/renoncer.js?v=1" defer></script>
+</head>
+<body>
+<div class="page">
+
+  <nav class="nav" aria-label="Navigation principale">
+    <a class="brand" href="../index.html"><atom-logo></atom-logo><span>atomes<span class="brand-tld">.studio</span></span></a>
+    <input type="checkbox" id="nav-toggle" class="nav-tgl" aria-label="Menu" aria-controls="nav-links">
+    <label for="nav-toggle" class="nav-btn"><span></span><span></span><span></span></label>
+    <div class="nav-links" id="nav-links">
+      <a href="../index.html">Accueil</a>
+      <a href="../projets.html">Projets</a>
+      <a href="../a-propos.html">À propos</a>
+      <a href="../contact.html">Contact</a>
+      <a href="../devis.html">Devis</a>
+    </div>
+  </nav>
+
+  <main class="main">
+    <section class="espace action-page renoncer-page">
+      <div class="lbl">Votre dossier</div>
+
+      <!-- Service indisponible (config.js vide) : message plein écran -->
+      <div data-vue="erreur" hidden>
+        <h1>Page indisponible</h1>
+        <p class="espace-intro">Ce service n’est pas encore disponible.</p>
+        <p class="espace-intro">Une question&nbsp;? Écrivez-nous à <a href="mailto:contact@atomes.studio">contact@atomes.studio</a>.</p>
+      </div>
+
+      <!-- Formulaire public de rétractation, sans connexion (conditions générales, article 11.3) : le numéro de dossier
+           et l'adresse e-mail de la demande identifient le contrat. Champs sans name et méthode « dialog » (aucun envoi
+           natif : sans script, « Confirmer la rétractation » ne recharge pas la page et la saisie reste) : renoncer.js
+           envoie le formulaire à la fonction « espace » ; la confirmation remplace ensuite le formulaire. -->
+      <div data-vue="formulaire">
+        <div class="dossier-head">
+          <h1>Renoncer au contrat</h1>
+        </div>
+
+        <section class="bloc" aria-labelledby="lbl-retractation">
+          <div class="lbl bloc-lbl" id="lbl-retractation">Votre rétractation</div>
+          <div class="action-bloc" data-bloc>
+            <form class="action-form renoncer-form" method="dialog" data-form novalidate>
+              <div class="field">
+                <label class="lbl" for="ren-nom">Votre nom et prénom</label>
+                <input class="input" id="ren-nom" autocomplete="name" maxlength="120" aria-describedby="ren-nom-err">
+                <div class="f-err" id="ren-nom-err" role="alert" hidden></div>
+              </div>
+              <div class="field">
+                <label class="lbl" for="ren-dossier">Numéro de dossier</label>
+                <input class="input" id="ren-dossier" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="ren-dossier-err">
+                <div class="f-err" id="ren-dossier-err" role="alert" hidden></div>
+              </div>
+              <div class="field">
+                <label class="lbl" for="ren-email">Adresse e-mail de votre demande</label>
+                <input class="input" type="email" id="ren-email" autocomplete="email" maxlength="200" placeholder="vous@exemple.fr" aria-describedby="ren-email-err">
+                <div class="f-err" id="ren-email-err" role="alert" hidden></div>
+              </div>
+              <div class="field">
+                <label class="lbl" for="ren-accuse">Autre adresse pour l'accusé de réception <span class="lbl-opt">(facultatif)</span></label>
+                <input class="input" type="email" id="ren-accuse" autocomplete="off" maxlength="200" aria-describedby="ren-accuse-err">
+                <div class="f-err" id="ren-accuse-err" role="alert" hidden></div>
+              </div>
+              <div class="f-err" data-err-envoi role="alert" hidden></div>
+              <div class="form-actions"><button type="submit" class="btn" data-confirmer>Confirmer la rétractation</button></div>
+            </form>
+            <p class="f-hint">Si vous avez demandé que la mission commence avant la fin du délai, un montant proportionné au travail déjà réalisé reste dû.</p>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div>ATOMES.STUDIO — ARCHITECTURE DU DÉTAIL<br>SIMON CHARLES — ARCHITECTE HMONP · INGÉNIEUR GÉNIE CIVIL ET URBANISME<br><a href="../dossier/">ESPACE CLIENT <span aria-hidden="true">→</span></a><br><a class="lien-legal" href="./" aria-current="page">Renoncer au contrat ici</a></div>
+    <div class="footer-contact">
+      <span class="footer-line"><i class="ico ico-house" aria-hidden="true"></i><span class="sr-only">Adresse — </span>31 RUE CHEVALIER PAUL, 83000 TOULON</span>
+      <a class="footer-line" href="mailto:contact@atomes.studio"><i class="ico ico-mail" aria-hidden="true"></i><span class="sr-only">Mail — </span>CONTACT@ATOMES.STUDIO</a>
+      <a class="footer-line" href="https://www.instagram.com/atomes.studio" target="_blank" rel="noopener"><i class="ico ico-instagram" aria-hidden="true"></i><span class="sr-only">Instagram — </span>@ATOMES.STUDIO</a>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

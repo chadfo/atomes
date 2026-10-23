@@ -1712,6 +1712,9 @@
 
   // ---------- Devis, signature, démarrage anticipé, rétractation, virement ----------
   const REF_PAIEMENT = { virement: ' par virement', manuel: ' (hors du site)' };
+  // Devis toujours joint à l'e-mail du client (support durable des conditions générales qu'il contient) : 15 Mo au plus,
+  // comme MAX_DEVIS_JOINT dans la fonction « espace », qui refuse aussi un devis plus lourd (même message, DEVIS_LOURD).
+  const MAX_DEVIS = 15 * 1024 * 1024;
   const rendreDevis = (d) => {
     const dl = $('[data-devis-etat]');
     dl.textContent = '';
@@ -1768,7 +1771,7 @@
     const dire = (m) => { err.textContent = m; err.hidden = false; };
     if (!f) return dire('Choisissez le devis au format PDF.');
     if (!/\.pdf$/i.test(f.name)) return dire('Le devis doit être un fichier PDF.');
-    if (f.size > 50 * 1024 * 1024) return dire('Fichier trop lourd (50 Mo max).');
+    if (f.size > MAX_DEVIS) return dire('Devis trop lourd (15 Mo au plus) : il doit toujours être joint à l’e-mail du client. Allégez le PDF, puis envoyez-le de nouveau.');
     if (!centimes(montant)) return dire('Montant invalide : par exemple 720 ou 720,50.');
     const id = courant.id, compte = charge;
     const meme = () => !!courant && courant.id === id;

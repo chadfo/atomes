@@ -8,9 +8,12 @@
 // formulaire de devis : envoi multipart à l'action « message_client » de la fonction « espace », qui range les pièces
 // dans <id>/client/ (jamais d'écriture directe en base ni dans Storage). Brouillon par dossier, en mémoire seulement.
 // Le reste se fait hors d'ici : le client signe le devis et valide ses documents depuis les liens reçus par e-mail
-// (page action/), paie par virement. Le lien légal « Renoncer au contrat ici » (particulier, devis signé, dans le
-// délai) mène à la page action/ ; ce lien et les coordonnées bancaires viennent de l'action « infos_espace » de la
-// fonction « espace » (config.js : espaceUrl).
+// (page action/), paie par virement (coordonnées bancaires : action « infos_espace » de la fonction « espace »,
+// config.js : espaceUrl). Le lien légal « Renoncer au contrat ici », dans le pied de page de toutes les vues, mène au
+// formulaire public de rétractation (renoncer/) ; la fiche ne parle plus de rétractation, sauf pour une rétractation
+// reçue (« Vous avez renoncé au contrat le … », sous l'étape en cours).
+// Impression (conditions générales, article 18 : la discussion s'imprime ou s'enregistre en PDF) : fil entier montré
+// avant l'impression ; la feuille de style d'impression fait le reste.
 // Tableau de bord (21 octobre 2026) : sur un écran d'ordinateur, la feuille de style place la fiche en colonnes
 // (en-tête, timeline et récapitulatif à gauche, discussion au milieu, documents à droite) ; montrer() pose
 // .espace--tableau sur la section quand la vue dossier est affichée. Sur un écran assez haut, le fil de la discussion
@@ -80,18 +83,8 @@
   const fmtDate = (iso) => (dateValide(iso) ? premier(new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' })) : '');
   // « 20 octobre 2026 à 09:42 »
   const fmtHeure = (iso) => (dateValide(iso) ? premier(new Date(iso).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Paris' })) : '');
-  // Date limite « AAAA-MM-JJ » (dernier jour du délai de rétractation) : « mercredi 28 octobre 2026 ».
-  const fmtLimite = (jour) => {
-    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(jour || ''));
-    return m ? premier(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12)).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })) : '';
-  };
   const fmtTaille = (o) => (o >= 1048576 ? (o / 1048576).toFixed(1).replace('.', ',') + ' Mo' : Math.max(1, Math.round((o || 0) / 1024)) + ' Ko');
   const euros = (c) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format((c || 0) / 100);
-  // Adresse renvoyée par la fonction (lien de rétractation) : http(s) seulement.
-  const urlSure = (u) => {
-    if (!u) return '';
-    try { const x = new URL(String(u), location.href); return /^https?:$/.test(x.protocol) ? x.href : ''; } catch (ex) { return ''; }
-  };
   // Surfaces du formulaire (même liste que devis.js et la fonction « demande ») : [colonne, libellé].
   const SURFACES = [['surface_existante', 'Surface habitable existante'], ['surface', 'Surface habitable créée'], ['emprise_existante', 'Emprise au sol du bâti existant'], ['emprise', 'Emprise au sol du bâti après projet'], ['surface_terrain', 'Surface de la parcelle']];
 
@@ -137,7 +130,7 @@
           .map((o) => ({ nom: o.name, chemin: id + '/' + dossier + '/' + o.name, taille: (o.metadata && o.metadata.size) || 0, date: o.created_at }))),
       // Lien signé de téléchargement (10 minutes)
       lien: (chemin, nom) => sb.storage.from('dossiers').createSignedUrl(chemin, 600, { download: nom }).then(ok).then((d) => d.signedUrl),
-      // Coordonnées de virement et lien de rétractation : action « infos_espace » (lecture seule).
+      // Coordonnées de virement : action « infos_espace » (lecture seule).
       infosEspace: async (projet) => {
         const r = await fetch(urlEspace, {
           method: 'POST',
@@ -292,8 +285,6 @@
 
     let session = { user: { email: projet.email } };
     let ecouteur = null;
-    // Délai de démonstration : 14 jours après la signature (le calcul réel, jours fériés compris, est fait par la fonction).
-    const limite = () => new Date(new Date(projet.signe_le).getTime() + 14 * j).toISOString().slice(0, 10);
     const copie = (x) => JSON.parse(JSON.stringify(x));
     const envois = new Map();   // cle d'envoi → id du message (même cle rejouée : réponse « deja »)
     return {
@@ -310,8 +301,7 @@
       infosEspace: () => new Promise((res) => setTimeout(() => res({
         ok: true,
         virement: projet.etape === 'paiement' && projet.montant_cents && !projet.paye_le
-          ? { titulaire: 'Atomes studio (démo)', iban: 'FR76 XXXX XXXX XXXX XXXX XXXX XXX', bic: 'XXXXXXXXXXX', reference: ID } : null,
-        renoncer: projet.signe_le && !projet.retracte_le ? { url: '../action/?demo=renoncer', date_limite: limite() } : null
+          ? { titulaire: 'Atomes studio (démo)', iban: 'FR76 XXXX XXXX XXXX XXXX XXXX XXX', bic: 'XXXXXXXXXXX', reference: ID } : null
       }), 150)),
       envoyerMessage: (_projet, cle, texte, fichiers) => new Promise((res) => setTimeout(() => {
         if (envois.has(cle)) { res({ deja: true, message: copie(projet.messages.find((m) => m.id === envois.get(cle))) }); return; }
@@ -582,15 +572,13 @@
   // Oubli des données affichées (déconnexion)
   const oublier = () => {
     dossiers = []; courant = null; infos = {};
-    ['[data-dossiers]', '[data-timeline]', '[data-discussion]', '[data-recap]', '[data-docs-agence]', '[data-docs-client]', '[data-d-num]', '[data-d-titre]', '[data-d-sous]', '[data-renoncer]']
+    ['[data-dossiers]', '[data-timeline]', '[data-discussion]', '[data-recap]', '[data-docs-agence]', '[data-docs-client]', '[data-d-num]', '[data-d-titre]', '[data-d-sous]']
       .forEach((sel) => { const n = $(sel); if (n) n.textContent = ''; });
-    $('[data-renoncer]').hidden = true;
     oublierDiscussion();
     erreur('');
   };
 
   const etapeCourante = (d) => (d.etapes || []).find((e) => e.cle === d.etape);
-  const particulier = (d) => d.profil !== 'Professionnel';
   // Compte agence ouvert sur l'espace client (même navigateur) : ni infos_espace ni message (la fonction réserve ces
   // actions au client du dossier).
   const compteAgence = (d) => !demo && d.client_id !== utilisateurCharge;
@@ -646,7 +634,6 @@
     $('[data-d-titre]').textContent = d.type + ' · ' + d.commune;
     $('[data-d-sous]').textContent = 'Demande du ' + fmtDate(d.cree_le) + (d.documents && d.documents.length ? ' · ' + d.documents.join(', ') : '');
     rendreTimeline(d);
-    rendreRenoncer(d, null);
     rendreDiscussion(d, meme);
     rendreRecap(d);
     montrer('dossier');
@@ -763,7 +750,7 @@
     zone.appendChild(el('p', 'f-hint', 'Indiquez cette référence dans le libellé de votre virement.'));
     if (r === undefined || banque) return;
     zone.appendChild(el('p', '', r.agence
-      ? 'Compte agence : les coordonnées bancaires et le lien de rétractation s’affichent pour le client du dossier.'
+      ? 'Compte agence : les coordonnées bancaires s’affichent pour le client du dossier.'
       : 'Les coordonnées bancaires figurent sur votre devis.'));
   };
 
@@ -773,35 +760,12 @@
     box.appendChild(el('p', '', 'Vos documents vous ont été envoyés par e-mail' + (e.debut_le ? ' le ' + fmtDate(e.debut_le) : '') + ' : validez-les depuis le lien reçu, ou écrivez-nous dans la discussion pour demander une modification.'));
   };
 
-  // ---------- Lien légal « Renoncer au contrat ici » (particulier, devis signé, dans le délai, non rétracté) ----------
-  // Un lien vers la page action/ (jeton créé par la fonction), pas une action dans l'espace client.
-  const renoncerPossible = (d) => particulier(d) && !!d.signe_le && !d.retracte_le;
-  const rendreRenoncer = (d, r) => {
-    const p = $('[data-renoncer]');
-    p.textContent = '';
-    const ren = r && r.renoncer;
-    const url = ren && urlSure(ren.url);
-    if (url && !d.retracte_le) {
-      const limite = fmtLimite(ren.date_limite);
-      p.appendChild(document.createTextNode('Vous pouvez renoncer au contrat ' + (limite ? 'jusqu’au ' + limite + ' inclus' : 'pendant le délai de rétractation') + ' : '));
-      const a = el('a', 'lien-legal', 'Renoncer au contrat ici'); a.href = url;
-      p.appendChild(a);
-    } else if (r && r.echec && renoncerPossible(d) && Date.now() - new Date(d.signe_le).getTime() < 20 * 86400000) {
-      // Lien momentanément indisponible, signature récente : les autres moyens de se rétracter.
-      p.appendChild(document.createTextNode('Pour renoncer au contrat, utilisez le lien « Renoncer au contrat ici » reçu par e-mail, ou écrivez-nous à '));
-      const m = el('a', '', 'contact@atomes.studio'); m.href = 'mailto:contact@atomes.studio';
-      p.appendChild(m); p.appendChild(document.createTextNode('.'));
-    }
-    p.hidden = !p.childNodes.length;
-  };
-
-  // Lecture « infos_espace » quand elle sert : virement attendu, ou rétractation possible. Compte agence ouvert sur
-  // l'espace client (même navigateur) : rien n'est demandé (la fonction réserve ces informations au client).
-  const besoinInfos = (d) => !d.retracte_le && ((d.etape === 'paiement' && !!d.montant_cents && !d.paye_le) || renoncerPossible(d));
+  // Lecture « infos_espace » quand elle sert : virement attendu. Compte agence ouvert sur l'espace client (même
+  // navigateur) : rien n'est demandé (la fonction réserve ces informations au client).
+  const besoinInfos = (d) => !d.retracte_le && d.etape === 'paiement' && !!d.montant_cents && !d.paye_le;
   const appliquer = (d, r) => {
     const zone = $('[data-virement]');
     if (zone) blocVirement(zone, d, r);
-    rendreRenoncer(d, r);
   };
   const completer = (d) => {
     if (!besoinInfos(d)) return;
@@ -1068,6 +1032,25 @@
     if (premierLi) { premierLi.setAttribute('tabindex', '-1'); premierLi.focus(); }
   });
 
+  // Impression (conditions générales, article 18 : la discussion s'imprime ou s'enregistre en PDF, chaque message avec
+  // sa date et son heure) : fil entier montré avant l'impression, comme avec « Afficher les messages précédents » (qui
+  // garde alors le focus s'il l'avait) ; il le reste ensuite, la fenêtre ne se réduisant jamais. beforeprint (Chromium,
+  // Firefox, Safari), page encore à l'écran : position du fil gardée comme à une mise à jour. Passage au média print
+  // sans beforeprint (Firefox et WebKit en émulation) : page déjà mise en page pour l'impression, rien à compenser.
+  const filEntier = (ecran) => {
+    if (!courant || vues.dossier.hidden || !fil.debut) return;
+    const bouton = document.activeElement === boutonPlus;
+    fil.debut = null;
+    majFil(courant, !ecran);
+    const premierLi = listeFil.firstElementChild;
+    if (bouton && premierLi) { premierLi.setAttribute('tabindex', '-1'); premierLi.focus({ preventScroll: true }); }
+  };
+  window.addEventListener('beforeprint', () => filEntier(true));
+  const mediaImpression = window.matchMedia ? window.matchMedia('print') : null;
+  const versImpression = (e) => { if (e.matches) filEntier(false); };
+  if (mediaImpression && mediaImpression.addEventListener) mediaImpression.addEventListener('change', versImpression);
+  else if (mediaImpression && mediaImpression.addListener) mediaImpression.addListener(versImpression);
+
   // Ligne renvoyée par l'envoi (ou déjà enregistrée) : ajoutée au dossier une seule fois, et gardée jusqu'à la
   // relecture qui la contient (une relecture partie avant l'envoi ne la fait pas disparaître).
   const ajouterLigne = (d, m) => {
@@ -1091,7 +1074,7 @@
   // Réponse ignorée si le dossier affiché ou le compte a changé ; échec silencieux (nouvel essai au tour suivant). Étape
   // clé nouvelle (devis envoyé, paiement reçu…) : le dossier a changé (étape, montant, documents) ; il est relu en entier
   // et la fiche redessinée (ouvrir sur le même dossier : fil, fenêtre, détails ouverts, brouillon et focus gardés ;
-  // coordonnées de virement et lien de rétractation relus). Sans étape clé nouvelle, projets n'est pas relu.
+  // coordonnées de virement relues). Sans étape clé nouvelle, projets n'est pas relu.
   let relecture = false;
   const clesJalons = (d) => new Set((Array.isArray(d.evenements) ? d.evenements : []).filter(Boolean).map((ev) => ev.type + '|' + ev.le));
   const rafraichir = () => {

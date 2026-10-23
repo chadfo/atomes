@@ -16,6 +16,7 @@ site/                      ← racine publiée (tout ce dossier va à la racine 
   dossier/                 Espace client : timeline, discussion avec l'agence, documents, récapitulatif
   admin/                   Espace agence
   action/                  Page d'action, ouverte par les liens des e-mails (signer, valider, renoncer)
+  renoncer/                Formulaire public de rétractation (lien « Renoncer au contrat ici »)
   assets/css/site.css      Feuille de style commune : jetons de la charte + composants + pages
   assets/js/atom-logo.js   Logo animé <atom-logo> (à conserver tel quel)
   assets/js/projets.js     Accordéon et galeries de la page Projets
@@ -25,6 +26,7 @@ site/                      ← racine publiée (tout ce dossier va à la racine 
   assets/js/dossier.js     Espace client
   assets/js/admin.js       Espace agence
   assets/js/action.js      Page d'action
+  assets/js/renoncer.js    Formulaire public de rétractation
   images/                  Toutes les photos (.webp)
   favicon.png · a5ce3393-….png (image OG) · robots.txt · sitemap.xml · .nojekyll
 supabase/migrations/       Schéma, règles de sécurité, timeline, discussion (0001 à 0006, dans l'ordre)
@@ -186,8 +188,9 @@ GitHub Pages fait garder chaque fichier 10 minutes par les navigateurs. Quand un
 que son script ou la feuille de style changent avec elle, versionner leur adresse dans la page
 (`site.css?v=4`, `dossier.js?v=6`…) et augmenter le numéro à la modification suivante du même genre : sinon,
 pendant ces 10 minutes, un visiteur peut recevoir la nouvelle page avec l'ancien script. Versions en cours depuis la
-discussion (20 octobre 2026) : `site.css?v=4` (contact, devis, espace client, espace agence, page d'action),
-`dossier.js?v=6`, `admin.js?v=7`, `action.js?v=4`, `contact.js?v=2` ; accueil, projets et à propos sans numéro.
+rétractation par le formulaire public (22 octobre 2026) : `site.css?v=5` (espace client, espace agence, page
+d'action, formulaire de rétractation ; contact et devis, inchangés, gardent `?v=4`), `dossier.js?v=7`,
+`admin.js?v=8`, `action.js?v=5`, `renoncer.js?v=1`, `contact.js?v=2` ; accueil, projets et à propos sans numéro.
 Le numéro ne protège que dans ce sens : GitHub Pages ignore `?v=` et sert toujours le fichier à jour. Une ancienne
 page encore en cache qui redemande son script reçoit donc le nouveau (visiteur qui a rechargé la page peu avant la
 publication) et peut rester sur « Chargement… » jusqu'à un rechargement.
@@ -235,6 +238,16 @@ les e-mails de l'agence, dont les avis « Message du client » du site. La réce
 `email.received`, anciennes adresses de réponse des dossiers en `r.atomes.studio`), prévue pour la transition, a été
 retirée le 20 octobre 2026, aucun vrai client n'ayant encore reçu une telle adresse : le moteur est la seule voie
 d'arrivée des e-mails des clients.
+
+**Rétractation et conditions générales (21 et 22 octobre 2026, décisions de Simon).** Le particulier qui a signé son
+devis en ligne renonce au contrat sur le formulaire public `renoncer/` (atomes.studio/renoncer/, adresse annoncée par
+les conditions générales), sans connexion ni lien reçu par e-mail : un petit lien « Renoncer au contrat ici » y mène
+depuis le pied de page de l'espace client, de la page d'action et du formulaire lui-même, et de nulle part ailleurs.
+Plus aucun lien de rétractation n'est envoyé ; les anciens restent acceptés jusqu'à la fin du délai. L'information sur
+la rétractation et le formulaire type sont dans les conditions générales, imprimées à la fin de chaque devis : la page
+de signature et les e-mails ne les montrent plus. Au-dessus du bouton de signature, pour tous les clients : « En
+signant, vous acceptez nos conditions générales, jointes au devis. ». Le devis, toujours joint aux e-mails (support
+durable), fait 15 Mo au plus.
 
 - `supabase/migrations/0001_espace_client.sql` : tables `projets` (une ligne par demande, identifiant
   `AAMMJJHHMMSS` à l'heure de Paris, ex. `261012173615`), `modele_etapes` et `etapes` (timeline), `admins` ;
@@ -310,9 +323,11 @@ d'arrivée des e-mails des clients.
 - `supabase/functions/espace/index.ts` : un seul fichier, comme `demande` (déploiement par copier-coller dans
   l'éditeur Supabase : petites fonctions utilitaires dupliquées, pas de module partagé). Appel : `POST` JSON
   `{ action, projet, … }` (64 Ko au plus, sinon 413 « Requête trop lourde ») avec `Authorization: Bearer <session>`,
-  ou `{ action, jeton, … }` pour un lien d'action ; `message_client` seulement en `multipart/form-data` (voir plus
-  bas). Jamais le même nom d'action côté client et côté agence. Quatre entrées :
-  - actions de l'agence, avec sa session : `devis` (PDF joint à l'e-mail, lien de signature), `etape` (lien de
+  ou `{ action, jeton, … }` pour un lien d'action, ou `{ action: "renoncer_formulaire", … }` sans session ni jeton ;
+  `message_client` seulement en `multipart/form-data` (voir plus bas). Jamais le même nom d'action côté client et
+  côté agence. Cinq entrées :
+  - actions de l'agence, avec sa session : `devis` (PDF de 15 Mo au plus, toujours joint à l'e-mail : au-delà, 413
+    sans rien écrire ni envoyer, et la page retire le fichier déposé ; lien de signature), `etape` (lien de
     validation à l'étape « Validation de vos documents »), `option`, `paye` (« Virement reçu »), `message_agence`
     (message de la discussion, envoyé au client par e-mail), `renvoyer_message` (e-mail d'un message de l'agence qui
     n'est pas parti), `messages_lus` (messages du client affichés à l'agence), `rattacher` et `supprimer_message`
@@ -320,10 +335,13 @@ d'arrivée des e-mails des clients.
     à traiter, le moteur range ses pièces à son passage suivant), `renvoyer` (confirmation du contrat ou accusé de
     rétractation qui n'a pas pu partir) ; chaque action qui écrit au client renvoie `mail` (faux si l'e-mail n'est
     pas parti, ce que l'espace agence signale). L'action `questions` n'existe plus (« Action inconnue ») ;
-  - actions par lien, sans compte, avec le jeton reçu par e-mail : `infos`, `signer`, `valider`, `renoncer` ;
+  - actions par lien, sans compte, avec le jeton reçu par e-mail : `infos`, `signer`, `valider`, et `renoncer` pour
+    les anciens liens de rétractation (plus aucun n'est créé) ;
+  - action publique `renoncer_formulaire` (formulaire de rétractation, page `renoncer/` ; voir « Rétractation »
+    plus bas), sans session ni jeton, traitée avant eux ;
   - actions du client, avec sa session (compte agence : 403 explicite ; autre compte : 404, comme un dossier
-    inexistant) : `infos_espace`, en lecture seule (coordonnées du virement, lien de rétractation), et
-    `message_client` (message de la discussion, avec pièces jointes) ;
+    inexistant) : `infos_espace`, en lecture seule (coordonnées du virement), et `message_client` (message de la
+    discussion, avec pièces jointes) ;
   - webhook Resend `email.received`, **inactif depuis le 20 octobre 2026** : la réception par Resend (anciennes
     adresses de réponse des dossiers, sous-domaine `r.atomes.studio`) a été retirée, et ses secrets
     `REPONSES_DOMAINE`, `RESEND_WEBHOOK_SECRET` et `RESEND_RECEPTION_KEY` supprimés. Sans `RESEND_WEBHOOK_SECRET`,
@@ -388,33 +406,66 @@ d'arrivée des e-mails des clients.
     {"message":42,"pieces":2,"code":null,"statut":null}`. Jamais un texte de message, une adresse e-mail, un nom de
     fichier, un chemin de pièce, `error.details` ni `error.hint`.
 
+  **Rétractation** (action `renoncer_formulaire`, décisions de Simon des 21 et 22 octobre 2026 ; L221-21 et D221-5) :
+  - `renoncer_formulaire` (JSON `{ action, nom, dossier, email, email_accuse }`, `email_accuse` facultatif, vide =
+    absent ; traitée par le routeur avant le jeton et la session, mêmes CORS et même format de réponse que les autres
+    actions) : nom de 3 à 120 caractères, numéro de dossier de 12 chiffres (espaces retirés), adresses valides de
+    200 caractères au plus (espaces retirés, en minuscules), sinon 400 avec le message du champ. Contrat reconnu
+    seulement si le dossier existe, est celui d'un particulier, porte un devis signé et a pour adresse celle saisie ;
+    sinon un seul refus, 404, même texte (« Nous ne retrouvons pas de contrat en cours avec ce numéro de dossier et
+    cette adresse e-mail… »), sans rien écrire, envoyer ni journaliser : rien ne révèle qu'un numéro existe ni à qui
+    il appartient. Déjà rétracté : `{ deja: true, retracte_le }` ; délai écoulé : 410 (« Le délai de rétractation
+    est expiré. Si vous pensez que ce n'est pas le cas, écrivez-nous à contact@atomes.studio. ») ; sinon
+    `{ retracte_le, mail }`. Pas de limite de fréquence : un refus n'écrit et n'envoie rien, un succès n'a lieu
+    qu'une fois (risque d'un numéro deviné accepté par Simon le 23 octobre 2026). Journaux sans le nom, les adresses ni le numéro saisis (erreur inattendue, y compris pendant la
+    relecture du dossier ou l'écriture de `envois_echoues` : son code et son statut, jamais l'erreur entière, dont le
+    message reprend l'adresse de la requête ; sans clé Resend, l'objet de l'e-mail n'est pas journalisé).
+  - Effets, les mêmes qu'avec un ancien lien (`enregistrerRetractation`) : écriture conditionnelle de `retracte_*`
+    (dossier pas encore rétracté, même signature ; nom saisi ; `retracte_email` = l'autre adresse si elle est donnée,
+    sinon l'adresse saisie ; IP, navigateur), accusé de réception à l'adresse du dossier (avec la timeline) et,
+    séparément, à l'autre adresse si elle diffère (sans timeline) ; il reprend le contenu de la déclaration (nom,
+    numéro de dossier, adresse e-mail de la demande, autre adresse pour l'accusé, sous les libellés du formulaire),
+    puis la date et l'heure de réception ; s'il n'est pas parti vers l'une des deux adresses, mention dans
+    `envois_echoues` (« Renvoyer », qui l'envoie de nouveau aux deux) et alerte dans l'avis ; `mail` faux seulement
+    s'il n'est parti nulle part ; avis « Rétractation — dossier … » à l'agence, « par le formulaire du site », avec
+    l'autre adresse. L'étape ne change pas.
+  - Plus aucun lien de rétractation n'est créé (`lienRenoncer` supprimé) : ni dans `infos`, `signer` ou
+    `infos_espace`, ni dans les e-mails. L'information sur la rétractation et le formulaire type sont dans les
+    conditions générales imprimées à la fin du devis : l'e-mail « Votre devis est prêt » dit « Nos conditions
+    générales figurent à la fin du devis. » ; `infos` (mode signer) renvoie `textes = { case, bouton, cgv }`, `cgv`
+    étant la phrase affichée au-dessus du bouton ; l'e-mail « Devis signé » d'un particulier confirme sa demande de
+    démarrage en citant la case (texte enregistré avec la signature), sans bloc ni lien de rétractation. Le devis,
+    support durable de ces conditions, est toujours joint : 15 Mo au plus (`MAX_DEVIS_JOINT`).
+
   E-mails Resend : timeline du dossier dans chaque e-mail au client, adresse de réponse contact@ (`MAIL_AGENCE`), lien
   « Suivre mon dossier en ligne » ; liens d'action toujours vers `SITE_URL` (jamais vers l'origine de la
-  requête). « Verify JWT » désactivé : session, jeton ou signature de Resend vérifiés dans la fonction.
+  requête). « Verify JWT » désactivé : session, jeton ou signature de Resend vérifiés dans la fonction (rien de tel
+  pour l'action publique `renoncer_formulaire`, qui reconnaît le contrat par le numéro et l'adresse du dossier).
   Signature : nom, date, IP (celle ajoutée par la plateforme, chaîne X-Forwarded-For gardée), navigateur, montant,
   empreinte SHA-256 du PDF recalculée au moment de signer ; particulier : case de démarrage anticipé obligatoire. Rétractation : 14 jours après la
   signature, prolongés jusqu'au premier jour ouvrable (week-end, jours fériés français) ; l'étape ne change pas.
-  Les textes juridiques (case, bouton, information et formulaire de rétractation) viennent de cette fonction,
-  pour les e-mails comme pour la page d'action, qui les reçoit d'elle.
+  Les textes juridiques (case, bouton, phrase des conditions générales, refus du formulaire de rétractation ;
+  formulaire type des anciens liens) viennent de cette fonction, pour les e-mails comme pour la page d'action, qui
+  les reçoit d'elle.
 - **Liens et adresses de réponse** (secret `JETON_SECRET`) : lien `https://atomes.studio/action/#t=<jeton>`,
   jeton = `base64url(JSON)` + `.` + `base64url(HMAC-SHA256)`, charge utile `{ a, p, e, d }` (action, dossier,
   expiration ; `d` : début de l'empreinte du devis pour signer, du contrat signé pour renoncer, soit
   `SHA-256(date de signature + empreinte du devis signé)`) ; placé dans le fragment, il n'est jamais envoyé au
   serveur des pages. Durées : signer 30 jours (un nouveau devis invalide les anciens liens), valider 90 jours,
-  renoncer jusqu'à la fin du délai de rétractation (le lien d'un contrat précédent ne vaut plus). Ancienne adresse de
-  réponse, plus reçue depuis le retrait de la réception Resend (20 octobre 2026) : `d<id>-<mac>@<REPONSES_DOMAINE>`
-  (`r.atomes.studio`), `mac` = 20 premiers caractères hexadécimaux de `HMAC-SHA256(JETON_SECRET, "reponse:" + id)`.
-  Sans `JETON_SECRET` : pas de lien ; sans `REPONSES_DOMAINE` (supprimé le 20 octobre 2026) : le webhook n'ajoute
-  plus rien.
+  renoncer jusqu'à la fin du délai de rétractation (plus aucun n'est créé ; ceux déjà envoyés restent acceptés, sauf
+  celui d'un contrat précédent). Ancienne adresse de réponse, plus reçue depuis le retrait de la réception Resend
+  (20 octobre 2026) : `d<id>-<mac>@<REPONSES_DOMAINE>` (`r.atomes.studio`), `mac` = 20 premiers caractères
+  hexadécimaux de `HMAC-SHA256(JETON_SECRET, "reponse:" + id)`. Sans `JETON_SECRET` : pas de lien ; sans
+  `REPONSES_DOMAINE` (supprimé le 20 octobre 2026) : le webhook n'ajoute plus rien.
 - `site/assets/js/config.js` : URL Supabase, clé anon, URL des fonctions `demande` (`apiUrl`) et `espace`
-  (`espaceUrl`, aussi pour la page d'action). Vide = le formulaire de devis envoie via FormSubmit comme avant ;
-  rempli = fonction « demande », FormSubmit en secours si elle ne répond pas.
+  (`espaceUrl`, aussi pour la page d'action et le formulaire de rétractation). Vide = le formulaire de devis envoie
+  via FormSubmit comme avant ; rempli = fonction « demande », FormSubmit en secours si elle ne répond pas.
 - `site/dossier/` + `assets/js/dossier.js` : espace client. Connexion sans mot de passe, par code reçu par
   e-mail (voir « Connexion par code » plus bas), liste des dossiers, timeline numérotée et datée (« Depuis le … »
   pour l'étape en cours), sous l'étape en cours une information (devis à signer depuis le lien reçu, montant,
   référence et coordonnées du virement, documents à valider depuis le lien reçu ou modification à demander dans la
-  discussion, rétractation), discussion, documents de l'agence et du client, récapitulatif de la demande. Dates à
-  l'heure de Paris, « 1er » comme dans les e-mails (« 1er octobre 2026 à 09:05 »).
+  discussion, rétractation reçue), discussion, documents de l'agence et du client, récapitulatif de la demande. Dates
+  à l'heure de Paris, « 1er » comme dans les e-mails (« 1er octobre 2026 à 09:05 »).
   - Lecture : `*, etapes(*), messages(id, recu_le, auteur, origine, texte, pieces, verifie), evenements(type, le,
     details)` ; avant la migration 0006 (PGRST200 ou 42703), ancienne lecture, chaque message traité comme un
     e-mail du client. Messages vérifiés seulement.
@@ -424,10 +475,10 @@ d'arrivée des e-mails des clients.
     texte et avant les pièces (même ordre que l'espace agence). Dossier ouvert relu toutes les 30 s (onglet visible)
     et au retour sur l'onglet (messages et étapes clés) ; le fil est mis à jour par élément (`data-id`), sans perdre
     la saisie ni le défilement. Une étape clé nouvelle (devis envoyé, paiement reçu…) fait relire le dossier entier :
-    timeline, information sous l'étape, documents, coordonnées de virement et lien de rétractation à jour ; fil,
-    fenêtre, brouillon et focus gardés. Sans ancrage de défilement natif (Safari), la page garde à sa place le champ
-    qui a le focus, sinon le premier élément visible resté en place (fil, composeur, blocs suivants) : même règle
-    dans l'espace agence. Une réponse arrivée après une déconnexion n'écrit rien dans la page.
+    timeline, information sous l'étape, documents et coordonnées de virement à jour ; fil, fenêtre, brouillon et focus
+    gardés. Sans ancrage de défilement natif (Safari), la page garde à sa place le champ qui a le focus, sinon le
+    premier élément visible resté en place (fil, composeur, blocs suivants) : même règle dans l'espace agence. Une
+    réponse arrivée après une déconnexion n'écrit rien dans la page.
   - Composeur : texte (compteur au-delà de 4 500 caractères, 5 000 au plus), photos et PDF (10 fichiers, 10 Mo en
     tout, mêmes refus que le formulaire de devis), glisser-déposer ; brouillon par dossier gardé en mémoire
     seulement (jamais dans un stockage), vidé après l'envoi et à la déconnexion ; envoi multipart à
@@ -468,20 +519,62 @@ d'arrivée des e-mails des clients.
     Du plus récent au plus ancien, sans doublon de chemin ; « Aucun document pour le moment… » seulement si les deux
     manquent. Ancienne lecture (avant 0006) : aucune pièce de message. Démo : à partir de `?demo=validation`
     (notice jointe par l'agence).
-  - Aucune autre action, sauf le lien légal « Renoncer au contrat ici » vers la page d'action (particulier signé,
-    pendant le délai).
+  - Impression (conditions générales, article 18 : la discussion s'imprime ou s'enregistre en PDF, chaque message
+    avec sa date et son heure) : feuille `@media print` des pages à `.espace` (espace client, espace agence, page
+    d'action, formulaire de rétractation ; pages vitrine inchangées), encre `#171512` sur papier blanc par les jetons
+    (seule exception à la charte), sans barre de navigation, composeur ni boutons ; sans pied de page dans les espaces
+    client et agence (il reste sur la page d'action et le formulaire de rétractation : l'imprimé d'une confirmation
+    nomme l'agence, son adresse et son e-mail) ; « Message complet » imprimé s'il est ouvert, sans son intitulé ;
+    dates et heures lisibles ; une bulle, une étape ou une ligne de document jamais coupée entre deux pages. Fiche en
+    une colonne ; `dossier.js` montre tout le fil avant l'impression (`beforeprint`, et `matchMedia('print')` pour un
+    navigateur qui passe à l'impression sans cet événement), comme « Afficher les messages précédents » : il reste
+    entier ensuite.
+  - Aucune autre action. Lien légal « Renoncer au contrat ici » dans le pied de page, sur toutes les vues (connecté
+    ou non, quel que soit le dossier), vers le formulaire public `renoncer/` ; la fiche ne parle de rétractation
+    qu'une fois celle-ci reçue (« Vous avez renoncé au contrat le … », sous l'étape en cours).
   - **Mode démo sans backend : `dossier/?demo`**, ou `?demo=signature`, `paiement`, `production`, `validation`,
     `suivi`, `clos` pour partir d'une étape, `retracte` pour une rétractation reçue (en local :
     http://localhost:3000/dossier/?demo ; avec `npx serve`, l'adresse `dossier/index.html` est redirigée et perd
     le paramètre) ; messages des deux côtés et étapes clés, et le composeur écrit dans les données de la démo.
 - `site/action/` + `assets/js/action.js` : page d'action, ouverte par les liens des e-mails, sans connexion ni
   supabase-js (`fetch` vers la fonction `espace`, avec le jeton). Trois modes : signer le devis, valider les
-  documents, renoncer au contrat. Le jeton est lu dans le fragment puis effacé de la barre d'adresse ; rien ne se
-  fait sans clic. `noindex`, sans `Referer`. **Mode démo : `action/?demo=signer`** (particulier), ou
-  `?demo=signer-pro`, `valider`, `renoncer` ; ses textes juridiques sont une copie de ceux de la fonction.
+  documents, et renoncer au contrat pour les anciens liens de rétractation (formulaire et formulaire type ; aucun
+  n'est plus envoyé). Signature : case de démarrage anticipé (particulier), nom, puis, juste au-dessus du bouton et
+  pour tous les clients, « En signant, vous acceptez nos conditions générales, jointes au devis. » (`textes.cgv` de
+  la fonction ; la page garde une copie de secours de cette phrase et du bouton) ; ni information sur la
+  rétractation ni formulaire type (dans les conditions générales du devis), ni lien de rétractation après la
+  signature. Pied de page : « Renoncer au contrat ici », vers `renoncer/`. Le jeton est lu dans le fragment puis
+  effacé de la barre d'adresse ; rien ne se fait sans clic. `noindex`, sans `Referer`.
+  **Mode démo : `action/?demo=signer`** (particulier), ou `?demo=signer-pro`, `valider`, `renoncer` ; ses textes
+  juridiques sont une copie de ceux de la fonction.
+- `site/renoncer/` + `assets/js/renoncer.js` : formulaire public de rétractation (21 et 22 octobre 2026 ; L221-21 et
+  D221-5 ; adresse `atomes.studio/renoncer/`, annoncée par les conditions générales, article 11.3 et annexe 1),
+  ouvert par le lien « Renoncer au contrat ici » du pied de page de l'espace client, de la page d'action et de la
+  page elle-même, ou directement ; sans connexion ni supabase-js. Champs : nom et prénom, numéro de dossier
+  (12 chiffres), adresse e-mail de la demande, autre adresse pour l'accusé de réception (facultative) ; bouton
+  « Confirmer la rétractation », puis une seule phrase (« Si vous avez demandé que la mission commence avant la fin
+  du délai, un montant proportionné au travail déjà réalisé reste dû. ») ; ni motif ni étape de plus. Rien n'est lu au
+  chargement ; au clic, formats contrôlés par la page (mêmes règles que la fonction ; message sous le premier champ
+  invalide, qui reçoit le focus), puis `POST` JSON à `renoncer_formulaire` (`espaceUrl`, en-tête `apikey`, sans
+  `Authorization`). Refus de la fonction (format, contrat introuvable, délai expiré) affichés tels quels sous le
+  formulaire, contact@atomes.studio en lien, saisie gardée ; requête qui n'aboutit pas (réseau coupé ou requête
+  bloquée), 401 (fonction antérieure, qui exige une session) et erreur du serveur : message d'échec, qui donne aussi
+  contact@. Réussite : la confirmation remplace le formulaire (date et heure de réception à l'heure de Paris, dossier,
+  nom ; accusé parti, ou « conservez cette page ») ; déjà reçue : « Votre rétractation était déjà enregistrée. ».
+  Confirmation focalisée ; son haut caché sous la barre de navigation collante (zoom), elle défile juste sous la barre
+  (de même sur la page d'action). Champs sans `name`, formulaire en méthode `dialog` (sans script, « Confirmer la
+  rétractation » n'envoie rien et ne recharge pas la page : la saisie reste) ; nom, numéro et adresses jamais dans une
+  URL, un stockage ni un journal. `noindex, nofollow`, sans `Referer`, hors sitemap ; même tête de page, barre de
+  navigation et pied de page que la page d'action ; étiquette « Votre rétractation », mention « (facultatif) » et
+  exemple d'adresse plus foncés qu'ailleurs sur le site (5,2:1). Lien du pied de page (`.footer .lien-legal`, sur ces
+  trois pages seulement : ni pages vitrine, ni espace agence, ni e-mails) : texte du DOM « Renoncer au contrat ici »,
+  en capitales par la feuille de style, souligné, contraste de 5,96:1, cible de 24 px de haut.
+  **Mode démo : `renoncer/?demo`** (rétractation reçue simulée, aucune requête ; « Démonstration : rien n’a été envoyé. » à la place de l'accusé).
 - `site/admin/` + `assets/js/admin.js` : espace agence (compte inscrit dans `admins`, même connexion par code que
   l'espace client). Liste filtrable (en cours, à traiter, clos), fiche : étapes (« Passer ici »), option de suivi,
-  note pour le client, discussion, envoi du devis (un fichier par version,
+  note pour le client, discussion, envoi du devis (PDF de 15 Mo au plus, refusé avant tout dépôt au-delà ; sous le
+  choix du fichier, l'aide « Le devis doit contenir nos conditions générales, droit de rétractation et formulaire
+  type compris. » ; un fichier par version,
   `<id>/agence/devis-<id>-<AAMMJJHHMMSS>.pdf`, jamais écrasé ; montant, libellé), état de la signature (démarrage
   anticipé, rétractation), référence et « Virement reçu », documents, demande de validation, pièces du client.
   Chaque opération reste attachée au dossier ouvert au moment du clic, même si une autre fiche est ouverte pendant
@@ -568,7 +661,9 @@ d'arrivée des e-mails des clients.
 1. Moteur de l'agence : modules suivants (plans de situation et de masse, ArchiCAD 27), voir `atomes-moteur/README.md`.
 1. Avis clients (quand la fiche Google existera).
 2. Anti-spam (Cloudflare Turnstile) si nécessaire.
-3. Textes juridiques du parcours, médiateur de la consommation, devis et conditions générales : à faire valider
-   par l'Ordre des architectes (SETUP-ESPACE-CLIENT.md, « À savoir »).
+3. Textes juridiques du parcours (formulaire de rétractation compris), médiateur de la consommation, devis et
+   conditions générales (rédigées le 21 octobre 2026 : à compléter, puis à imprimer à la fin de chaque devis, client
+   professionnel compris, dès la mise en ligne de la rétractation par le formulaire public) : à faire valider par
+   l'Ordre des architectes (SETUP-ESPACE-CLIENT.md, « Mises à jour à appliquer » et « À savoir »).
 4. Tables `questions` et `modifications` : à supprimer quand le moteur 0.2.0 sera en service pour de bon (le retour
    à la 0.1.0, qui y écrit encore, n'est possible que tant qu'elles existent).

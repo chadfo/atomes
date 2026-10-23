@@ -173,6 +173,21 @@ rétractation, dossier clos). Elle remplace les « Questions au client » et les
 les e-mails : les questions déjà posées, les réponses et les demandes déjà reçues y sont reprises. Mode d'emploi :
 « Au quotidien », Discussion.
 
+La même mise à jour change la **rétractation** (décisions du 21 et du 22 octobre 2026) : le lien « Renoncer au contrat
+ici » est désormais en bas de l'espace client et de la page de signature, et mène au formulaire de rétractation du
+site (https://atomes.studio/renoncer/) ; l'information sur la rétractation et le formulaire type sont dans les
+conditions générales, à la fin de chaque devis (« À savoir »). Côté technique, rien de plus à appliquer : la fonction
+`espace` (étape 2) et le site (étape 3) suffisent. Mode d'emploi : « Au quotidien », Rétractation.
+
+**Rétractation et conditions générales** : dès l'étape 3, la page de signature dit à tout client, professionnel
+compris, « En signant, vous acceptez nos conditions générales, jointes au devis. », et l'e-mail du devis « Nos
+conditions générales figurent à la fin du devis. » ; le client particulier ne reçoit plus l'information sur la
+rétractation et le formulaire type que par elles. La séance peut donc avoir lieu avant qu'elles soient prêtes, à deux
+conditions : aucun devis en attente de signature (« Validation de votre devis ») dont le PDF ne les contient pas (le
+renvoyer avec elles, même montant, sinon le client le signerait sous cette phrase) ; et aucun devis envoyé ensuite
+sans les conditions générales complètes (version 1 du 21 octobre 2026, plus aucun « [À COMPLÉTER] ») imprimées à sa
+fin. Sans elles, un client particulier pourrait renoncer pendant douze mois au lieu de quatorze jours.
+
 **Avant la séance** : Claude a intégré la discussion à `main` dans ce dépôt, sans la publier. Ne pas faire « Sync
 Changes » avant l'étape 3. Les étapes 1 à 3 se font d'affilée, dans la même séance et dans cet ordre.
 
@@ -240,10 +255,12 @@ Changes » avant l'étape 3. Les étapes 1 à 3 se font d'affilée, dans la mêm
 2. **Redéployer la fonction `espace`** (§ 7, point 1). Avant de remplacer le code : **Edge Functions → espace →
    Code**, tout sélectionner, copier, et coller dans un fichier hors du dépôt (par exemple sur le Bureau) : c'est le
    retour arrière (recoller ce code, **Deploy updates**). La migration resterait alors en place : l'ancienne fonction
-   et les pages en ligne fonctionnent avec elle ; seuls les envois de la discussion (messages de l'agence et du
-   client), « Renvoyer l'e-mail » et le marquage « lu » seraient refusés (« Action inconnue » ou « Requête
-   illisible ») : les messages du client resteraient « Nouveau » jusqu'au redéploiement. « Verify JWT » reste
-   désactivé. La fonction `demande` ne change pas.
+   et les pages en ligne fonctionnent avec elle ; les envois de la discussion (messages de l'agence et du client),
+   « Renvoyer l'e-mail » et le marquage « lu » seraient refusés (« Action inconnue » ou « Requête illisible ») : les
+   messages du client resteraient « Nouveau » jusqu'au redéploiement. Le formulaire de rétractation du site refuserait
+   lui aussi tout envoi (« Action impossible pour le moment… », qui renvoie à contact@atomes.studio) ; la page de
+   signature reprendrait l'ancien texte de la case, et les e-mails du devis l'ancienne information sur la
+   rétractation. « Verify JWT » reste désactivé. La fonction `demande` ne change pas.
 3. **Publier le site** (VS Code → Sync Changes), attendre le vert dans l'onglet Actions de GitHub, puis une dizaine
    de minutes. Recharger ensuite les onglets de /admin/ et /dossier/ restés ouverts : un onglet ouvert avant la
    publication garde l'ancien script.
@@ -276,6 +293,23 @@ Changes » avant l'étape 3. Les étapes 1 à 3 se font d'affilée, dans la mêm
       la page : c'est voulu. Les pièces jointes du point 4 figurent aussi sous « Documents de l'agence ». Sur ton
       téléphone (même connexion, par code) : une seule colonne, dans l'ordre « Avancement », « Discussion », les
       documents, puis « Votre demande ».
+   7. **Signature et rétractation**, sur un dossier de test au profil Particulier (au besoin, une nouvelle demande sur
+      https://atomes.studio/devis.html avec ton adresse personnelle). Espace agence : envoyer un devis (un PDF
+      quelconque, 1 €). L'e-mail « Votre devis est prêt » contient le PDF, le bouton « Lire et signer mon devis » et
+      « Nos conditions générales figurent à la fin du devis. », sans information sur la rétractation. La page de
+      signature montre la case (texte du 22 octobre, celui de l'article 11.4 des conditions générales), puis, juste
+      au-dessus du bouton, « En signant, vous acceptez nos conditions générales, jointes au devis. », et « Renoncer au
+      contrat ici » en bas de page. Cocher, saisir le nom, signer : la confirmation ne propose aucun lien de
+      rétractation (seul reste celui du bas de page). L'e-mail « Devis signé » contient le devis et une phrase qui
+      cite la case cochée, sans bloc de rétractation. Puis, en bas de l'espace client, cliquer « Renoncer au contrat
+      ici » : https://atomes.studio/renoncer/ s'ouvre. Saisir ton nom, le numéro du dossier et une autre adresse que
+      celle du dossier, « Confirmer la rétractation » : la page répond « Nous ne retrouvons pas de contrat en
+      cours… », et rien n'est enregistré ni envoyé. Mettre l'adresse du dossier, et une autre adresse à toi dans
+      « Autre adresse pour l'accusé de réception », puis de nouveau « Confirmer la rétractation » : la page affiche
+      « Votre rétractation a bien été reçue le … » ; l'accusé de réception arrive aux deux adresses (il reprend ton
+      nom, le numéro du dossier, les deux adresses, puis la date et l'heure de réception), « Rétractation —
+      dossier … » à contact@ (« par le formulaire du site »), et la fiche du dossier affiche la rétractation.
+      Recharger la page et renvoyer le formulaire : « Votre rétractation était déjà enregistrée. ».
 
    Si un essai échoue : ne rien défaire ; noter le message affiché et l'heure, regarder Edge Functions → espace →
    Logs, puis prévenir Claude. La base reste telle quelle : l'ancienne fonction et l'ancien site fonctionnent avec
@@ -419,7 +453,8 @@ s'ajoutent à la discussion du dossier (par le moteur de l'agence, § 8). Il peu
 client, avec photos et PDF : ses messages passent par la fonction. Il signe le devis et valide ses documents sur une
 page du site ouverte par un lien reçu par e-mail, sans se connecter, et paie par virement avec le numéro de dossier
 pour référence : dans son espace, il consulte son dossier et écrit dans la discussion, rien d'autre. La fonction
-reçoit aussi les actions de l'espace agence, dont tes messages au client.
+reçoit aussi les actions de l'espace agence, dont tes messages au client, et les rétractations envoyées sans connexion
+par le formulaire du site (https://atomes.studio/renoncer/).
 
 1. **Déployer la fonction `espace`**. Première fois : **Edge Functions → Deploy a new function → Via editor**, nom
    `espace`, coller le contenu de `supabase/functions/espace/index.ts`, Deploy. Mise à jour : **Edge Functions →
@@ -445,7 +480,7 @@ reçoit aussi les actions de l'espace agence, dont tes messages au client.
    - Anciens secrets de la réception par Resend, `REPONSES_DOMAINE`, `RESEND_WEBHOOK_SECRET` et
      `RESEND_RECEPTION_KEY` : supprimés le 20 octobre 2026, à ne pas recréer. La fonction les lit encore : sans eux,
      son ancienne réception par webhook reste inactive (point 3).
-   - Les liens des e-mails (signature, validation, rétractation) mènent toujours à `SITE_URL` (https://atomes.studio),
+   - Les liens des e-mails (signature, validation) mènent toujours à `SITE_URL` (https://atomes.studio),
      même si l'espace agence est ouvert depuis localhost. Une fois les essais en local finis, tu peux retirer
      localhost des origines autorisées : `ORIGINES_AUTORISEES` = `https://atomes.studio,https://www.atomes.studio`
      (facultatif ; à remettre pour essayer de nouveau le formulaire en local, § 6).
@@ -468,11 +503,11 @@ reçoit aussi les actions de l'espace agence, dont tes messages au client.
       dossier … » arrive à l'adresse du test ; y répondre. Dans les 5 minutes, la réponse s'affiche dans la
       discussion.
    4. Envoyer un devis (un PDF quelconque, 1 €). L'e-mail « Votre devis est prêt » contient le PDF, le bouton
-      « Lire et signer mon devis », l'information sur la rétractation et le formulaire type. Sur la page qui s'ouvre
-      (information et formulaire type au-dessus de la case), cliquer « Signer et commander avec obligation de
-      paiement » sans cocher la case : un message demande de la cocher. Cocher, saisir le nom, signer. L'e-mail
-      « Devis signé » contient la preuve de signature, le devis, les coordonnées et la référence du virement,
-      l'information sur la rétractation et le lien « Renoncer au contrat ici ». Dans la fiche du dossier, l'adresse
+      « Lire et signer mon devis » et « Nos conditions générales figurent à la fin du devis. ». Sur la page qui
+      s'ouvre (« En signant, vous acceptez nos conditions générales, jointes au devis. » juste au-dessus du bouton),
+      cliquer « Signer et commander avec obligation de paiement » sans cocher la case : un message demande de la
+      cocher. Cocher, saisir le nom, signer. L'e-mail « Devis signé » contient la preuve de signature, le devis,
+      les coordonnées et la référence du virement, et cite la case cochée. Dans la fiche du dossier, l'adresse
       IP de la signature doit être la tienne (la comparer avec celle qu'affiche une recherche « mon adresse IP ») ;
       sinon, le signaler : la règle qui la choisit est à ajuster.
    5. Espace agence : le dossier est en « Virement attendu ». Cliquer « Virement reçu » : e-mail « Paiement
@@ -481,10 +516,11 @@ reçoit aussi les actions de l'espace agence, dont tes messages au client.
       sont prêts » : dans les 5 minutes, la réponse s'affiche dans la discussion et le dossier passe « Message du
       client » dans la liste. Puis, dans le même e-mail, cliquer « Voir et valider mes documents », et « Je valide mes
       documents ».
-   7. Dans l'e-mail « Devis signé », cliquer « Renoncer au contrat ici », remplir, « Confirmer la rétractation ».
-      L'accusé de réception arrive à l'adresse du test, « Rétractation — dossier … » à contact@atomes.studio, et la
-      fiche affiche la rétractation : le dossier, clos au point 6, s'affiche « Rétractation reçue » (reçue après la
-      clôture) dans les dossiers « À traiter ».
+   7. En bas de la page de signature ou de l'espace client, cliquer « Renoncer au contrat ici » (ou ouvrir
+      https://atomes.studio/renoncer/) ; saisir le nom, le numéro du dossier et l'adresse du test, « Confirmer la
+      rétractation ». L'accusé de réception arrive à l'adresse du test, « Rétractation — dossier … » à
+      contact@atomes.studio, et la fiche affiche la rétractation : le dossier, clos au point 6, s'affiche
+      « Rétractation reçue » (reçue après la clôture) dans les dossiers « À traiter ».
    8. Depuis une autre adresse à toi (ni celle du test, ni une adresse en atomes.studio), écrire à
       contact@atomes.studio avec le numéro du dossier dans l'objet : dans les 5 minutes, la fiche montre le message
       avec le badge « À vérifier » (aucun e-mail ne l'annonce). Le supprimer.
@@ -619,19 +655,22 @@ par e-mail. Dans la fiche d'un dossier, relue seule toutes les 30 secondes et qu
 - **E-mail à renvoyer** : si la confirmation du contrat (« Devis signé ») ou l'accusé de réception d'une
   rétractation n'a pas pu partir (quota d'e-mails atteint, panne de Resend), le dossier s'affiche « E-mail à
   renvoyer » et un bandeau en tête de la fiche propose « Renvoyer ». Ces deux e-mails sont des obligations
-  légales : les renvoyer sans attendre. Le client, lui, a vu sur la page qu'il le recevrait plus tard. Tant que
-  l'accusé d'une rétractation reste à renvoyer, un nouveau devis est refusé ; une confirmation restée à renvoyer
-  disparaît d'elle-même si le client se rétracte ou si un nouveau devis est envoyé.
-- **Devis** : choisir le PDF, le montant à payer à la signature (acompte ou total) et son libellé, puis
-  « Envoyer le devis au client ». Le dossier passe à « Validation de votre devis » ; le client reçoit le devis en
-  pièce jointe et un bouton « Lire et signer mon devis », valable 30 jours (un particulier, aussi l'information sur
-  la rétractation et le formulaire type). Si l'e-mail n'a pas pu partir, la fiche le dit et donne le lien de
-  signature, à lui transmettre. Il signe sur une page du site, sans se
-  connecter : nom, date, adresse IP, navigateur et empreinte du PDF sont enregistrés. Un particulier ne peut signer
-  qu'après avoir coché la case qui demande le démarrage de la mission avant la fin du délai de rétractation (la
+  légales : les renvoyer sans attendre. Le client, lui, a vu sur la page qu'il le recevrait plus tard. L'accusé d'une
+  rétractation est aussi à renvoyer quand il n'est parti que vers l'une de ses deux adresses (celle du dossier, et
+  l'autre adresse donnée sur le formulaire du site) : « Renvoyer » l'envoie de nouveau aux deux. Tant que l'accusé
+  d'une rétractation reste à renvoyer, un nouveau devis est refusé ; une confirmation restée à renvoyer disparaît
+  d'elle-même si le client se rétracte ou si un nouveau devis est envoyé.
+- **Devis** : choisir le PDF (15 Mo au plus, conditions générales comprises : voir « À savoir »), le montant à payer à
+  la signature (acompte ou total) et son libellé, puis « Envoyer le devis au client ». Le dossier passe à « Validation
+  de votre devis » ; le client reçoit le devis en pièce jointe, un bouton « Lire et signer mon devis »,
+  valable 30 jours, et la phrase « Nos conditions générales figurent à la fin du devis. ». Si l'e-mail n'a pas pu
+  partir, la fiche le dit et donne le lien de signature, à lui transmettre. Il signe sur une page du site, sans se
+  connecter : nom, date, adresse IP, navigateur et empreinte du PDF sont enregistrés ; juste au-dessus du bouton, la
+  page indique « En signant, vous acceptez nos conditions générales, jointes au devis. ». Un particulier ne peut
+  signer qu'après avoir coché la case qui demande le démarrage de la mission avant la fin du délai de rétractation (la
   fiche indique la date de cette demande, sous « Démarrage anticipé »). Le dossier passe alors à « Paiement » et le
   client reçoit la confirmation du contrat : devis signé, coordonnées et référence du virement et, pour un
-  particulier, l'information sur la rétractation, le formulaire type et le lien « Renoncer au contrat ici ».
+  particulier, la confirmation de sa demande de démarrage, qui cite la case cochée.
   Chaque envoi crée un nouveau fichier `devis-<numéro>-<AAMMJJHHMMSS>.pdf` : un devis signé n'est jamais remplacé.
   Les versions précédentes restent visibles par le client dans « Documents de l'agence » ; seule la dernière est à
   signer (le lien d'une version précédente ne fonctionne plus). Un nouvel envoi annule la signature en cours, et
@@ -651,15 +690,19 @@ par e-mail. Dans la fiche d'un dossier, relue seule toutes les 30 secondes et qu
   demande, une validation précédente ne compte plus (pareil après une demande du service instructeur, avec l'option
   de suivi).
 - **Rétractation** (client particulier) : pendant 14 jours après la signature, prolongés jusqu'au premier jour
-  ouvrable si le dernier tombe un samedi, un dimanche ou un jour férié, le client peut renoncer au contrat avec le
-  lien « Renoncer au contrat ici » (e-mail de confirmation, page de signature, espace client). Il reçoit un accusé
-  de réception, toi « Rétractation — dossier … », et le dossier s'affiche « Rétractation reçue » parmi les dossiers
-  à traiter, même s'il était déjà clos (rétractation reçue après la clôture) ; l'étape ne change pas. Arrêter la
-  mission ; si un virement a été reçu, rembourser le client dans les 14 jours, déduction faite du travail déjà
-  réalisé. Le dossier peut ensuite être classé (« Passer ici » sur « Dossier clos » ; déjà clos : « Passer ici » sur
-  l'étape précédente, puis sur « Dossier clos ») : plus aucun e-mail de mission ne part à un client qui a renoncé.
-  Une rétractation reçue par lettre, par e-mail ou dans la discussion vaut autant : voir « À savoir » et « En
-  dépannage ».
+  ouvrable si le dernier tombe un samedi, un dimanche ou un jour férié, le client peut renoncer au contrat sur le
+  formulaire de rétractation du site, https://atomes.studio/renoncer/, sans se connecter (lien « Renoncer au contrat
+  ici » en bas de l'espace client et de la page de signature ; aucun e-mail ne le contient). Il y saisit ses nom et
+  prénom, le numéro du dossier et l'adresse e-mail de sa demande, qui désignent le contrat, et peut donner une autre
+  adresse pour l'accusé de réception. Si le numéro et l'adresse ne désignent pas le devis signé d'un particulier, la
+  page oppose un seul et même refus, qui renvoie à contact@ : rien n'est enregistré ni envoyé. Sinon, il reçoit un
+  accusé de réception (aussi à l'autre adresse), toi « Rétractation — dossier … » (« par le formulaire du site »), et
+  le dossier s'affiche « Rétractation reçue » parmi les dossiers à traiter, même s'il était déjà clos (rétractation
+  reçue après la clôture) ; l'étape ne change pas. Arrêter la mission ; si un virement a été reçu, rembourser le
+  client dans les 14 jours, déduction faite du travail déjà réalisé. Le dossier peut ensuite être classé (« Passer
+  ici » sur « Dossier clos » ; déjà clos : « Passer ici » sur l'étape précédente, puis sur « Dossier clos ») : plus
+  aucun e-mail de mission ne part à un client qui a renoncé. Une rétractation reçue par lettre, par e-mail ou dans la
+  discussion vaut autant : voir « À savoir » et « En dépannage ».
 - **Suivi administratif** : cocher la case pour faire apparaître les étapes 8 à 10 chez le client, puis faire
   avancer le dossier avec « Passer ici ». Un e-mail part au client quand le dossier avance vers les documents à
   valider, le dossier déposé, la démarche validée ou le dossier clos. Sur un dossier clos qui n'est pas passé
@@ -699,26 +742,27 @@ par e-mail. Dans la fiche d'un dossier, relue seule toutes les 30 secondes et qu
   après 10 essais ratés, le moteur le laisse de côté et ses pièces sont à ranger à la main. Journal :
   `%LOCALAPPDATA%\AtomesMoteur\journal\moteur.log`.
 - **Un e-mail légal n'est pas parti** (fiche « E-mail à renvoyer ») : « Renvoyer » dans le bandeau de la fiche. Si
-  l'envoi échoue encore (quota de Resend atteint pour la journée), réessayer le lendemain, ou écrire au client
-  depuis ta messagerie : confirmation du contrat = devis signé en pièce jointe, date de signature, coordonnées et
-  référence du virement, et pour un particulier l'information sur la rétractation et le formulaire type (textes de
-  l'e-mail « Devis signé ») ; accusé de rétractation = nom, numéro de dossier, date de signature du devis, date et
-  heure de réception de la rétractation (fiche, « Devis, signature et paiement »). La mention reste dans la fiche
-  jusqu'à un renvoi réussi par « Renvoyer ».
+  l'envoi échoue encore (quota de Resend atteint pour la journée), réessayer le lendemain, ou écrire au client depuis
+  ta messagerie : confirmation du contrat = devis signé en pièce jointe, date de signature, coordonnées et référence
+  du virement, et pour un particulier la confirmation de sa demande de démarrage, qui cite la case cochée (textes de
+  l'e-mail « Devis signé ») ; accusé de rétractation = nom, numéro de dossier, adresse e-mail de la demande et, s'il y
+  en a une, autre adresse pour l'accusé, date de signature du devis, date et heure de réception de la rétractation
+  (fiche, « Devis, signature et paiement »). La mention reste dans la fiche jusqu'à un renvoi réussi par « Renvoyer ».
 - **L'e-mail d'un message au client n'est pas parti** (badge « E-mail non parti » sous le message, dossier « E-mail
   non parti » dans la liste) : « Renvoyer l'e-mail » sous le message. S'il échoue encore (quota de Resend atteint pour
   la journée), réessayer le lendemain : le message est déjà dans la discussion, seul l'e-mail manque. Un envoi resté
   « Envoi en cours » plus de 10 minutes (fonction interrompue) se renvoie de la même façon.
 - **Un client demande un nouveau lien** (« Ce lien a expiré ») : pour signer, renvoyer le devis depuis l'espace
   agence (même PDF, même montant) ; pour valider, « Passer ici » sur « Production de vos documents », puis
-  « Documents prêts : demander la validation ». Un nouvel e-mail part avec un nouveau lien. Le lien de
-  rétractation, lui, expire avec le délai.
-- **Rétractation reçue par lettre, par e-mail ou dans la discussion** : elle vaut autant que le lien, si elle est
-  claire. En accuser réception au client depuis l'espace agence, tout de suite (un message de la discussion, qui
-  part par e-mail ; pas la case « Déjà envoyé depuis ma messagerie »), en reprenant la date et l'heure de son envoi ;
-  arrêter la mission ; puis l'enregistrer : Table Editor → `projets` → le dossier → `retracte_le` (date et heure de
-  réception) et `retracte_nom`. La fiche et l'espace client l'affichent alors. Le texte de cet accusé est à faire
-  valider par l'Ordre (« À savoir »).
+  « Documents prêts : demander la validation ». Un nouvel e-mail part avec un nouveau lien. Pour renoncer au contrat,
+  il n'y a pas de lien à renvoyer : le formulaire du site (https://atomes.studio/renoncer/) reste ouvert pendant tout
+  le délai ; les anciens liens de rétractation, envoyés par les e-mails d'avant cette mise à jour, expirent avec lui.
+- **Rétractation reçue par lettre, par e-mail ou dans la discussion** : elle vaut autant que le formulaire du site, si
+  elle est claire. En accuser réception au client depuis l'espace agence, tout de suite (un message de la discussion,
+  qui part par e-mail ; pas la case « Déjà envoyé depuis ma messagerie »), en reprenant la date et l'heure de son
+  envoi ; arrêter la mission ; puis l'enregistrer : Table Editor → `projets` → le dossier → `retracte_le` (date et
+  heure de réception) et `retracte_nom`. La fiche et l'espace client l'affichent alors. Le texte de cet accusé est à
+  faire valider par l'Ordre (« À savoir »).
 - **Modifier les étapes ou leurs textes** : Table Editor → `modele_etapes` (pour les nouveaux dossiers) et
   `etapes` (pour un dossier existant, colonne `note` pour une précision visible par le client). Les étapes des
   dossiers créés avant le parcours v2 sont archivées dans `etapes_v1`.
@@ -743,17 +787,27 @@ par e-mail. Dans la fiche d'un dossier, relue seule toutes les 30 secondes et qu
 
 - **À faire valider par l'Ordre des architectes avant d'envoyer un devis à un particulier** :
   - les textes juridiques du parcours, repris mot pour mot dans la fonction `espace`, qui les place dans les
-    e-mails et sur la page de signature : la case de démarrage anticipé, et le choix de la rendre obligatoire pour
-    signer ; le bouton « Signer et commander avec obligation de paiement » ; l'information sur la rétractation ;
-    le formulaire type de rétractation ; la page « Renoncer au contrat » (nom, e-mail, bouton « Confirmer la
-    rétractation », accusé de réception), qui répond à l'obligation d'une fonction de rétractation en ligne pour
-    les contrats conclus en ligne (depuis juin 2026) ;
+    e-mails et sur la page de signature : la case de démarrage anticipé (texte corrigé le 22 octobre 2026, le même
+    qu'à l'article 11.4 des conditions générales), et le choix de la rendre obligatoire pour signer ; le bouton
+    « Signer et commander avec obligation de paiement » ; la phrase « En signant, vous acceptez nos conditions
+    générales, jointes au devis. », au-dessus du bouton ; la phrase de l'e-mail « Devis signé » qui cite la case
+    cochée ; le formulaire de rétractation du site (https://atomes.studio/renoncer/ : nom et prénom, numéro de
+    dossier, adresse e-mail de la demande, autre adresse pour l'accusé, bouton « Confirmer la rétractation », phrase
+    sur le travail déjà réalisé, refus, accusé de réception), qui répond à l'obligation d'une fonction de
+    rétractation en ligne pour les contrats conclus en ligne (depuis juin 2026) ;
+  - trois choix de ce formulaire (décisions du 21 octobre 2026) : le lien « Renoncer au contrat ici » en bas de
+    l'espace client, de la page de signature et du formulaire seulement (ni dans les e-mails, ni sur les pages du
+    site vitrine) ; l'adresse e-mail du dossier exigée pour reconnaître le contrat (une autre adresse reçoit le
+    refus, qui renvoie à contact@) ; la retenue du travail déjà réalisé, rappelée sous le bouton (« Si vous avez
+    demandé que la mission commence avant la fin du délai, un montant proportionné au travail déjà réalisé reste
+    dû. », comme la case corrigée le 22 octobre et l'article 11.5 des conditions générales) ;
   - le médiateur de la consommation : obligatoire avec un particulier ; à désigner (l'Ordre en propose un à ses
     inscrits : à confirmer auprès de lui), puis à indiquer sur le devis, les conditions générales (CGV) et le site ;
-  - le devis et les CGV : à compléter (attestation d'assurance, missions, rémunération) et à accorder avec le
-    parcours (délai de rétractation, démarrage anticipé, virement avec la référence du dossier). L'information sur
-    la rétractation doit être donnée avant la signature avec le formulaire type : l'e-mail « Votre devis est prêt »
-    et la page de signature d'un particulier les montrent ; les mettre aussi dans le devis ou les CGV ;
+  - le devis et les conditions générales : à compléter (attestation d'assurance, missions, rémunération, et les
+    « [À COMPLÉTER] » des conditions générales rédigées le 21 octobre 2026) et à accorder avec le parcours (délai de
+    rétractation, démarrage anticipé, virement avec la référence du dossier). L'information sur la rétractation et
+    le formulaire type ne sont plus donnés qu'en annexes des conditions générales, à la fin de chaque devis (voir
+    plus bas) ;
   - le devis signé chez le client, en ta présence : c'est un contrat « hors établissement », avec d'autres règles
     (notamment aucun paiement pendant 7 jours) : à vérifier avant de faire signer lors d'un rendez-vous chez lui ;
   - le texte de l'accusé de réception d'une rétractation reçue par lettre, par e-mail ou dans la discussion (point
@@ -761,6 +815,13 @@ par e-mail. Dans la fiche d'un dossier, relue seule toutes les 30 secondes et qu
 - Une rétractation peut aussi arriver dans la discussion ou par e-mail : elle vaut si elle est claire. Accuses-en
   réception tout de suite depuis l'espace agence (un message de la discussion part par e-mail), en reprenant la date
   et l'heure de son envoi. Arrête la mission, puis enregistre-la (« En dépannage »).
+- **Chaque devis doit contenir les conditions générales**, avec l'information sur la rétractation et le formulaire
+  type (annexes 1 et 2) : c'est là seulement que le client particulier les reçoit (l'e-mail « Votre devis est prêt »
+  dit seulement « Nos conditions générales figurent à la fin du devis. », et la page de signature ne les montre plus).
+  Sans elles, le délai de rétractation est prolongé de 12 mois (article L221-20 du code de la consommation). Le devis
+  est toujours joint aux e-mails « Votre devis est prêt » et « Devis signé » (support durable) : 15 Mo au plus.
+  L'espace agence et la fonction refusent un PDF plus lourd (« Devis trop lourd (15 Mo au plus)… ») : l'alléger,
+  puis l'envoyer de nouveau.
 - Une réponse écrite depuis ta messagerie part au client mais n'entre pas dans la discussion : recopie-la dans
   l'espace agence avec la case « Déjà envoyé depuis ma messagerie » (aucun e-mail ne repart).
 - Offre gratuite Supabase : un projet inactif pendant 7 jours est mis en pause (l'espace client ne répond
@@ -784,7 +845,12 @@ par e-mail. Dans la fiche d'un dossier, relue seule toutes les 30 secondes et qu
   par 24 heures, et les mêmes 200 Mo par dossier (au-delà, la page lui demande de t'écrire à contact@) ; un seul envoi
   à la fois par dossier (un second envoi simultané, depuis un autre onglet par exemple, reçoit « Un envoi est déjà en
   cours : réessayez dans quelques secondes. »), pour que ces limites tiennent. Elles évitent qu'un afflux de messages
-  remplisse la base et le stockage.
+  remplisse la base et le stockage. Le formulaire de rétractation du site n'a pas de limite (choix
+  du 21 octobre 2026) : un refus n'enregistre et n'envoie rien, et une rétractation n'est enregistrée qu'une fois.
+  Revers relevé le 22 octobre 2026, risque accepté le 23 octobre 2026 : le numéro de dossier (date et heure de la
+  demande) se devine, et quelqu'un qui connaît l'adresse e-mail d'un client peut essayer tous les numéros d'une
+  journée, jusqu'à rétracter son contrat. Le client reçoit alors un accusé de réception qu'il n'a pas demandé : s'il
+  te le signale, préviens Claude pour annuler la rétractation enregistrée.
 - Ne jamais activer le CAPTCHA de Supabase (Authentication → Attack Protection) sans la modification du site qui va
   avec : la demande de code serait refusée et plus personne ne pourrait se connecter, toi compris.
 - Un e-mail « Votre code de connexion » reçu à contact@ sans l'avoir demandé veut dire que quelqu'un a tapé cette
@@ -800,11 +866,12 @@ par e-mail. Dans la fiche d'un dossier, relue seule toutes les 30 secondes et qu
   messagerie, chez LWS. En revanche, les messages écrits par un client dans son espace y passent en entier, dans
   l'avis envoyé à contact@, ainsi que tes messages au client, pièces jointes comprises). Pour le RGPD : mentionner
   dans les mentions légales l'espace client, la discussion (messages, photos et PDF envoyés depuis l'espace client,
-  conservés avec le dossier), les e-mails envoyés (Resend), la durée de conservation et, pour la signature du devis
-  et la rétractation, la conservation de l'adresse IP et du navigateur (preuve) ; supprimer les dossiers à la
-  demande (Table Editor, la suppression du projet supprime sa timeline, ses étapes clés, sa discussion, ses
-  questions, ses demandes de modification et son archive ; les fichiers sont à supprimer dans Storage, sous-dossiers
-  `client` et `agence` avec `agence/discussion`, et le compte dans Authentication → Users).
+  conservés avec le dossier), les e-mails envoyés (Resend), le formulaire de rétractation du site (nom, numéro de
+  dossier, adresses saisies), la durée de conservation et, pour la signature du devis et la rétractation, la
+  conservation de l'adresse IP et du navigateur (preuve) ; supprimer les dossiers à la demande (Table Editor, la
+  suppression du projet supprime sa timeline, ses étapes clés, sa discussion, ses questions, ses demandes de
+  modification et son archive ; les fichiers sont à supprimer dans Storage, sous-dossiers `client` et `agence` avec
+  `agence/discussion`, et le compte dans Authentication → Users).
 - Les sauvegardes quotidiennes de la base sont incluses dans l'offre Pro. En gratuit, exporter de temps en
   temps : Table Editor → `projets` → Export (CSV), idem pour `etapes`, `evenements`, `messages`, `questions` et
   `modifications` ; les fichiers se téléchargent depuis Storage.
@@ -816,7 +883,8 @@ par e-mail. Dans la fiche d'un dossier, relue seule toutes les 30 secondes et qu
   Yousign, pas d'abonnement). La date, le nom saisi, l'adresse IP (celle que transmet la plateforme, suivie de la
   chaîne X-Forwarded-For complète quand elle contient d'autres valeurs), le navigateur, le montant et l'empreinte
   SHA-256 du PDF signé sont conservés dans le dossier et envoyés par e-mail à l'agence ; pour un particulier,
-  aussi la case cochée (texte exact et date). Le client reçoit par e-mail la confirmation du contrat : le devis,
-  la date, son nom et l'empreinte. La signature porte sur la version et le montant affichés au client : si un
-  nouveau devis est envoyé entre-temps, elle est refusée, et le client doit utiliser le lien du dernier e-mail.
+  aussi la case cochée (texte exact et date). Le client reçoit par e-mail la confirmation du contrat : le devis, la
+  date, son nom et l'empreinte, et pour un particulier la confirmation de sa demande de démarrage, qui cite la case
+  cochée. La signature porte sur la version et le montant affichés au client : si un nouveau devis est envoyé
+  entre-temps, elle est refusée, et le client doit utiliser le lien du dernier e-mail.
 - Avis clients : en suspens (pas encore de fiche Google). L'étape « Dossier clos » n'a pas encore de bouton.
